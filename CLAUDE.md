@@ -16,14 +16,26 @@ The original C++ implementation is located in the `CLIService/` subdirectory and
 
 ```bash
 # Standard development
-cargo build                    # Debug build
+cargo build                    # Debug build (all default features)
 cargo build --release          # Release build
 cargo test                     # Run all tests
 cargo test <test_name>         # Run specific test
 cargo run --example basic      # Run basic example
 
+# Feature configuration
+cargo build --all-features                         # All optional features enabled
+cargo build --no-default-features                  # Minimal build (no auth, no completion)
+cargo build --features authentication              # Authentication only
+cargo build --features completion                  # Tab completion only
+cargo build --features "authentication,completion" # Explicit feature combination
+
 # Embedded target (Raspberry Pi Pico)
-cargo build --target thumbv6m-none-eabi --release
+cargo build --target thumbv6m-none-eabi --release  # Full-featured embedded build
+cargo build --target thumbv6m-none-eabi --release --no-default-features  # Minimal embedded
+
+# Size optimization
+cargo build --target thumbv6m-none-eabi --release --no-default-features --features authentication
+cargo size --release -- -A                         # Measure binary size
 ```
 
 ## Core Architectural Decisions

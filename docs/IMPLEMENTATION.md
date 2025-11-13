@@ -115,7 +115,7 @@ This document tracks the implementation phases for porting CLIService from C++ t
 ---
 
 ### Phase 5: Tab Completion
-**Goal**: Smart command/path completion
+**Goal**: Smart command/path completion (optional feature)
 
 **Tasks**:
 1. Implement in `tree/completion.rs`:
@@ -125,16 +125,30 @@ This document tracks the implementation phases for porting CLIService from C++ t
    - Handle partial path completion (`sys/de<TAB>` → `system/debug`)
    - Port logic from C++ `PathCompleter` (229 lines, header-only)
 
-2. Tests for completion scenarios:
+2. Implement feature gating:
+   - Add `completion` feature flag to Cargo.toml
+   - Add `#[cfg(feature = "completion")]` conditional compilation to module
+   - Implement dual `handle_tab()` methods (enabled/disabled versions)
+   - Ensure `Response` type supports completion when feature enabled
+   - Update parser to handle tab key appropriately when feature disabled
+
+3. Tests for completion scenarios:
    - Single match completion
    - Multiple match display
    - No matches
    - Directory vs command completion
+   - Test builds with feature enabled/disabled
+   - Verify no_std compliance with feature disabled
+   - Measure code size impact (should be ~2KB)
 
 **C++ Reference**:
 - `PathCompleter.hpp` (229 lines)
 
-**Success Criteria**: Tab completion works for partial names with proper directory handling
+**Success Criteria**:
+- Tab completion works for partial names with proper directory handling
+- Feature can be disabled via `--no-default-features` flag
+- Graceful degradation when completion disabled
+- Code size savings measurable (~2KB)
 
 ---
 
@@ -219,13 +233,14 @@ This document tracks the implementation phases for porting CLIService from C++ t
    - Track current location (path stack of indices)
    - Store parser, history, current user
    - Process characters → requests → responses
-   - Implement global commands (cd, ls, help, pwd, history, logout, etc.)
+   - Implement global commands: `?` (context help), `help` (global help), `logout` (auth feature), `clear` (optional)
    - Command execution with access control
-   - Path resolution for navigation
-   - Tab completion integration
-   - History navigation integration
-   - Prompt generation
+   - Path resolution for navigation (absolute and relative paths)
+   - Tab completion integration (feature-gated)
+   - History navigation integration (arrow keys)
+   - Prompt generation (username@path format)
    - Port orchestration from C++ `CLIService.cpp` (~589 lines)
+   - Note: No `cd`, `ls`, `pwd`, or `tree` commands per syntax design (see ARCHITECTURE.md)
 
 2. Integration tests with mock I/O:
    - Login flow
