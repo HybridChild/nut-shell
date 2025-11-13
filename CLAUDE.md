@@ -4,13 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository contains a Rust port of CLIService, a lightweight library for adding a flexible command-line interface to embedded systems. The implementation targets no_std environments with static allocation, specifically designed for platforms like the Raspberry Pi Pico (RP2040).
+This repository contains a Rust port of cli-service, a lightweight library for adding a flexible command-line interface to embedded systems. The implementation targets no_std environments with static allocation, specifically designed for platforms like the Raspberry Pi Pico (RP2040).
 
-The original C++ implementation is located in the `CLIService/` subdirectory and serves as the functional specification.
+**Note:** The original C++ implementation was located in the `CLIService/` subdirectory. All necessary behavioral specifications have been extracted and documented in `docs/SPECIFICATION.md`, so the C++ directory is no longer required as a reference.
 
 **Key Documentation:**
-- **ARCHITECTURE.md**: Design decisions, rationale, and comparison with C++ implementation
-- **IMPLEMENTATION.md**: Phased implementation plan and current status tracking (temporary, will be archived)
+- **docs/SPECIFICATION.md**: Complete behavioral specification derived from C++ implementation
+- **docs/ARCHITECTURE.md**: Design decisions, rationale, and comparison with C++ implementation
+- **docs/IMPLEMENTATION.md**: Phased implementation plan and current status tracking (temporary, will be archived)
+- **docs/SECURITY.md**: Authentication, access control, and security design
 
 ## Common Build Commands
 
@@ -109,21 +111,16 @@ const TREE: &[Node] = &[
 ];
 ```
 
-## C++ Reference Implementation
+## Differences from C++ Implementation
 
-The original C++ implementation is located in `CLIService/` subdirectory:
+The Rust port maintains behavioral compatibility while leveraging Rust idioms:
 
-```bash
-cd CLIService
-sh configureCMake.sh  # First time setup
-sh build.sh           # Build library and examples
-sh runTests.sh        # Run test suite
-```
+**Key differences:**
+- C++ uses virtual inheritance for polymorphism → Rust uses `Node` enum with pattern matching
+- C++ uses parent pointers for navigation → Rust uses path stack (indices vector)
+- C++ allocates commands/directories dynamically → Rust uses static const initialization
+- C++ uses `std::variant` for static/dynamic nodes → Rust uses single allocation pattern
 
-C++ codebase serves as functional specification. Key differences:
-- C++ uses virtual inheritance for polymorphism (Rust uses enums)
-- C++ uses parent pointers for navigation (Rust uses path stack)
-- C++ allocates commands/directories dynamically (Rust uses static const)
-- C++ uses `std::variant` for static/dynamic nodes (Rust uses single pattern)
+**Behavioral specification:** See `docs/SPECIFICATION.md` for complete behavioral details extracted from the C++ implementation.
 
-Refer to `CLIService/README.md` for detailed C++ architecture documentation.
+**Architectural decisions:** See `docs/ARCHITECTURE.md` for rationale behind structural choices and comparisons with C++.

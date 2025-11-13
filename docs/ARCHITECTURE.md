@@ -1,6 +1,6 @@
-# CLIService Rust Port - Architecture
+# cli-service Rust Port - Architecture
 
-This document records the architectural decisions made when porting CLIService from C++ to Rust. It explains the rationale behind structural choices and documents alternatives considered.
+This document records the architectural decisions made when porting cli-service from C++ to Rust. It explains the rationale behind structural choices and documents alternatives considered.
 
 **Key Principle**: Port C++ *behavior*, not *structure*.
 
@@ -256,6 +256,7 @@ src/
 
 ## References
 
-- C++ implementation: `CLIService/` subdirectory
-- Implementation tracking: `IMPLEMENTATION.md`
-- Working guidance: `CLAUDE.md`
+- **SPECIFICATION.md**: Complete behavioral specification (extracted from C++ implementation)
+- **IMPLEMENTATION.md**: Implementation tracking and phased development plan
+- **SECURITY.md**: Authentication, access control, and security design
+- **CLAUDE.md**: Working patterns and practical implementation guidance

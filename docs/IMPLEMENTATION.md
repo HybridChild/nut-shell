@@ -1,4 +1,4 @@
-# CLIService Rust Port - Implementation Plan
+# cli-service Rust Port - Implementation Plan
 
 **Status**: Planning Complete - Ready to Implement
 **Last Updated**: 2025-11-09
@@ -6,7 +6,7 @@
 
 ## Overview
 
-This document tracks the implementation phases for porting CLIService from C++ to Rust. The port prioritizes **idiomatic Rust patterns** over structural similarity to the C++ codebase, while maintaining functional equivalence.
+This document tracks the implementation phases for porting cli-service from C++ to Rust. The port prioritizes **idiomatic Rust patterns** over structural similarity to the C++ codebase, while maintaining functional equivalence.
 
 **Key Principle**: Port C++ *behavior*, not *structure*.
 

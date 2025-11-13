@@ -2,7 +2,7 @@
 
 ## Authentication & Access Control Security Design
 
-This document describes the security architecture for authentication and access control in the Rust CLIService implementation, including rationale, implementation patterns, and best practices for embedded systems.
+This document describes the security architecture for authentication and access control in the Rust cli-service implementation, including rationale, implementation patterns, and best practices for embedded systems.
 
 ---
 
@@ -1280,5 +1280,5 @@ If your threat model requires stronger protections:
 
 **Document Status:** Draft
 **Last Updated:** 2025-11-09
-**Author:** CLIService Rust Port Team
+**Author:** cli-service Rust Port Team
 **Review Status:** Pending Security Review
