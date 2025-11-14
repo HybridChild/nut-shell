@@ -8,46 +8,15 @@ This document describes the security architecture for authentication and access 
 
 ## Table of Contents
 
-1. [Current C++ Implementation Analysis](#current-c-implementation-analysis)
-2. [Security Vulnerabilities & Concerns](#security-vulnerabilities--concerns)
-3. [Rust Implementation Security Design](#rust-implementation-security-design)
-4. [Password Hashing](#password-hashing)
-5. [Credential Storage Options](#credential-storage-options)
-6. [Access Control System](#access-control-system)
-7. [Feature Gating](#feature-gating)
-8. [Implementation Patterns](#implementation-patterns)
-9. [Migration Guide](#migration-guide)
-10. [Testing & Validation](#testing--validation)
-11. [Security Assumptions](#security-assumptions)
-
----
-
-## Current C++ Implementation Analysis
-
-### Authentication Flow
-
-The C++ implementation uses a simple username/password authentication system:
-
-```cpp
-// From CLIService/cliService/example/main.cpp
-std::vector<User> users {
-    {"admin", "admin123", AccessLevel::Admin},
-    {"user", "user123", AccessLevel::User}
-};
-```
-
-**Login Process:**
-1. User enters `username:password` (e.g., `admin:secretpass`)
-2. Password characters are masked with `*` after colon is detected
-3. System searches user vector for exact string match
-4. On success: user logged in, state changes to `LoggedIn`
-5. On failure: error message displayed, remains in `LoggedOut` state
-
-**Access Control:**
-- Each node (command/directory) has an `AccessLevel`
-- User's level must be >= node's level
-- Validation checks entire path from target node to root
-- Access denied if any node in path requires higher privileges
+1. [Security Vulnerabilities & Concerns](#security-vulnerabilities--concerns)
+2. [Rust Implementation Security Design](#rust-implementation-security-design)
+3. [Password Hashing](#password-hashing)
+4. [Credential Storage Options](#credential-storage-options)
+5. [Access Control System](#access-control-system)
+6. [Implementation Patterns](#implementation-patterns)
+7. [Migration Guide](#migration-guide)
+8. [Testing & Validation](#testing--validation)
+9. [Security Assumptions](#security-assumptions)
 
 ---
 
@@ -516,346 +485,22 @@ const ROOT: &[Node<MyAccessLevel>] = &[
 
 ---
 
-## Feature Gating & Optional Features
+## Authentication Feature Gating
 
-### Overview
+Authentication can be disabled via Cargo features for unsecured development environments. When disabled, all access control checks are eliminated and all commands are accessible.
 
-The Rust implementation provides optional features that can be enabled or disabled at compile time to accommodate different deployment scenarios and resource constraints. This allows fine-grained control over code size, dependencies, and functionality.
+For detailed feature configuration patterns, conditional compilation examples, and build instructions, see the "Feature Gating & Optional Features" section in ARCHITECTURE.md.
 
-**Available Optional Features:**
-- **authentication**: User login and access control system (default: enabled)
-- **completion**: Tab completion for commands and paths (default: enabled)
-
-**Philosophy:**
-- Features are enabled by default for best user experience
-- Can be disabled individually or in combination for constrained environments
-- No runtime overhead when disabled (eliminated at compile time)
-- Graceful degradation when features are unavailable
-
----
-
-### Authentication Feature
-
-#### Cargo.toml Configuration
-
-```toml
-[features]
-default = ["authentication"]
-
-# Core authentication system
-authentication = []
-
-# Flash storage provider (requires RP2040)
-flash-storage = ["authentication", "rp2040-flash"]
-
-# Optional: Additional providers
-ldap-auth = ["authentication", "ldap3"]
-external-auth = ["authentication"]
-
-[dependencies]
-heapless = "0.8"
-
-# Conditional dependencies
-sha2 = { version = "0.10", default-features = false, optional = true }
-rp2040-flash = { version = "0.3", optional = true }
-```
-
-#### Conditional Compilation
-
-```rust
-// src/lib.rs
-#[cfg(feature = "authentication")]
-pub mod auth;
-
-#[cfg(feature = "authentication")]
-pub use auth::{User, AccessLevel, CredentialProvider};
-
-// src/cli/mod.rs
-pub struct CliService<'tree, L, IO>
-where
-    L: AccessLevel,
-    IO: CharIo,
-{
-    #[cfg(feature = "authentication")]
-    current_user: Option<User<L>>,
-
-    #[cfg(feature = "authentication")]
-    credential_provider: &'tree dyn CredentialProvider<L>,
-
-    #[cfg(feature = "authentication")]
-    state: CliState,
-
-    // ... other fields
-}
-
-#[cfg(feature = "authentication")]
-impl<'tree, L, IO> CliService<'tree, L, IO> {
-    pub fn login(&mut self, username: &str, password: &str) -> Result<(), CliError> {
-        // Authentication logic
-    }
-}
-
-#[cfg(not(feature = "authentication"))]
-impl<'tree, L, IO> CliService<'tree, L, IO> {
-    // No-op login (always succeeds)
-    pub fn login(&mut self, _username: &str, _password: &str) -> Result<(), CliError> {
-        Ok(())
-    }
-
-    // Access control always allows
-    fn validate_access(&self, _node: &Node<L>) -> Result<(), CliError> {
-        Ok(())
-    }
-}
-```
-
-#### Build Examples
-
+**Quick Reference:**
 ```bash
-# Default build (authentication enabled)
+# With authentication (default)
 cargo build
 
-# Disable authentication for debugging
+# Without authentication
 cargo build --no-default-features
 
-# Production build with flash storage
-cargo build --release --features flash-storage
-
-# Embedded target
-cargo build --target thumbv6m-none-eabi --release --features flash-storage
+# See ARCHITECTURE.md for complete configuration options
 ```
-
----
-
-### Auto-Completion Feature
-
-Tab completion is an optional feature that provides interactive command and path completion. While it enhances user experience significantly, it can be disabled to reduce code size in severely constrained embedded environments or when only programmatic/scripted CLI access is expected.
-
-#### Cargo.toml Configuration
-
-```toml
-[features]
-default = ["authentication", "completion"]
-
-# Core authentication system
-authentication = []
-
-# Tab completion for commands and paths
-completion = []
-
-[dependencies]
-heapless = "0.8"
-
-# No additional dependencies required for completion
-# (uses only core Rust and heapless for bounded collections)
-```
-
-#### Code Size Impact
-
-| Build Configuration | Flash Usage | RAM Impact | Use Case |
-|---------------------|-------------|------------|----------|
-| **With completion** | +~2KB | Temporary only (stack) | Interactive CLI usage |
-| **Without completion** | Baseline | None | Scripted/programmatic access |
-
-**Memory Characteristics:**
-- Completion algorithm is stateless (no persistent RAM usage)
-- Temporary allocations during tab processing only
-- Uses `heapless::Vec` for bounded match results
-- All completion code placed in ROM
-- Estimated compiled size: 1.5-2.5KB depending on optimization level
-
-#### Conditional Compilation
-
-```rust
-// src/tree/mod.rs
-#[cfg(feature = "completion")]
-pub mod completion;
-
-#[cfg(feature = "completion")]
-pub use completion::{CompletionResult, complete_path};
-
-// src/cli/mod.rs
-pub struct CliService<'tree, L, IO>
-where
-    L: AccessLevel,
-    IO: CharIo,
-{
-    #[cfg(feature = "completion")]
-    last_completion: Option<CompletionResult>,
-
-    // ... other fields
-}
-
-// Tab key handling with dual implementation
-#[cfg(feature = "completion")]
-impl<'tree, L, IO> CliService<'tree, L, IO> {
-    fn handle_tab(&mut self) -> Result<Response, CliError> {
-        // Full completion logic
-        let result = completion::complete_path(
-            &self.input_buffer,
-            self.current_directory(),
-            self.current_user.as_ref().map(|u| &u.access_level)
-        )?;
-
-        // Store for potential re-display
-        self.last_completion = Some(result.clone());
-
-        // Return completion suggestions to user
-        Ok(Response::completion(result))
-    }
-}
-
-#[cfg(not(feature = "completion"))]
-impl<'tree, L, IO> CliService<'tree, L, IO> {
-    fn handle_tab(&mut self) -> Result<Response, CliError> {
-        // Option 1: Silent ignore (recommended for embedded)
-        Ok(Response::empty())
-
-        // Option 2: Echo literal tab character
-        // self.io.put_char('\t')?;
-        // Ok(Response::empty())
-    }
-}
-```
-
-#### Implementation Details
-
-**When completion is enabled:**
-1. Tab key triggers path resolution and prefix matching
-2. Current directory and access level determine visible options
-3. Common prefix auto-completed if unambiguous
-4. Multiple matches displayed for user selection
-5. Directories shown with trailing `/` separator
-
-**When completion is disabled:**
-1. Tab key silently ignored (no action)
-2. All completion code eliminated from binary
-3. Zero runtime overhead
-4. `CompletionResult` type and module not compiled
-
-#### Build Examples
-
-```bash
-# Default build (completion enabled)
-cargo build
-
-# Minimal build without completion
-cargo build --no-default-features --features authentication
-
-# Embedded target with completion
-cargo build --target thumbv6m-none-eabi --release
-
-# Embedded target without completion (maximum size optimization)
-cargo build --target thumbv6m-none-eabi --release \
-  --no-default-features --features authentication
-
-# Testing build without optional features
-cargo build --no-default-features
-
-# Custom feature combination
-cargo build --features "authentication,completion,logging"
-```
-
-#### When to Enable/Disable
-
-**Enable completion when:**
-- ✅ Interactive CLI usage expected (human operators)
-- ✅ Flash size is not critically constrained (<90% capacity)
-- ✅ User experience is a priority
-- ✅ Training/learning environment for new users
-- ✅ Development and debugging workflows
-
-**Disable completion when:**
-- ❌ Flash size is critically constrained (>95% capacity)
-- ❌ Only programmatic/scripted CLI access expected
-- ❌ Minimizing attack surface is required
-- ❌ Every byte counts (bootloader, recovery mode, minimal systems)
-- ❌ No interactive terminal available (headless operation)
-
-**Security Considerations:**
-- Completion reveals available commands/paths to authenticated users
-- Does not bypass access control (respects `AccessLevel`)
-- No sensitive data exposed through completion
-- Minimal attack surface (stateless algorithm)
-- Safe to enable in most security contexts
-
----
-
-### Combined Feature Configuration
-
-Multiple features can be enabled or disabled in combination to suit different deployment scenarios.
-
-#### Common Configuration Patterns
-
-```toml
-# Full-featured build (default)
-[features]
-default = ["authentication", "completion"]
-
-# Minimal embedded (size-optimized)
-[features]
-default = []
-
-# Interactive but unsecured (development only)
-[features]
-default = ["completion"]
-
-# Secured but non-interactive (scripted access)
-[features]
-default = ["authentication"]
-```
-
-#### Build Examples by Scenario
-
-```bash
-# Development workstation (full features, fast iteration)
-cargo build --all-features
-
-# Production embedded device (both features)
-cargo build --target thumbv6m-none-eabi --release
-
-# Constrained device (authentication only, ~2KB saved)
-cargo build --target thumbv6m-none-eabi --release \
-  --no-default-features --features authentication
-
-# Unsecured lab equipment (completion only, for ease of use)
-cargo build --no-default-features --features completion
-
-# Minimal bootloader/recovery (no optional features)
-cargo build --target thumbv6m-none-eabi --release --no-default-features
-
-# CI/CD testing (test all feature combinations)
-cargo test --all-features
-cargo test --no-default-features
-cargo test --features authentication
-cargo test --features completion
-```
-
-#### Feature Dependencies
-
-```
-authentication (independent)
-  ├── No dependencies on other features
-  └── Requires: sha2, subtle (optional crates)
-
-completion (independent)
-  ├── No dependencies on other features
-  └── Requires: No additional crates (uses heapless only)
-
-Note: Features are completely independent and can be
-enabled in any combination without conflicts.
-```
-
-#### Code Size Comparison
-
-| Configuration | Estimated Flash | Use Case |
-|---------------|----------------|----------|
-| `--no-default-features` | Baseline | Absolute minimum |
-| `--features authentication` | Baseline + ~2KB | Secured, non-interactive |
-| `--features completion` | Baseline + ~2KB | Interactive, unsecured |
-| `--features authentication,completion` | Baseline + ~4KB | Full-featured (default) |
-
-*Note: Actual sizes depend on target architecture, optimization level, and LLVM version. Use `cargo size` to measure your specific build.*
 
 ---
 
@@ -945,59 +590,11 @@ fn main() {
 
 ## Migration Guide
 
-### From C++ Hardcoded Credentials
+### Migrating to Secure Credential Storage
 
-#### Step 1: Generate Hashed Credentials
+For production deployments, migrate from hardcoded credentials to flash storage or external authentication:
 
-```bash
-# Use the password hashing tool
-cargo run --bin hash-password -- "admin123"
-# Output: admin:a1b2c3...:d4e5f6...:Admin
-
-cargo run --bin hash-password -- "user123"
-# Output: user:7a8b9c...:1d2e3f...:User
-```
-
-#### Step 2: Set Build-Time Environment
-
-```bash
-# Set environment variable
-export CLI_USERS="admin:a1b2c3...:d4e5f6...:Admin;user:7a8b9c...:1d2e3f...:User"
-
-# Build with hashed credentials
-cargo build --release
-```
-
-#### Step 3: Update C++ Code
-
-**Before (C++):**
-```cpp
-std::vector<User> users {
-    {"admin", "admin123", AccessLevel::Admin},
-    {"user", "user123", AccessLevel::User}
-};
-```
-
-**After (Rust):**
-```rust
-// No hardcoded credentials in source!
-// Loaded from environment at build time
-let provider = BuildTimeProvider::new();
-let service = CliService::new(root, provider, io);
-```
-
-#### Step 4: Remove Plaintext Passwords
-
-```bash
-# Clean version control
-git rm passwords.txt
-git commit -m "Remove hardcoded credentials"
-
-# Audit for exposed credentials
-git log --all --full-history -- "*password*"
-```
-
-### For Production: Migrate to Flash Storage
+#### For Production: Migrate to Flash Storage
 
 ```rust
 // 1. Compile with flash-storage feature
@@ -1274,7 +871,7 @@ If your threat model requires stronger protections:
   - Authentication system design
   - Password hashing approach (SHA-256)
   - Credential storage options
-  - Migration guide from C++ implementation
+  - Secure credential storage migration guide
 
 ---
 

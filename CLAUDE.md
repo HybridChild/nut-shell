@@ -4,123 +4,350 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository contains a Rust port of cli-service, a lightweight library for adding a flexible command-line interface to embedded systems. The implementation targets no_std environments with static allocation, specifically designed for platforms like the Raspberry Pi Pico (RP2040).
+**cli-service** is a lightweight library for adding a flexible command-line interface to embedded systems. The implementation targets **no_std** environments with static allocation, specifically designed for platforms like the Raspberry Pi Pico (RP2040).
 
-**Note:** The original C++ implementation was located in the `CLIService/` subdirectory. All necessary behavioral specifications have been extracted and documented in `docs/SPECIFICATION.md`, so the C++ directory is no longer required as a reference.
+**Current Status:** Architecture complete, implementation in progress (see IMPLEMENTATION.md for roadmap).
 
-**Key Documentation:**
-- **docs/SPECIFICATION.md**: Complete behavioral specification derived from C++ implementation
-- **docs/ARCHITECTURE.md**: Design decisions, rationale, and comparison with C++ implementation
-- **docs/IMPLEMENTATION.md**: Phased implementation plan and current status tracking (temporary, will be archived)
-- **docs/SECURITY.md**: Authentication, access control, and security design
+**Important Note on Design Evolution:**
+The architectural decisions and patterns documented here represent our current best thinking, not immutable requirements. During implementation, if you identify a better design approach or discover issues with the current plan:
+- **Feel free to suggest improvements** - your insights during implementation are valuable
+- **Ask before executing architectural changes** - discuss alternatives before modifying core design decisions
+- **Small improvements are fine** - refining implementation details within the existing architecture doesn't need approval
+- **Documentation is a snapshot** - treat specs as guidance that can evolve, not rigid constraints
 
-## Common Build Commands
+---
 
-```bash
-# Standard development
-cargo build                    # Debug build (all default features)
-cargo build --release          # Release build
-cargo test                     # Run all tests
-cargo test <test_name>         # Run specific test
-cargo run --example basic      # Run basic example
+## Documentation Navigation
 
-# Feature configuration
-cargo build --all-features                         # All optional features enabled
-cargo build --no-default-features                  # Minimal build (no auth, no completion)
-cargo build --features authentication              # Authentication only
-cargo build --features completion                  # Tab completion only
-cargo build --features "authentication,completion" # Explicit feature combination
+**When to consult each document:**
 
-# Embedded target (Raspberry Pi Pico)
-cargo build --target thumbv6m-none-eabi --release  # Full-featured embedded build
-cargo build --target thumbv6m-none-eabi --release --no-default-features  # Minimal embedded
+| Need | Document | What You'll Find |
+|------|----------|------------------|
+| Exact behavior (I/O, auth, commands) | **docs/SPECIFICATION.md** | Terminal sequences, password masking, command syntax |
+| Why architecture chosen this way | **docs/ARCHITECTURE.md** | Design rationale, alternatives considered, feature gating |
+| Implementation order and tasks | **docs/IMPLEMENTATION.md** | 10-phase roadmap, task breakdown, what to build next |
+| Security patterns and credential storage | **docs/SECURITY.md** | Password hashing, access control, credential providers |
 
-# Size optimization
-cargo build --target thumbv6m-none-eabi --release --no-default-features --features authentication
-cargo size --release -- -A                         # Measure binary size
-```
+---
 
-## Core Architectural Decisions
+## Quick Reference - Common Tasks
 
-### Polymorphism
-`Node` enum with `Command` and `Directory` variants instead of trait objects. Provides zero-cost dispatch via pattern matching, enables const initialization.
+### Adding a New Command
 
-### Memory Management
-Static allocation only using `heapless` crate for fixed-size buffers. No heap allocation, deterministic memory usage.
-
-### Navigation Pattern (Path Stack)
-CLI service maintains current location as vector of child indices (`heapless::Vec<usize, MAX_DEPTH>`) instead of parent pointers. Navigate down by pushing child index, up by popping. This enables:
-- Const-initialized directory trees
-- Nodes entirely in ROM on embedded devices
-- Simple lifetime management (no self-references)
-
-To get current directory: walk down from root using stored indices. To build prompt: iterate path stack and collect names.
-
-### I/O Abstraction
-`CharIo` trait with generic type parameters for zero-cost abstraction:
 ```rust
-CliService<'tree, L, IO> where L: AccessLevel, IO: CharIo
-```
+// 1. Define the command function
+fn reboot_fn<L: AccessLevel>(args: &[&str]) -> Result<Response, CliError> {
+    // Implementation
+    Ok(Response::success("Rebooting..."))
+}
 
-Platform-specific implementations (UART, USB-CDC, stdio) created separately. Compiler monomorphizes per implementation (no vtable overhead). Pattern follows `embedded-hal` conventions.
-
-### Access Control
-`AccessLevel` as generic trait bound. User defines enum or type implementing trait with comparison operators. Provides compile-time type safety.
-
-### Error Handling
-`Result<Response, CliError>` pattern throughout. Each error variant represents specific failure mode (InvalidArguments, AccessDenied, etc).
-
-### String Storage
-- `&'static str` for constant names and descriptions (zero runtime cost)
-- `heapless::String<N>` for runtime buffers (fixed-size, stack-allocated)
-
-### Commands
-Struct with function pointer field, enabling const initialization and ROM placement:
-```rust
-const COMMAND: Command = Command {
+// 2. Create const command definition
+const REBOOT: Command<MyAccessLevel> = Command {
     name: "reboot",
+    description: "Reboot the device",
     execute: reboot_fn,
-    ...
+    access_level: MyAccessLevel::Admin,
+    min_args: 0,
+    max_args: 0,
 };
-```
 
-## Implementation Patterns
-
-### Path Stack Navigation
-Service tracks location as indices into children arrays stored in a `heapless::Vec<usize, MAX_DEPTH>`. When user navigates to "system/debug", service pushes indices corresponding to those child names. Parent navigation (..) pops indices. Absolute paths clear the stack before navigation.
-
-Walking the path stack to get current directory: start at root, index into children array repeatedly using stored indices.
-
-**Implementation approach:**
-- `Path` type handles parsing and normalization of path strings
-- `Directory::resolve_path()` method performs the actual tree walking
-- Path resolution returns `Option<&Node>` - None if path invalid
-- Completion logic in `tree/completion` module uses similar traversal
-
-### Generic I/O Trait
-Each platform implements `CharIo` trait with platform-specific error type. Service generic over I/O type. Compiler generates optimized code per implementation, fully inlining I/O operations.
-
-Example implementations: `PicoUart` (RP2040 UART), `StdioStream` (desktop testing), `UsbCdc` (USB serial).
-
-### Directory Tree Construction
-Trees defined as const arrays of nodes. Each node contains either command reference or array of child nodes. Entire structure can be const-initialized and placed in ROM:
-```rust
-const TREE: &[Node] = &[
-    Node::directory("system", &SYSTEM_CHILDREN),
-    Node::command(&REBOOT_CMD),
+// 3. Add to tree
+const SYSTEM_DIR: &[Node<MyAccessLevel>] = &[
+    Node::Command(&REBOOT),
+    // ... other nodes
 ];
 ```
 
-## Differences from C++ Implementation
+### Implementing a Feature-Gated Module
 
-The Rust port maintains behavioral compatibility while leveraging Rust idioms:
+```rust
+// In Cargo.toml
+[features]
+my_feature = []
 
-**Key differences:**
-- C++ uses virtual inheritance for polymorphism → Rust uses `Node` enum with pattern matching
-- C++ uses parent pointers for navigation → Rust uses path stack (indices vector)
-- C++ allocates commands/directories dynamically → Rust uses static const initialization
-- C++ uses `std::variant` for static/dynamic nodes → Rust uses single allocation pattern
+// In lib.rs
+#[cfg(feature = "my_feature")]
+pub mod my_module;
 
-**Behavioral specification:** See `docs/SPECIFICATION.md` for complete behavioral details extracted from the C++ implementation.
+// Provide no-op fallback when disabled
+#[cfg(not(feature = "my_feature"))]
+impl SomeType {
+    pub fn feature_method(&self) -> Result<()> {
+        Ok(()) // Silent no-op
+    }
+}
+```
 
-**Architectural decisions:** See `docs/ARCHITECTURE.md` for rationale behind structural choices and comparisons with C++.
+### Creating a New CharIo Implementation
+
+```rust
+pub struct MyIo {
+    // Platform-specific fields
+}
+
+impl CharIo for MyIo {
+    type Error = MyError;
+
+    fn get_char(&mut self) -> Result<Option<char>, Self::Error> {
+        // Non-blocking read
+    }
+
+    fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
+        // Write character
+    }
+}
+```
+
+### Testing a Module
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_with_all_features() {
+        // Test default configuration
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_without_auth() {
+        // Test feature-disabled path
+    }
+}
+```
+
+---
+
+## Critical Constraints
+
+### no_std Environment
+- **No heap allocation**: Cannot use `Vec`, `String`, `Box`, etc.
+- **Use `heapless` instead**: `heapless::Vec<T, N>`, `heapless::String<N>`
+- **Fixed sizes at compile time**: Must specify maximum capacity
+- **What happens when full**: Operations return errors, not panics
+- **Core dependencies only**: Check `default-features = false` for all crates
+
+### Static Allocation Requirements
+- **Everything const-initializable**: Trees, commands, directories must be `const`
+- **Lives in ROM**: Data placed in flash memory, not RAM
+- **No runtime initialization**: No `lazy_static`, no `once_cell`
+- **Function pointers, not closures**: Use `fn` pointers for command execution
+
+### Path Stack Navigation
+- **Current directory = index path from root**: Not a pointer to current node
+- **Navigate down**: Push child index onto stack
+- **Navigate up (..)**: Pop index from stack
+- **Get current node**: Walk from root following indices
+- **Why**: Enables const initialization (no self-referential pointers)
+
+### String Handling
+- **Const strings**: Use `&'static str` for names, descriptions, help text
+- **Runtime buffers**: Use `heapless::String<N>` with explicit capacity
+- **Parsing**: Work with `&str` slices, avoid allocation
+- **Buffer sizes**: Choose carefully (MAX_INPUT: 128, MAX_PATH_DEPTH: 8, etc.)
+
+---
+
+## Core Architecture
+
+### Node Type System
+```rust
+enum Node<L: AccessLevel> {
+    Command(&'static Command<L>),
+    Directory(&'static Directory<L>),
+}
+```
+- **Zero-cost dispatch**: Pattern matching instead of vtable
+- **Const-friendly**: Can initialize at compile time
+- **ROM placement**: Entire tree lives in flash
+
+### Service Generics
+```rust
+CliService<'tree, L, IO>
+where
+    L: AccessLevel,    // User-defined access hierarchy
+    IO: CharIo,        // Platform-specific I/O
+```
+- **Monomorphization**: Compiler generates specialized code per type
+- **Zero overhead**: No runtime dispatch, fully inlined
+- **Lifetime `'tree`**: References tree data (static or const)
+
+### Feature Gating Pattern
+```rust
+// Field present only when feature enabled
+struct Service {
+    #[cfg(feature = "auth")]
+    current_user: Option<User>,
+}
+
+// Dual implementation
+#[cfg(feature = "auth")]
+impl Service { /* full auth logic */ }
+
+#[cfg(not(feature = "auth"))]
+impl Service { /* no-op stubs */ }
+```
+
+### Module Structure
+
+See ARCHITECTURE.md for complete module structure and organization rationale.
+
+---
+
+## Common Pitfalls & Solutions
+
+### ❌ Forgetting Feature Gates
+```rust
+// WRONG: Always compiles completion code
+use crate::tree::completion;
+
+// RIGHT: Conditional import
+#[cfg(feature = "completion")]
+use crate::tree::completion;
+```
+
+### ❌ Using std Types
+```rust
+// WRONG: std types in no_std
+fn parse(input: String) -> Vec<&str> { }
+
+// RIGHT: heapless or slices
+fn parse(input: &str) -> heapless::Vec<&str, 16> { }
+```
+
+### ❌ Runtime Initialization
+```rust
+// WRONG: Can't initialize at runtime
+const TREE: Vec<Node> = vec![...];
+
+// RIGHT: Const initialization
+const TREE: &[Node] = &[...];
+```
+
+### ❌ Dynamic Dispatch for Commands
+```rust
+// WRONG: Trait objects prevent const init
+trait Command { fn execute(&self); }
+const CMD: &dyn Command = &MyCommand;
+
+// RIGHT: Function pointers
+type ExecuteFn = fn(&[&str]) -> Result<Response>;
+const CMD: Command = Command { execute: my_fn, ... };
+```
+
+### ❌ Mutable Static Without Synchronization
+```rust
+// WRONG: Unsafe mutable global
+static mut STATE: State = State::new();
+
+// RIGHT: Use Mutex or atomic types (if needed at all)
+// Or better: pass as parameter through CliService
+```
+
+### ⚠️ heapless Buffer Overflow
+```rust
+// WRONG: Doesn't handle full buffer
+let mut buf: heapless::String<64> = heapless::String::new();
+buf.push_str(&long_string); // Can panic!
+
+// RIGHT: Handle capacity errors
+buf.push_str(&long_string).map_err(|_| Error::BufferFull)?;
+```
+
+---
+
+## Testing Patterns
+
+### Test Const Initialization
+```rust
+#[test]
+fn test_tree_is_const() {
+    // Just referencing TREE proves it compiles as const
+    let _tree = &EXAMPLE_TREE;
+}
+```
+
+### Mock I/O for Testing
+```rust
+struct MockIo {
+    input: VecDeque<char>,
+    output: Vec<char>,
+}
+
+impl CharIo for MockIo {
+    type Error = ();
+    fn get_char(&mut self) -> Result<Option<char>> {
+        Ok(self.input.pop_front())
+    }
+    fn put_char(&mut self, c: char) -> Result<()> {
+        self.output.push(c);
+        Ok(())
+    }
+}
+```
+
+### Integration Test Pattern
+```rust
+#[test]
+fn test_login_and_command() {
+    let mut io = MockIo::new("admin:pass123\nsystem/reboot\n");
+    let mut service = CliService::new(&TREE, provider, &mut io);
+
+    // Process login
+    service.process_char('a');
+    service.process_char('d');
+    // ... assert state changes
+}
+```
+
+---
+
+## Common Build Commands
+
+Quick reference for frequent operations:
+
+```bash
+# Development
+cargo check                              # Fast compile check
+cargo test                               # Run tests
+cargo clippy                             # Lint code
+cargo fmt                                # Format code
+
+# Feature testing
+cargo test --all-features                # Test with all features
+cargo test --no-default-features         # Test minimal configuration
+
+# Embedded target
+cargo check --target thumbv6m-none-eabi  # Verify no_std compliance
+cargo size --target thumbv6m-none-eabi --release -- -A  # Measure binary size
+
+# Pre-commit
+cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-features
+```
+
+**For comprehensive build workflows, CI configuration, and troubleshooting:** See IMPLEMENTATION.md
+
+---
+
+## Implementation Workflow
+
+**Current Phase:** See IMPLEMENTATION.md for detailed task breakdown
+
+**General Approach:**
+1. **Consult SPECIFICATION.md** for exact behavior to implement
+2. **Check IMPLEMENTATION.md** for current phase and tasks
+3. **Write tests first** based on behavioral specification
+4. **Implement minimal functionality** to pass tests
+5. **Test on native target** (`cargo test`)
+6. **Verify embedded target** (`cargo check --target thumbv6m-none-eabi`)
+7. **Verify feature combinations** (test with/without features)
+8. **Document public APIs** with doc comments
+
+**When stuck:**
+- SPECIFICATION.md for "what should this do?"
+- ARCHITECTURE.md for "why is it designed this way?"
+- SECURITY.md for authentication/access control specifics
+- This file (CLAUDE.md) for constraints and patterns
+- **If the documented approach seems problematic**: Ask! Design can evolve based on implementation insights

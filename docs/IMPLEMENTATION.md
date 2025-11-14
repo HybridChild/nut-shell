@@ -6,12 +6,10 @@
 
 ## Overview
 
-This document tracks the implementation phases for porting cli-service from C++ to Rust. The port prioritizes **idiomatic Rust patterns** over structural similarity to the C++ codebase, while maintaining functional equivalence.
-
-**Key Principle**: Port C++ *behavior*, not *structure*.
+This document tracks the implementation phases for cli-service. The implementation prioritizes **idiomatic Rust patterns** while maintaining behavioral correctness.
 
 **Related Documentation:**
-- **ARCHITECTURE.md**: Design decisions, rationale, and comparison with C++ implementation
+- **ARCHITECTURE.md**: Design decisions and rationale
 - **CLAUDE.md**: Working patterns and practical guidance for implementing features
 
 ## Implementation Phases
@@ -46,11 +44,6 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - `User` struct with username and access level
    - Unit tests
 
-**C++ Reference**:
-- `CharIOStreamIf.hpp` (trait definition)
-- `UnixWinCharIOStream.cpp` (stdio implementation)
-- `User.hpp` (user and access level)
-
 **Success Criteria**: Can abstract I/O and access control with zero runtime cost
 
 ---
@@ -70,11 +63,6 @@ This document tracks the implementation phases for porting cli-service from C++ 
 3. Verify const initialization with integration test
 4. Verify tree can be placed in ROM (check with `nm` or `objdump`)
 
-**C++ Reference**:
-- `NodeIf.hpp` (base interface)
-- `Directory.hpp` and `Directory.cpp`
-- `CommandIf.hpp`
-
 **Success Criteria**:
 - Tree lives in ROM with zero runtime initialization
 - Can construct complex tree structures at compile time
@@ -91,7 +79,7 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - Handle ".." (parent) and "." (current) components
    - Path normalization
    - Component iteration
-   - Port logic from C++ `Path.cpp` (~190 lines)
+   - Implement path parsing (~190 lines)
 
 2. Add path resolution to `Directory` in `tree/mod.rs`:
    - `find_child(&self, name: &str) -> Option<&Node>`
@@ -106,10 +94,6 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - Invalid paths return None
    - Deep tree navigation
 
-**C++ Reference**:
-- `Path.hpp` and `Path.cpp` (190 lines)
-- `PathResolver.hpp` and `PathResolver.cpp` (83 lines)
-
 **Success Criteria**: Can navigate tree with complex paths like `../system/debug`
 
 ---
@@ -123,7 +107,7 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - Return multiple matches when ambiguous
    - Auto-append "/" for directories
    - Handle partial path completion (`sys/de<TAB>` → `system/debug`)
-   - Port logic from C++ `PathCompleter` (229 lines, header-only)
+   - Implement completion logic (~229 lines)
 
 2. Implement feature gating:
    - Add `completion` feature flag to Cargo.toml
@@ -140,9 +124,6 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - Test builds with feature enabled/disabled
    - Verify no_std compliance with feature disabled
    - Measure code size impact (should be ~2KB)
-
-**C++ Reference**:
-- `PathCompleter.hpp` (229 lines)
 
 **Success Criteria**:
 - Tab completion works for partial names with proper directory handling
@@ -172,14 +153,9 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - Success/error variants
    - Formatting flags (show prompt, suppress output, etc.)
    - Helper constructors
-   - Port from C++ `CLIResponse.hpp`
+   - Implement response type system
 
 4. Tests for request/response handling
-
-**C++ Reference**:
-- `RequestBase.hpp`, `LoginRequest.hpp`, `CommandRequest.hpp`, etc. (multiple files)
-- `CLIResponse.hpp`
-- `CLIState.hpp`
 
 **Success Criteria**: Can represent all CLI operations type-safely
 
@@ -197,13 +173,13 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - Password masking mode for login
    - Buffer management with `heapless::String`
    - Convert buffer to Request when complete
-   - Port from C++ `InputParser.cpp` (~397 lines)
+   - Implement input parser (~397 lines)
 
 2. Implement `CommandHistory` in `cli/history.rs`:
    - Circular buffer with const generic size
    - O(1) add, previous, next operations
    - Position tracking for navigation
-   - Port from C++ `CommandHistory.hpp` (~85 lines)
+   - Implement command history (~85 lines)
 
 3. Comprehensive tests:
    - Escape sequence parsing
@@ -211,10 +187,6 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - History navigation
    - Password masking
    - Buffer overflow handling
-
-**C++ Reference**:
-- `InputParser.hpp` and `InputParser.cpp` (397 lines)
-- `CommandHistory.hpp` (85 lines, header-only)
 
 **Success Criteria**:
 - Correctly parse all terminal input
@@ -239,7 +211,7 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - Tab completion integration (feature-gated)
    - History navigation integration (arrow keys)
    - Prompt generation (username@path format)
-   - Port orchestration from C++ `CLIService.cpp` (~589 lines)
+   - Implement service orchestration (~589 lines)
    - Note: No `cd`, `ls`, `pwd`, or `tree` commands per syntax design (see ARCHITECTURE.md)
 
 2. Integration tests with mock I/O:
@@ -249,11 +221,6 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - Access control enforcement
    - Tab completion
    - History navigation
-
-**C++ Reference**:
-- `CLIService.hpp` and `CLIService.cpp` (589 lines)
-- `CLIServiceConfiguration.hpp`
-- `CLIMessages.hpp`
 
 **Success Criteria**: End-to-end CLI functionality works
 
@@ -283,10 +250,10 @@ This document tracks the implementation phases for porting cli-service from C++ 
 ---
 
 ### Phase 10: Testing & Polish
-**Goal**: Match C++ quality and functionality
+**Goal**: Match target quality and functionality
 
 **Tasks**:
-1. Port relevant C++ tests to Rust:
+1. Write comprehensive tests:
    - Tree operations test
    - CLI service test
    - Input parser test
@@ -309,17 +276,14 @@ This document tracks the implementation phases for porting cli-service from C++ 
    - Memory usage profiling
    - Stack usage analysis
    - Verify ROM placement
-   - Compare to C++ baseline
+   - Measure baseline performance
 
 5. Create README.md:
    - Project overview
    - Quick start guide
    - API examples
    - Build instructions
-   - Comparison to C++
-
-**C++ Reference**:
-- `test/` directory (8 test files)
+   - Performance characteristics
 
 **Success Criteria**: Comprehensive test coverage, quality documentation
 
@@ -330,7 +294,7 @@ This document tracks the implementation phases for porting cli-service from C++ 
 ### Test-Driven Development
 
 For each phase:
-1. **Write tests first** (port from C++ reference or create new)
+1. **Write tests first** based on behavioral specification
 2. **Implement minimal functionality** to pass tests
 3. **Iterate** until all tests pass
 4. **Refine and optimize** with confidence
@@ -357,17 +321,95 @@ For each phase:
 - Stack usage analysis
 - Actual hardware testing (Pico)
 
-### Build Validation
+### Build & Validation Commands
 
-Test on both targets regularly:
+#### Quick Iteration (Development)
 ```bash
-# Native (fast iteration)
-cargo test
-cargo run --example basic
+cargo check                              # Fast compile check
+cargo test                               # Run all tests
+cargo test test_name                     # Run specific test
+cargo clippy                             # Lint
+cargo fmt                                # Format
+cargo run --example basic                # Manual testing
+```
 
-# Embedded (verify no_std compliance)
+#### Feature Validation
+```bash
+# Test all feature combinations
+cargo test --all-features
+cargo test --no-default-features
+cargo test --no-default-features --features authentication
+cargo test --no-default-features --features completion
+
+# Verify compilation with specific features
+cargo check --features authentication
+cargo clippy --features completion
+```
+
+#### Embedded Target Verification
+```bash
+# Verify no_std compliance
+cargo check --target thumbv6m-none-eabi
+
+# Build for embedded (various configurations)
 cargo build --target thumbv6m-none-eabi --release
-cargo size --release --target thumbv6m-none-eabi
+cargo build --target thumbv6m-none-eabi --release --no-default-features
+cargo build --target thumbv6m-none-eabi --release --features authentication
+
+# Measure and compare binary sizes
+cargo size --target thumbv6m-none-eabi --release -- -A
+cargo size --target thumbv6m-none-eabi --release --no-default-features -- -A
+```
+
+#### Pre-Commit Validation
+```bash
+# Full check (one-liner)
+cargo fmt && \
+cargo clippy --all-features -- -D warnings && \
+cargo test --all-features && \
+cargo check --target thumbv6m-none-eabi --release
+
+# Or step-by-step:
+cargo fmt                                          # 1. Format
+cargo check --all-features                         # 2. Compile check
+cargo clippy --all-features -- -D warnings         # 3. Lint
+cargo test --all-features                          # 4. Test
+cargo check --target thumbv6m-none-eabi --release  # 5. Embedded check
+cargo doc --no-deps --all-features                 # 6. Doc check
+```
+
+#### CI Simulation (Full Validation)
+```bash
+# All feature combinations
+cargo test --all-features
+cargo test --no-default-features
+cargo test --features authentication
+cargo test --features completion
+
+cargo build --all-features
+cargo build --no-default-features
+cargo build --features authentication
+cargo build --features completion
+
+# Embedded builds
+cargo build --target thumbv6m-none-eabi --release --all-features
+cargo build --target thumbv6m-none-eabi --release --no-default-features
+
+# Quality checks
+cargo fmt -- --check
+cargo clippy --all-features -- -D warnings
+cargo clippy --no-default-features -- -D warnings
+cargo doc --no-deps --all-features
+```
+
+#### Troubleshooting
+```bash
+cargo build -vv                          # Verbose build output
+cargo tree                               # Show dependency tree
+cargo tree --target thumbv6m-none-eabi   # Embedded dependencies
+cargo tree --format "{p} {f}"            # Show feature resolution
+cargo clean && cargo build               # Clean rebuild
+cargo expand --lib                       # Expand macros
 ```
 
 ## Current Status
@@ -399,5 +441,4 @@ cargo size --release --target thumbv6m-none-eabi
 - **Track blockers** and design questions as they arise
 - **Archive when complete** (move to docs/ or delete) - this is a temporary tracking document
 - **Reference CLAUDE.md** for architecture decisions and design rationale
-- **Reference C++ implementation** for behavior, not structure
-- **Maintain test parity** with C++ throughout development
+- **Reference SPECIFICATION.md** for behavioral requirements

@@ -1,6 +1,6 @@
 # cli-service - Behavioral Specification
 
-This document specifies the exact behavior of the cli-service library, serving as the authoritative reference for implementation. All behavioral details are derived from the original C++ implementation.
+This document specifies the exact behavior of the cli-service library, serving as the authoritative reference for implementation.
 
 ## Terminal I/O Behavior
 
@@ -51,7 +51,7 @@ The CLI recognizes ANSI escape sequences for terminal navigation.
 - Validates CSI (Control Sequence Introducer) format: `[` followed by command character
 - Arrow keys only functional when logged in
 - Unrecognized sequences are discarded after alphabetic terminator
-- Buffer overflow protection: resets after 16 characters
+- Buffer overflow protection: resets to normal mode when buffer reaches 16 characters (discards incomplete sequence)
 
 **State machine:**
 1. **Normal mode**: Process characters normally
@@ -221,13 +221,14 @@ Commands are stored in a circular buffer for recall via arrow keys.
 - Configurable size (default: 10 entries)
 - Circular/ring buffer structure
 - O(1) add, previous, next operations
-- Only successful command entries are stored (not invalid input)
+- Only successfully executed commands are stored (invalid input/paths not stored)
 
 **Storage rules:**
 - Only completed commands are added (after pressing Enter)
 - Empty inputs are not stored
 - Login attempts are not stored in history
-- Failed/invalid commands are not stored
+- Commands with parse errors or invalid paths are not stored
+- Successfully executed commands are stored regardless of their result (success/error)
 
 ### Navigation
 
@@ -271,8 +272,7 @@ Commands return `CLIResponse` with message and formatting flags.
 - `Success` - Command completed successfully
 - `Error` - Command failed (generic error)
 - `InvalidArguments` - Wrong argument count or format
-- `InvalidPath` - Path does not exist or is malformed
-- `AccessDenied` - User lacks permission
+- `InvalidPath` - Path does not exist, is malformed, or user lacks permission (security: inaccessible nodes appear non-existent)
 
 **Formatting flags:**
 
@@ -297,23 +297,25 @@ admin@/system>
 
 **Standard error messages:**
 
-| Error Type | Message |
-|------------|---------|
-| Access denied | "Access denied" |
-| Invalid path | "Invalid path" |
-| Invalid arguments | "Command takes no arguments" (or specific count) |
-| Invalid login | "Invalid login attempt. Please enter <username>:<password>" |
+| Error Type | Message | When Used |
+|------------|---------|-----------|
+| Invalid path | "Invalid path" | Path does not exist OR user lacks access (nodes invisible to user) |
+| Invalid arguments | "Command takes no arguments" (or specific count) | Wrong argument count or format |
+| Invalid login | "Invalid login attempt. Please enter <username>:<password>" | Authentication failure |
+
+**Note:** "Access denied" is not used to maintain security - inaccessible nodes appear non-existent.
 
 **Custom error messages:**
 Commands can return custom error strings with appropriate status codes.
 
 **Example error responses:**
 ```
-> system/reboot
-  Access denied
-
 > invalid/path
   Invalid path
+
+> system/reboot
+  Invalid path
+  [Note: Same error whether path doesn't exist or user lacks access]
 
 > hw/led/set 255
   Invalid argument count. Expected 4 arguments, got 1.
@@ -341,8 +343,7 @@ guest@/hw/sensors>
 
 **Path display:**
 - Root directory: `/`
-- Subdirectories: `/parent/child/`
-- No trailing slash except for root
+- Subdirectories: `/parent/child` (no trailing slash)
 
 ## Global Commands
 
@@ -368,6 +369,7 @@ Display contents of current directory with descriptions.
 - Indented output (2 spaces)
 - Each item on separate line
 - Items sorted alphabetically (implementation-defined)
+- If no accessible nodes: displays empty list (no output after newline)
 
 **Example:**
 ```
@@ -507,9 +509,9 @@ Every node has an associated access level requirement.
 4. Directory listing (`?` command)
 
 **Denial behavior:**
-- Return "Access denied" error response
-- Do not reveal node existence
-- Same error for non-existent vs inaccessible
+- Inaccessible nodes are treated as non-existent
+- Return "Invalid path" error (same as non-existent nodes)
+- Do not reveal node existence through error messages
 
 ## Example Command Trees
 
@@ -558,8 +560,6 @@ const ROOT: Directory = Directory {
 
 ### Full-Featured Tree (With Authentication)
 
-Based on C++ example implementation.
-
 **Structure:**
 ```
 /
@@ -583,21 +583,17 @@ Based on C++ example implementation.
 ```
 Welcome to CLI Service. Please login.
 
-> user:password1234
+> user:********
 
   Logged in. Type 'help' for help.
-
-user@/> tree
-  (not available - removed from global commands)
 
 user@/> ?
 
   hw - Hardware interface commands
-  system - System commands
 
 user@/> system
 
-  Access denied
+  Invalid path
 
 user@/> hw
 user@/hw> ?
@@ -607,9 +603,11 @@ user@/hw> ?
   toggle - Toggle switch interface
 
 user@/hw> rgb
+user@/hw/rgb> ?
+
 user@/hw/rgb> set 1 255 0 0
 
-  Access denied
+  Invalid path
 
 user@/hw> pot
 user@/hw/pot> get
@@ -624,7 +622,7 @@ user@/hw/pot> logout
 
   Logged out.
 
-> admin:secretPa$$word
+> admin:**********
 
   Logged in. Type 'help' for help.
 
