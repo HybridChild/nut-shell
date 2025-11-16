@@ -1,15 +1,21 @@
 # cli-service Rust Port - Implementation Plan
 
-**Status**: Planning Complete - Ready to Implement
-**Last Updated**: 2025-11-09
+**Status**: Planning Ongoing
 **Estimated Timeline**: 6-8 weeks
 
 ## Overview
 
 This document tracks the implementation phases for cli-service. The implementation prioritizes **idiomatic Rust patterns** while maintaining behavioral correctness.
 
+**When to use this document:**
+- Finding out what phase of implementation we're in
+- Understanding what needs to be built next
+- Getting the complete build and validation workflow
+- Checking task completion status
+
 **Related Documentation:**
 - **ARCHITECTURE.md**: Design decisions and rationale
+- **SPECIFICATION.md**: Exact behavioral requirements for each feature
 - **CLAUDE.md**: Working patterns and practical guidance for implementing features
 
 ## Implementation Phases
@@ -294,7 +300,7 @@ This document tracks the implementation phases for cli-service. The implementati
 ### Test-Driven Development
 
 For each phase:
-1. **Write tests first** based on behavioral specification
+1. **Write tests first** based on behavioral specification (see SPECIFICATION.md)
 2. **Implement minimal functionality** to pass tests
 3. **Iterate** until all tests pass
 4. **Refine and optimize** with confidence
@@ -321,7 +327,9 @@ For each phase:
 - Stack usage analysis
 - Actual hardware testing (Pico)
 
-### Build & Validation Commands
+### Build & Validation Commands - Complete Workflows
+
+**Note:** For a quick reference, see CLAUDE.md "Common Build Commands"
 
 #### Quick Iteration (Development)
 ```bash

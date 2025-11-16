@@ -2,6 +2,27 @@
 
 This document records the architectural decisions for cli-service. It explains the rationale behind structural choices and documents alternatives considered.
 
+**When to use this document:**
+- Understanding why a design decision was made
+- Evaluating trade-offs between architectural alternatives
+- Learning about feature gating patterns and implementation
+- Understanding the unified architecture approach for optional features
+
+## Table of Contents
+
+1. [Command Syntax](#command-syntax)
+2. [Key Design Decisions](#key-design-decisions)
+3. [Feature Gating & Optional Features](#feature-gating--optional-features)
+   - [Authentication Feature](#authentication-feature)
+   - [Auto-Completion Feature](#auto-completion-feature)
+   - [Command History Feature](#command-history-feature)
+   - [Combined Feature Configuration](#combined-feature-configuration)
+4. [Implementation Benefits](#implementation-benefits)
+5. [Module Structure](#module-structure)
+6. [References](#references)
+
+---
+
 ## Command Syntax
 
 The CLI uses a path-based syntax that mirrors filesystem navigation, optimized for embedded systems with minimal parsing overhead.
@@ -59,15 +80,9 @@ clear     # Clear screen (optional, platform-dependent)
 - Simpler mental model
 
 **Why reserved keywords instead of prefixed globals?**
-- Using `/tree` would conflict with absolute path syntax (`/system/tree`)
 - Small reserved word list (3-4 keywords) validated at compile time
 - Cleaner syntax for global commands
-
-**Why no `tree` global command?**
-- Engineers typically know structure (defined in code)
-- Tab completion + `?` command sufficient for exploration
-- Saves ~50-100 lines of tree rendering code
-- Not needed for the intended use cases
+- Avoids conflicts with absolute path syntax
 
 **Why positional arguments only?**
 - No `--flags` or `-options` reduces parser complexity

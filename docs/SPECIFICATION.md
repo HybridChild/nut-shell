@@ -238,7 +238,7 @@ Only nodes accessible at the current user's access level are shown.
 **Filtering:**
 - Nodes with higher required access level are invisible
 - Directories are only shown if user can access them
-- Commands only shown if user has permission to execute
+- Commands only shown if user's access level permits execution
 
 **Example:**
 ```
@@ -614,14 +614,43 @@ For development or unsecured environments.
 
 **Rust implementation:**
 ```rust
-const INFO_CMD: Command = Command {
+const INFO_CMD: Command<AccessLevel> = Command {
     name: "info",
     description: "Show system information",
     execute: info_fn,
     access_level: AccessLevel::Public,
+    min_args: 0,
+    max_args: 0,
 };
 
-const CONFIG_DIR: Directory = Directory {
+const REBOOT_CMD: Command<AccessLevel> = Command {
+    name: "reboot",
+    description: "Reboot the device",
+    execute: reboot_fn,
+    access_level: AccessLevel::Public,
+    min_args: 0,
+    max_args: 0,
+};
+
+const CONFIG_GET: Command<AccessLevel> = Command {
+    name: "get",
+    description: "Get config value",
+    execute: config_get_fn,
+    access_level: AccessLevel::Public,
+    min_args: 1,
+    max_args: 1,
+};
+
+const CONFIG_SET: Command<AccessLevel> = Command {
+    name: "set",
+    description: "Set config value",
+    execute: config_set_fn,
+    access_level: AccessLevel::Public,
+    min_args: 2,
+    max_args: 2,
+};
+
+const CONFIG_DIR: Directory<AccessLevel> = Directory {
     name: "config",
     children: &[
         Node::Command(&CONFIG_GET),
@@ -630,7 +659,7 @@ const CONFIG_DIR: Directory = Directory {
     access_level: AccessLevel::Public,
 };
 
-const ROOT: Directory = Directory {
+const ROOT: Directory<AccessLevel> = Directory {
     name: "root",
     children: &[
         Node::Command(&INFO_CMD),

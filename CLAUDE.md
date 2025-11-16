@@ -550,7 +550,7 @@ fn test_esc_bracket_is_sequence() {
 
 ---
 
-## Common Build Commands
+## Common Build Commands - Quick Reference
 
 Quick reference for frequent operations:
 

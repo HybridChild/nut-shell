@@ -14,9 +14,8 @@ This document describes the security architecture for authentication and access 
 4. [Credential Storage Options](#credential-storage-options)
 5. [Access Control System](#access-control-system)
 6. [Implementation Patterns](#implementation-patterns)
-7. [Migration Guide](#migration-guide)
-8. [Testing & Validation](#testing--validation)
-9. [Security Assumptions](#security-assumptions)
+7. [Testing & Validation](#testing--validation)
+8. [Security Assumptions](#security-assumptions)
 
 ---
 
@@ -619,38 +618,6 @@ fn main() {
 
 ---
 
-## Migration Guide
-
-### Migrating to Secure Credential Storage
-
-For production deployments, migrate from hardcoded credentials to flash storage or external authentication:
-
-#### For Production: Migrate to Flash Storage
-
-```rust
-// 1. Compile with flash-storage feature
-// cargo build --release --features flash-storage --target thumbv6m-none-eabi
-
-// 2. Provision device on first boot
-let mut provider = FlashProvider::new();
-
-if provider.is_empty()? {
-    // First boot: provision with temporary password
-    provider.provision("temporary_admin_password")?;
-
-    println!("Device provisioned. Please login and change password.");
-}
-
-// 3. User changes password via admin command
-// CLI> passwd
-// Current password: temporary_admin_password
-// New password: <strong password>
-// Confirm: <strong password>
-// Password updated successfully
-```
-
----
-
 ## Testing & Validation
 
 ### Unit Tests
@@ -898,15 +865,16 @@ If your threat model requires stronger protections:
 
 ## Changelog
 
+- **2025-11-16**: Documentation cleanup
+  - Removed migration guide (not applicable for new implementation)
 - **2025-11-09**: Initial security architecture document
   - Authentication system design
   - Password hashing approach (SHA-256)
   - Credential storage options
-  - Secure credential storage migration guide
 
 ---
 
 **Document Status:** Draft
-**Last Updated:** 2025-11-09
+**Last Updated:** 2025-11-16
 **Author:** cli-service Rust Port Team
 **Review Status:** Pending Security Review
