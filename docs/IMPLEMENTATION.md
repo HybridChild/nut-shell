@@ -21,19 +21,164 @@ This document tracks the implementation phases for cli-service. The implementati
 - **[PHILOSOPHY.md](PHILOSOPHY.md)**: Design philosophy and feature decision framework
 - **[../CLAUDE.md](../CLAUDE.md)**: Working patterns and practical guidance for implementing features
 
+---
+
+## Prerequisites: Essential Patterns
+
+**IMPORTANT**: Before starting implementation, you must understand these three architectural patterns. An implementer who discovers these mid-implementation will require significant refactoring.
+
+### 1. Unified Architecture Pattern (Authentication)
+
+**Single code path for both auth-enabled and auth-disabled modes.**
+
+```rust
+pub struct CliService<'tree, L, IO> {
+    // ALWAYS present (not feature-gated)
+    current_user: Option<User<L>>,
+    state: CliState,
+
+    // ONLY this field is feature-gated
+    #[cfg(feature = "authentication")]
+    credential_provider: &'tree dyn CredentialProvider<L>,
+}
+
+// State variants
+pub enum CliState {
+    #[cfg(feature = "authentication")]
+    LoggedOut,  // Only exists when auth enabled
+
+    LoggedIn,   // Always available
+    Inactive,   // Always available
+}
+```
+
+**Key principle**: State determines behavior, not feature flags.
+- Auth enabled: Start in `LoggedOut`, transition to `LoggedIn` after authentication
+- Auth disabled: Start in `LoggedIn` immediately, `current_user = None`
+
+See DESIGN.md "Unified Architecture" for complete pattern.
+
+### 2. Stub Function Pattern (Feature Gating)
+
+**Provide identical function signatures for both feature-enabled and feature-disabled builds.**
+
+```rust
+// Feature-enabled: Full implementation
+#[cfg(feature = "completion")]
+pub fn suggest_completions<'a, L: AccessLevel>(
+    node: &'a Node<L>,
+    partial_input: &str,
+) -> Result<Vec<&'a str, MAX_SUGGESTIONS>, CliError> {
+    // Real implementation
+}
+
+// Feature-disabled: Stub returns empty results
+#[cfg(not(feature = "completion"))]
+pub fn suggest_completions<'a, L: AccessLevel>(
+    node: &'a Node<L>,
+    partial_input: &str,
+) -> Result<Vec<&'a str, MAX_SUGGESTIONS>, CliError> {
+    Ok(Vec::new())  // No suggestions
+}
+```
+
+**Benefits**:
+- Single code path in main service (no `#[cfg]` branching)
+- Behavior determined by return value, not feature flags
+- Compiler optimizes away stub calls when empty
+
+**Apply to**: `completion` and `history` features
+
+See DESIGN.md "Feature Gating & Optional Features" for complete pattern.
+
+### 3. Access Control Integration
+
+**Access control is checked at EVERY tree traversal, not as a separate step.**
+
+```rust
+fn resolve_path(&self, path: &Path) -> Result<&Node<L>, CliError> {
+    // Walk path segments
+    for segment in path.segments() {
+        let node = current_dir.find_child(segment)?;
+
+        // Check access at EACH segment
+        #[cfg(feature = "authentication")]
+        {
+            let user = self.current_user.as_ref().ok_or(CliError::NotLoggedIn)?;
+            if user.access_level < node.access_level() {
+                return Err(CliError::InvalidPath);  // Hide inaccessible
+            }
+        }
+
+        current_dir = node;
+    }
+}
+```
+
+**Security principle**: Inaccessible nodes return "Invalid path" (same as non-existent) to prevent revealing restricted commands.
+
+See SPECIFICATION.md and SECURITY.md for complete access control model.
+
+---
+
+## Module Map
+
+This shows which phase creates which file:
+
+```
+Phase 2:
+  - src/io.rs (CharIo trait)
+  - src/auth/mod.rs (AccessLevel trait, User struct)
+
+Phase 3:
+  - src/tree/mod.rs (Node enum, Command struct, Directory struct)
+
+Phase 4:
+  - src/tree/path.rs (Path type)
+
+Phase 5:
+  - src/tree/completion.rs (with stub pattern)
+
+Phase 6:
+  - src/response.rs (Response type)
+  - src/cli/mod.rs (Request enum, CliState enum - partial)
+
+Phase 7:
+  - src/cli/parser.rs (InputParser)
+  - src/cli/history.rs (CommandHistory with stub pattern)
+
+Phase 8:
+  - src/cli/mod.rs (CliService implementation, complete)
+
+Phase 9:
+  - examples/basic.rs
+  - examples/rp2040_uart.rs (optional)
+```
+
 ## Implementation Phases
 
 ### Phase 1: Project Foundation ✓
-**Goal**: Runnable Rust project with basic structure
+**Goal**: Runnable Rust project with basic structure and testing infrastructure
 
 **Tasks**:
 - [ ] Create Cargo.toml with no_std support, heapless dependency
 - [ ] Create src/lib.rs with feature gates and module declarations
 - [ ] Create directory structure (cli/, tree/ modules with placeholder files)
+- [ ] Create testing infrastructure:
+  - `tests/fixtures/mod.rs` with `MockIo` implementation for CharIo
+  - `tests/fixtures/mod.rs` with simple test tree (used across all phases)
+  - `tests/fixtures/mod.rs` with `MockAccessLevel` enum (Guest/User/Admin)
+- [ ] Document feature flag testing approach:
+  - Test with all features: `cargo test --all-features`
+  - Test with no features: `cargo test --no-default-features`
+  - Test selective features: `cargo test --features authentication`
 - [ ] Verify `cargo build` on native target
 - [ ] Verify `cargo build --target thumbv6m-none-eabi` on embedded target
 
-**Success Criteria**: Project compiles on both native and embedded targets
+**Success Criteria**:
+- Project compiles on both native and embedded targets
+- MockIo available for testing CharIo implementations
+- Test fixtures can be reused in subsequent phases
 
 ---
 
@@ -47,39 +192,77 @@ This document tracks the implementation phases for cli-service. The implementati
    - Create `StdioStream` implementation for testing
    - Add basic tests
 
-2. Implement access control in `user.rs`
+2. Implement access control in `auth/mod.rs` (see DESIGN.md "Module Structure")
    - `AccessLevel` trait with comparison operators
    - Example implementations (e.g., enum with Admin/User/Guest)
    - `User` struct with username and access level
+   - Module is feature-gated, but `User` and `AccessLevel` are re-exported at root level (always available)
+   - Only `CredentialProvider` requires authentication feature
    - Unit tests
 
 **Success Criteria**: Can abstract I/O and access control with zero runtime cost
 
 ---
 
-### Phase 3: Tree Data Model
-**Goal**: Const-initializable directory tree in ROM
+### Phase 3a: Tree Core Types
+**Goal**: Define foundational tree types with access control
 
 **Tasks**:
 1. Implement in `tree/mod.rs`:
    - `Node` enum with Command and Directory variants
-   - `Command` struct with function pointer, name, help, access level
-   - `Directory` struct with name, children array, access level
-   - Helper methods for const initialization
-   - Type checking methods (is_command, is_directory)
+   - `Command` struct:
+     - `name: &'static str`
+     - `description: &'static str`
+     - `execute: fn(&[&str]) -> Result<Response, CliError>` (function pointer)
+     - `access_level: L` (generic over AccessLevel)
+     - `min_args: usize`, `max_args: usize`
+   - `Directory` struct:
+     - `name: &'static str`
+     - `children: &'static [Node<L>]` (array reference)
+     - `access_level: L`
+   - Type checking methods: `is_command()`, `is_directory()`, `name()`, `access_level()`
 
-2. Create example tree as test fixture
+2. Unit tests for type construction and pattern matching
+
+**Success Criteria**:
+- Can define individual Command and Directory instances
+- Node enum enables zero-cost dispatch via pattern matching
+- Access level integration works with generic parameter
+
+---
+
+### Phase 3b: Tree Const Initialization
+**Goal**: Build const-initializable tree structures in ROM
+
+**Tasks**:
+1. Implement const tree construction patterns:
+   - Define command functions as `fn` (not closures)
+   - Create const Command definitions
+   - Create const Directory definitions with child arrays
+   - Nest directories to create hierarchical structure
+   - Example: `/system/reboot`, `/hw/led/set`, etc.
+
+2. Create example tree as test fixture in `tests/fixtures/mod.rs`:
+   ```rust
+   pub const TEST_TREE: Directory<MockAccessLevel> = Directory {
+       name: "/",
+       children: &[/* ... */],
+       access_level: MockAccessLevel::Guest,
+   };
+   ```
+
 3. Verify const initialization with integration test
 4. Verify tree can be placed in ROM (check with `nm` or `objdump`)
 
 **Success Criteria**:
 - Tree lives in ROM with zero runtime initialization
-- Can construct complex tree structures at compile time
+- Can construct complex nested tree structures at compile time
+- Test fixture available for use in subsequent phases
 
 ---
 
 ### Phase 4: Path Navigation
-**Goal**: Unix-style path resolution using index stack
+**Goal**: Unix-style path resolution with access control integration
 
 **Tasks**:
 1. Implement `Path` type in `tree/path.rs`:
@@ -91,19 +274,30 @@ This document tracks the implementation phases for cli-service. The implementati
    - Implement path parsing (~190 lines)
 
 2. Add path resolution to `Directory` in `tree/mod.rs`:
-   - `find_child(&self, name: &str) -> Option<&Node>`
-   - `resolve_path(&self, path: &Path) -> Option<&Node>`
+   - `find_child(&self, name: &str) -> Option<&Node<L>>`
+   - Basic tree walking without access control
    - Use index stack pattern: push child indices, pop for parent
    - Walk tree using stored indices
 
-3. Comprehensive tests:
+3. **IMPORTANT**: Prepare for access control integration (implemented in Phase 8):
+   - Path resolution will need `current_user` context
+   - Access checks happen at EVERY segment during traversal
+   - Security principle: Return `Err(CliError::InvalidPath)` for both non-existent and inaccessible nodes
+   - This prevents revealing existence of restricted commands
+   - Note: Full integration happens in Phase 8 when `CliService::resolve_path()` is implemented
+
+4. Comprehensive tests:
    - Path parsing edge cases
    - Parent navigation (`..`)
    - Absolute vs relative paths
    - Invalid paths return None
    - Deep tree navigation
+   - Document placeholder for access control tests (added in Phase 8)
 
-**Success Criteria**: Can navigate tree with complex paths like `../system/debug`
+**Success Criteria**:
+- Can navigate tree with complex paths like `../system/debug`
+- Path resolution methods ready for access control integration
+- Understand that full security integration requires `current_user` context (Phase 8)
 
 ---
 
@@ -144,30 +338,40 @@ This document tracks the implementation phases for cli-service. The implementati
 ---
 
 ### Phase 6: Request/Response Types
-**Goal**: Type-safe command processing
+**Goal**: Type-safe command processing types (MUST complete before Phase 7)
+
+**Why this phase comes first**: Phase 7 (Input Processing) needs to convert input buffers into `Request` types, so these types must exist first.
 
 **Tasks**:
-1. Complete `Request` enum in `cli/mod.rs`:
-   - Login { username, password }
-   - InvalidLogin
-   - Command { path, args, original }
-   - TabComplete { path }
-   - History { up, buffer }
+1. Implement `Request` enum in `cli/mod.rs`:
+   - `Login { username, password }` - Authentication attempt
+   - `InvalidLogin` - Failed login
+   - `Command { path, args, original }` - Execute command
+   - `TabComplete { path }` - Request completions
+   - `History { up, buffer }` - Navigate history
 
-2. Complete `CliState` enum in `cli/mod.rs`:
-   - Inactive
-   - LoggedOut
-   - LoggedIn
+2. Implement `CliState` enum in `cli/mod.rs`:
+   - `Inactive` - CLI not active
+   - `LoggedOut` - Awaiting authentication (feature-gated variant)
+   - `LoggedIn` - Authenticated or auth-disabled mode
 
 3. Implement `Response` in `response.rs`:
    - Success/error variants
-   - Formatting flags (show prompt, suppress output, etc.)
-   - Helper constructors
-   - Implement response type system
+   - Formatting flags:
+     - `prefix_newline` - Add newline before message
+     - `indent_message` - Indent output (2 spaces)
+     - `postfix_newline` - Add newline after message
+     - `show_prompt` - Display prompt after response
+   - Helper constructors: `Response::success()`, `Response::error()`
+   - Message content and status code
+   - See INTERNALS.md Level 7 for complete response formatting
 
 4. Tests for request/response handling
 
-**Success Criteria**: Can represent all CLI operations type-safely
+**Success Criteria**:
+- Can represent all CLI operations type-safely
+- Response type supports all formatting modes needed by global commands and custom commands
+- Input Parser (Phase 7) can convert buffers to Request types
 
 ---
 
@@ -213,28 +417,91 @@ This document tracks the implementation phases for cli-service. The implementati
 ---
 
 ### Phase 8: CLI Service Orchestration
-**Goal**: Bring it all together
+**Goal**: Bring it all together with unified architecture
 
 **Tasks**:
-1. Implement `CliService` in `cli/mod.rs` using unified architecture pattern (see DESIGN.md "Unified Architecture"):
-   - Generic over `AccessLevel` and `CharIo`
-   - Store root directory reference
-   - Track current location (path stack of indices)
-   - Store parser, history, current user
-   - **Unified architecture**: Single state machine for auth-enabled/disabled modes
-   - `current_user: Option<User<L>>` always present (not feature-gated)
-   - `state: CliState` always present (LoggedOut variant only when auth enabled)
-   - Only `credential_provider` field is feature-gated
-   - State determines behavior (LoggedOut vs LoggedIn), not feature flags
-   - Process characters → requests → responses
-   - Implement global commands: `?` (context help), `help` (global help), `logout` (auth feature), `clear` (optional)
-   - Command execution with access control
-   - Path resolution for navigation (absolute and relative paths)
-   - Tab completion integration (calls stub functions)
-   - History navigation integration (calls stub methods)
-   - Prompt generation (username@path format, unified for both modes)
-   - Implement service orchestration (~589 lines)
-   - Note: No `cd`, `ls`, `pwd`, or `tree` commands per syntax design (see DESIGN.md)
+1. Implement `CliService` struct in `cli/mod.rs` using unified architecture pattern:
+
+   a. **Field definitions**:
+   ```rust
+   pub struct CliService<'tree, L, IO>
+   where
+       L: AccessLevel,
+       IO: CharIo,
+   {
+       // ALWAYS present (not feature-gated)
+       tree: &'tree Directory<L>,
+       current_user: Option<User<L>>,
+       state: CliState,
+       input_buffer: heapless::String<MAX_INPUT>,
+       current_path: heapless::Vec<usize, MAX_PATH_DEPTH>,
+       parser: InputParser,
+       history: CommandHistory<HISTORY_SIZE>,
+       io: IO,
+
+       // ONLY this field is feature-gated
+       #[cfg(feature = "authentication")]
+       credential_provider: &'tree dyn CredentialProvider<L>,
+   }
+   ```
+
+   b. **Feature-conditional constructors**:
+   ```rust
+   // Constructor when authentication enabled
+   #[cfg(feature = "authentication")]
+   impl<'tree, L, IO> CliService<'tree, L, IO> {
+       pub fn new(
+           tree: &'tree Directory<L>,
+           provider: &'tree dyn CredentialProvider<L>,
+           io: IO
+       ) -> Self {
+           Self {
+               tree,
+               current_user: None,  // Start logged out
+               state: CliState::LoggedOut,
+               credential_provider: provider,
+               // ... other fields
+           }
+       }
+   }
+
+   // Constructor when authentication disabled
+   #[cfg(not(feature = "authentication"))]
+   impl<'tree, L, IO> CliService<'tree, L, IO> {
+       pub fn new(
+           tree: &'tree Directory<L>,
+           io: IO
+       ) -> Self {
+           Self {
+               tree,
+               current_user: None,  // No user needed
+               state: CliState::LoggedIn,  // Start in logged-in state
+               // ... other fields
+           }
+       }
+   }
+   ```
+
+   c. **Core methods** (same implementation for both modes):
+   - `activate()` - Show welcome message, initial prompt
+   - `process_char()` - Main character processing loop
+   - `generate_prompt()` - Create `username@path> ` prompt (unified for both modes)
+   - `resolve_path()` - Path navigation with access control checks at each segment
+   - `execute_command()` - Run command with argument validation
+
+   d. **Global commands**:
+   - `help` - List global commands
+   - `?` - Show current directory contents with descriptions
+   - `logout` - End session (only available when authentication enabled)
+   - `clear` - Clear screen (platform-dependent)
+
+   e. **Integration with optional features** (using stub patterns):
+   - Tab completion: calls `completion::suggest_completions()` (returns empty when disabled)
+   - History navigation: calls `history.previous()`/`history.next()` (no-op when disabled)
+
+   f. **Implement service orchestration** (~589 lines total)
+
+   Note: No `cd`, `ls`, `pwd`, or `tree` commands per syntax design (see DESIGN.md)
 
 2. Integration tests with mock I/O:
    - Login flow (auth enabled)
