@@ -4,6 +4,13 @@
 
 This document describes the security architecture for authentication and access control in the Rust cli-service implementation, including rationale, implementation patterns, and best practices for embedded systems.
 
+**Related Documentation:**
+- **[DESIGN.md](DESIGN.md)** - Unified architecture pattern and feature gating details
+- **[INTERNALS.md](INTERNALS.md)** - Complete authentication flow and state machine implementation
+- **[SPECIFICATION.md](SPECIFICATION.md)** - Behavioral specification for authentication (prompts, messages, login flow)
+- **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy and feature criteria
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Authentication implementation roadmap
+
 ---
 
 ## Table of Contents
@@ -443,35 +450,43 @@ impl AccessLevel for MyAccessLevel {
 
 ### Path-Based Access Validation
 
+Access control is enforced during path resolution, checking each segment as the tree is traversed:
+
 ```rust
 impl<'tree, L: AccessLevel, IO: CharIo> CliService<'tree, L, IO> {
-    fn validate_access(&self, node: &Node<L>) -> Result<(), CliError> {
-        // SAFETY: current_user is always Some() in LoggedIn state
-        // Access validation only occurs during command processing in LoggedIn state
-        let current_user = self.current_user
-            .as_ref()
-            .expect("BUG: validate_access called while not logged in");
+    fn resolve_path(&self, path: &Path) -> Result<&Node<L>, CliError> {
+        let mut current = self.get_current_directory();
 
-        // Check node's required access level
-        if current_user.access_level < node.access_level() {
-            // SECURITY: Return InvalidPath instead of AccessDenied to hide node existence
-            return Err(CliError::InvalidPath);
-        }
+        for segment in path.segments() {
+            // Find child by name
+            let child = current.find_child(segment)
+                .ok_or(CliError::InvalidPath)?;
 
-        // Check entire path from node to root
-        let mut current = Some(node);
-        while let Some(n) = current {
-            if current_user.access_level < n.access_level() {
-                // SECURITY: Return InvalidPath to hide inaccessible nodes
-                return Err(CliError::InvalidPath);
+            // Check access to this node
+            self.check_access(child)?;
+            //   └─ Returns InvalidPath if denied (see implementation above)
+
+            // Continue traversal if directory
+            if let Node::Directory(dir) = child {
+                current = dir;
+            } else {
+                return Ok(child);  // Command found
             }
-            current = n.parent();
         }
 
-        Ok(())
+        Ok(Node::Directory(current))
     }
+
+    // Access check implementation shown in "Access Control Implementation Pattern" above
 }
 ```
+
+**Key security properties:**
+- Access checked **at every path segment** during traversal
+- Inaccessible nodes return same error as non-existent nodes
+- No information leakage about node existence
+- Parent directory access doesn't imply child access (each node checked independently)
+- See INTERNALS.md for complete resolve_path() implementation with access control
 
 ### Node Access Levels
 
@@ -493,44 +508,102 @@ const ROOT: &[Node<MyAccessLevel>] = &[
 
 ---
 
-## Authentication Feature Gating
+## Authentication Feature Gating & Unified Architecture
 
-Authentication can be disabled via Cargo features for unsecured development environments. When disabled, the system uses a unified architecture approach that minimizes code branching.
+Authentication can be disabled via Cargo features for unsecured development environments. The implementation uses a **unified architecture approach** that maintains a single code path for both authentication-enabled and authentication-disabled modes.
 
-### Unified Architecture Approach
+### Unified Architecture Principles
 
-Instead of maintaining separate code paths, the implementation uses a unified state machine:
+Instead of maintaining separate implementations, the system uses a single state machine with consistent semantics:
 
-**When authentication is disabled:**
-- `current_user` is `None` (no user object needed)
-- State machine starts in `LoggedIn` state (bypasses login flow)
-- All access control checks unconditionally pass (skipped via `#[cfg]`)
-- Prompt generation treats `None` as empty username → `@path>` format
-- Welcome message shown: "Welcome to CLI Service. Type 'help' for help."
+**Core Design:**
+- `current_user: Option<User<L>>` field is **always present** (NOT feature-gated)
+- `state: CliState` enum drives behavior (same structure, different initial state)
+- Only the `credential_provider` field is conditionally compiled
 
-**State Semantics:**
-The combination of `state` and `current_user` determines behavior:
-- `state = LoggedOut, current_user = None` → Awaiting login (auth enabled)
-- `state = LoggedIn, current_user = Some(user)` → Authenticated user (auth enabled)
-- `state = LoggedIn, current_user = None` → Auth disabled (no user needed)
+**State and User Combinations:**
 
-**Benefits:**
-- Single state machine for both modes
-- Simplified prompt generation (always `username@path>`, username may be empty)
-- No artificial "system user" needed
-- Access control implementation naturally skips checks when auth disabled
-- Minimal code duplication
-- Consistent user experience across both modes
-- Easy to understand and maintain
+| `state` | `current_user` | Mode | Meaning |
+|---------|----------------|------|---------|
+| `LoggedOut` | `None` | Auth enabled | Awaiting login credentials |
+| `LoggedIn` | `Some(user)` | Auth enabled | Authenticated as specific user |
+| `LoggedIn` | `None` | Auth disabled | No authentication required |
 
-For detailed feature configuration patterns, conditional compilation examples, and build instructions, see the "Feature Gating & Optional Features" section in [DESIGN.md](DESIGN.md). For runtime authentication flow, see [INTERNALS.md](INTERNALS.md).
+**Behavioral Implications:**
+
+When authentication is **enabled** (default):
+- System starts: `state = LoggedOut`, `current_user = None`
+- Welcome message: "Welcome to CLI Service. Please login."
+- Prompt: `>` (no username until logged in)
+- After login: `state = LoggedIn`, `current_user = Some(user)`
+- Prompt becomes: `username@path>`
+- Access control checks enforced via `#[cfg(feature = "authentication")]` blocks
+
+When authentication is **disabled**:
+- System starts: `state = LoggedIn`, `current_user = None`
+- Welcome message: "Welcome to CLI Service. Type 'help' for help."
+- Prompt: `@path>` (empty username before `@` separator)
+- Access control checks compiled out (always allow)
+- No user object needed or created
+
+**Implementation Benefits:**
+- **Single state machine**: Same `CliState` enum, different initial state
+- **Unified prompt generation**: Always `username@path>` format (username may be empty string)
+- **Minimal branching**: Feature gates isolated to access control enforcement
+- **No artificial types**: No "system user" or dummy user objects
+- **Consistent UX**: Always shows welcome message and `@` separator
+- **Easy to reason about**: Behavior determined by state + user combination, not scattered `#[cfg]`
+
+### Access Control Implementation Pattern
+
+**Correct implementation** (matches DESIGN.md and INTERNALS.md):
+
+```rust
+fn check_access(&self, node: &Node<L>) -> Result<(), CliError> {
+    #[cfg(feature = "authentication")]
+    {
+        // SAFETY: When authentication is enabled, current_user is guaranteed
+        // to be Some() in LoggedIn state. Commands are only processed in
+        // LoggedIn state (see state machine in INTERNALS.md).
+        let user = self.current_user
+            .as_ref()
+            .expect("BUG: check_access called while not logged in");
+
+        if user.access_level < node.access_level() {
+            // SECURITY: Return InvalidPath to hide node existence
+            return Err(CliError::InvalidPath);
+        }
+    }
+
+    #[cfg(not(feature = "authentication"))]
+    {
+        let _ = node;  // Auth disabled, always allow
+    }
+
+    Ok(())
+}
+```
+
+**Key points:**
+- Access checks use `#[cfg]` feature gates, not runtime conditionals
+- When auth disabled, entire check is compiled out (zero runtime cost)
+- `current_user.expect()` is safe because:
+  - Auth enabled: `LoggedOut` state doesn't call `check_access()`
+  - Auth disabled: This code block doesn't exist (compiled out)
+
+### Configuration & Build
+
+For complete feature configuration patterns, conditional compilation examples, and build instructions, see:
+- **[DESIGN.md](DESIGN.md)** - Feature gating patterns and unified architecture details
+- **[INTERNALS.md](INTERNALS.md)** - Complete authentication flow and state machine
+- **[SPECIFICATION.md](SPECIFICATION.md)** - Behavioral specification for both modes
 
 **Quick Reference:**
 ```bash
 # With authentication (default)
 cargo build
 
-# Without authentication (uses system user)
+# Without authentication (no login required)
 cargo build --no-default-features
 
 # See DESIGN.md for complete configuration options
@@ -869,6 +942,14 @@ If your threat model requires stronger protections:
 
 ## Changelog
 
+- **2025-11-16**: Major update - Unified architecture alignment
+  - Added comprehensive unified architecture section explaining state + current_user semantics
+  - Fixed incorrect SAFETY comments and access control implementation patterns
+  - Updated feature gating section with correct `#[cfg]` patterns matching DESIGN.md
+  - Added cross-references to DESIGN.md, INTERNALS.md, SPECIFICATION.md
+  - Corrected path-based access validation examples
+  - Clarified that `current_user` field is NOT feature-gated (always present)
+  - Documented state machine behavior for both auth-enabled and auth-disabled modes
 - **2025-11-16**: Documentation cleanup
   - Removed migration guide (not applicable for new implementation)
 - **2025-11-09**: Initial security architecture document
@@ -880,11 +961,12 @@ If your threat model requires stronger protections:
 
 ## See Also
 
-- **[DESIGN.md](DESIGN.md)** - Authentication feature gating and unified architecture
-- **[INTERNALS.md](INTERNALS.md)** - Complete authentication flow from login to access control
-- **[SPECIFICATION.md](SPECIFICATION.md)** - Authentication behavioral specification
-- **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy
-- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Authentication implementation roadmap
+- **[DESIGN.md](DESIGN.md)** - Unified architecture pattern, feature gating, and authentication design decisions
+- **[INTERNALS.md](INTERNALS.md)** - Complete authentication flow, state machine, and access control enforcement
+- **[SPECIFICATION.md](SPECIFICATION.md)** - Behavioral specification (login flow, prompts, password masking)
+- **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy and feature decision framework
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Authentication implementation roadmap and testing strategy
+- **[../CLAUDE.md](../CLAUDE.md)** - Working patterns and practical implementation guidance
 
 ---
 
