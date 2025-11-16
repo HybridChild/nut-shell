@@ -62,7 +62,59 @@ const SYSTEM_DIR: &[Node<MyAccessLevel>] = &[
 
 For complete feature gating patterns, configuration examples, and build instructions, see ARCHITECTURE.md "Feature Gating & Optional Features" section.
 
-**Quick example:**
+**Recommended Pattern: Stub Functions** (aligns with unified architecture)
+
+```rust
+// src/tree/my_feature.rs - Module always exists
+#![cfg_attr(not(feature = "my_feature"), allow(unused_variables))]
+
+// Feature-enabled: Full implementation
+#[cfg(feature = "my_feature")]
+pub fn do_something<L: AccessLevel>(
+    node: &Node<L>,
+    input: &str,
+) -> Result<heapless::Vec<&str, 32>, CliError> {
+    // Real implementation
+}
+
+// Feature-disabled: Stub with identical signature
+#[cfg(not(feature = "my_feature"))]
+pub fn do_something<L: AccessLevel>(
+    _node: &Node<L>,
+    _input: &str,
+) -> Result<heapless::Vec<&str, 32>, CliError> {
+    Ok(heapless::Vec::new())  // No-op/empty result
+}
+```
+
+```rust
+// src/tree/mod.rs
+pub mod my_feature;  // Always include (contents are gated)
+pub use my_feature::do_something;
+
+// src/cli/mod.rs - NO feature gates needed!
+impl<'tree, L, IO> CliService<'tree, L, IO> {
+    fn some_method(&mut self) -> Result<(), CliError> {
+        // Works in both modes - stub returns empty when disabled
+        let results = my_feature::do_something(node, input)?;
+
+        if !results.is_empty() {
+            // Process results
+        }
+        // Empty = feature disabled, naturally no-op
+
+        Ok(())
+    }
+}
+```
+
+**Why this pattern?**
+- Single code path (no duplicate implementations)
+- Zero `#[cfg]` in main service code
+- Compiler optimizes away stub calls
+- Aligns with unified architecture principle
+
+**Alternative (when stub pattern doesn't fit):**
 ```rust
 #[cfg(feature = "my_feature")]
 pub mod my_module;
@@ -246,14 +298,20 @@ See ARCHITECTURE.md for complete module structure, feature gating patterns, and 
 
 ### ❌ Forgetting Feature Gates
 ```rust
-// WRONG: Always compiles
+// WRONG (old pattern): Always compiles
 use crate::tree::completion;
 
-// RIGHT: Conditional
+// OLD RIGHT: Conditional imports
 #[cfg(feature = "completion")]
 use crate::tree::completion;
+
+// BETTER (stub pattern): Module always available, contents gated
+// src/tree/completion.rs provides stub when feature disabled
+pub mod completion;  // No #[cfg] needed!
+use crate::tree::completion::suggest_completions;  // Works always
 ```
-See ARCHITECTURE.md for complete feature gating patterns.
+
+**Prefer stub function pattern** (see "Implementing a Feature-Gated Module" above) to minimize `#[cfg]` branching. See ARCHITECTURE.md for complete feature gating patterns.
 
 ### ❌ Using std Types
 ```rust

@@ -429,15 +429,72 @@ heapless = "0.8"
 - All completion code placed in ROM
 - Estimated compiled size: 1.5-2.5KB depending on optimization level
 
-#### Conditional Compilation
+#### Conditional Compilation - Stub Function Pattern
+
+**IMPORTANT:** Completion uses the **stub function pattern** to minimize `#[cfg]` branching in the main code path. This aligns with the unified architecture principle.
+
+**Pattern**: Provide identical function signatures for both feature-enabled and feature-disabled builds. The feature-disabled version returns empty/no-op results.
+
+```rust
+// src/tree/completion.rs - Module always exists, contents conditionally compiled
+#![cfg_attr(not(feature = "completion"), allow(unused_variables))]
+
+use crate::tree::{Node, Directory};
+use crate::auth::AccessLevel;
+use heapless::Vec;
+
+pub const MAX_SUGGESTIONS: usize = 32;
+
+// Feature-enabled: Full implementation
+#[cfg(feature = "completion")]
+pub fn suggest_completions<'a, L: AccessLevel>(
+    node: &'a Node<L>,
+    partial_input: &str,
+    access_level: Option<L>,
+) -> Result<Vec<&'a str, MAX_SUGGESTIONS>, CliError> {
+    let mut suggestions = Vec::new();
+
+    match node {
+        Node::Directory(dir) => {
+            for child in dir.children {
+                let name = child.name();
+                if name.starts_with(partial_input) {
+                    if has_access(child, access_level) {
+                        suggestions.push(name).map_err(|_| CliError::BufferFull)?;
+                    }
+                }
+            }
+        }
+        Node::Command(_) => {
+            // No children to complete
+        }
+    }
+
+    Ok(suggestions)
+}
+
+// Feature-disabled: Stub returns empty results
+#[cfg(not(feature = "completion"))]
+pub fn suggest_completions<'a, L: AccessLevel>(
+    _node: &'a Node<L>,
+    _partial_input: &str,
+    _access_level: Option<L>,
+) -> Result<Vec<&'a str, MAX_SUGGESTIONS>, CliError> {
+    Ok(Vec::new())  // No suggestions
+}
+
+// Helper function only needed when feature enabled
+#[cfg(feature = "completion")]
+fn has_access<L: AccessLevel>(node: &Node<L>, user_level: Option<L>) -> bool {
+    // Access check logic
+}
+```
 
 ```rust
 // src/tree/mod.rs
-#[cfg(feature = "completion")]
-pub mod completion;
+pub mod completion;  // Always include module (contents are feature-gated)
 
-#[cfg(feature = "completion")]
-pub use completion::{CompletionResult, complete_path};
+pub use completion::{suggest_completions, MAX_SUGGESTIONS};
 
 // src/cli/mod.rs
 pub struct CliService<'tree, L, IO>
@@ -445,49 +502,50 @@ where
     L: AccessLevel,
     IO: CharIo,
 {
-    #[cfg(feature = "completion")]
-    last_completion: Option<CompletionResult>,
+    // No feature-gated fields needed for completion
+    // (stateless algorithm, no persistent state)
 
     // ... other fields
 }
 
-// Tab key handling with dual implementation
-#[cfg(feature = "completion")]
+// Single implementation - NO feature gates needed!
 impl<'tree, L, IO> CliService<'tree, L, IO> {
     fn handle_tab(&mut self) -> Result<Response, CliError> {
-        // Full completion logic
-        #[cfg(feature = "authentication")]
-        let access_level = self.current_user.as_ref().map(|u| &u.access_level);
+        let current = self.get_current_node()?;
 
-        #[cfg(not(feature = "authentication"))]
-        let access_level = None;  // No auth: all nodes visible
-
-        let result = completion::complete_path(
-            &self.input_buffer,
-            self.current_directory(),
-            access_level
+        // Call works in both modes - stub returns empty Vec when disabled
+        let suggestions = completion::suggest_completions(
+            current,
+            self.input_buffer.as_str(),
+            self.current_user.as_ref().map(|u| u.access_level),
         )?;
 
-        // Store for potential re-display
-        self.last_completion = Some(result.clone());
+        // Behavior naturally adapts to empty vs. populated suggestions
+        if suggestions.len() == 1 {
+            // Auto-complete with single match
+            self.complete_input(suggestions[0])?;
+        } else if suggestions.len() > 1 {
+            // Display multiple options
+            self.display_suggestions(&suggestions)?;
+        }
+        // If empty (or feature disabled): no-op
 
-        // Return completion suggestions to user
-        Ok(Response::completion(result))
-    }
-}
-
-#[cfg(not(feature = "completion"))]
-impl<'tree, L, IO> CliService<'tree, L, IO> {
-    fn handle_tab(&mut self) -> Result<Response, CliError> {
-        // Option 1: Silent ignore (recommended for embedded)
-        Ok(Response::empty())
-
-        // Option 2: Echo literal tab character
-        // self.io.put_char('\t')?;
-        // Ok(Response::empty())
+        Ok(())
     }
 }
 ```
+
+**Benefits of Stub Function Pattern:**
+- **Zero `#[cfg]` in main input processing**: Single code path, no branching
+- **Zero runtime overhead**: Empty Vec creation optimized away by compiler
+- **Unified architecture alignment**: Behavior determined by return value, not feature flags
+- **Const-friendly**: No trait objects, just function pointers
+- **Minimal `#[cfg]` surface**: Feature gates isolated to completion module only
+- **Easy testing**: Can test both paths by toggling feature
+
+**Code Size Impact:**
+- **With feature disabled**: ~0 bytes (stub and caller optimized away)
+- **With feature enabled**: ~1.5-2.5KB (tree traversal + string matching logic)
 
 #### Implementation Details
 
