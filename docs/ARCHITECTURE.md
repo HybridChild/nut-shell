@@ -199,6 +199,7 @@ The Rust implementation provides optional features that can be enabled or disabl
 **Available Optional Features:**
 - **authentication**: User login and access control system (default: enabled)
 - **completion**: Tab completion for commands and paths (default: enabled)
+- **history**: Command history navigation with arrow keys (default: enabled)
 
 **Philosophy:**
 - Features are enabled by default for best user experience
@@ -610,6 +611,279 @@ cargo build --features "authentication,completion"
 
 ---
 
+### Command History Feature
+
+Command history provides arrow key navigation to recall and re-execute previously entered commands. While it significantly enhances interactive user experience, it can be disabled to save both flash and RAM in severely constrained embedded environments or when only programmatic/scripted CLI access is expected.
+
+#### Cargo.toml Configuration
+
+```toml
+[features]
+default = ["authentication", "completion", "history"]
+
+# Core authentication system
+authentication = []
+
+# Tab completion for commands and paths
+completion = []
+
+# Command history navigation
+history = []
+
+[dependencies]
+heapless = "0.8"
+
+# No additional dependencies required for history
+# (uses only heapless for bounded circular buffer)
+```
+
+#### Resource Impact
+
+| Build Configuration | Flash Usage | RAM Impact | Use Case |
+|---------------------|-------------|------------|----------|
+| **With history (N=10)** | +~500-800 bytes | ~1.3 KB | Interactive CLI, debugging |
+| **With history (N=4)** | +~500-800 bytes | ~0.5 KB | RAM-constrained interactive |
+| **Without history** | Baseline | 0 bytes | Scripted/programmatic only |
+
+**Memory Characteristics:**
+- **Flash (code size)**: ~500-800 bytes for history logic (circular buffer, navigation state)
+- **RAM (runtime)**: Configurable via const generic `HISTORY_SIZE`
+  - Default (N=10): ~1.3 KB (10 entries × 128 bytes + overhead)
+  - Constrained (N=4): ~0.5 KB (4 entries × 128 bytes + overhead)
+  - Disabled: 0 bytes (entire structure eliminated)
+- **Why not just use N=0?** Zero-capacity saves RAM but not flash (code still compiled). Feature gating eliminates both.
+
+**Design Decision: Feature Gating vs. Zero-Capacity**
+
+We chose feature gating over allowing `HISTORY_SIZE = 0` because:
+1. **Flash savings matter**: ~500-800 bytes saved on RP2040 (meaningful for bootloaders)
+2. **RAM already configurable**: Users who want history can choose their desired capacity
+3. **Clear intent**: Disabled feature vs. confusing "enabled but capacity 0" configuration
+4. **Code clarity**: Stub pattern eliminates dead code paths
+5. **Consistent with completion**: Both are interactive UX features that can be omitted
+
+#### Conditional Compilation - Stub Function Pattern
+
+Command history uses the stub pattern to maintain a single code path:
+
+```rust
+// src/cli/history.rs - Module always exists, contents conditionally compiled
+#![cfg_attr(not(feature = "history"), allow(unused_variables))]
+
+use heapless::{String, Vec};
+
+// Type exists in both modes with different implementations
+#[cfg(feature = "history")]
+pub struct CommandHistory<const N: usize> {
+    buffer: Vec<String<128>, N>,
+    position: Option<usize>,
+    original_buffer: Option<String<128>>,
+}
+
+#[cfg(not(feature = "history"))]
+pub struct CommandHistory<const N: usize> {
+    _phantom: core::marker::PhantomData<[(); N]>,
+}
+
+// Feature-enabled: Full circular buffer implementation
+#[cfg(feature = "history")]
+impl<const N: usize> CommandHistory<N> {
+    pub fn new() -> Self {
+        Self {
+            buffer: Vec::new(),
+            position: None,
+            original_buffer: None,
+        }
+    }
+
+    pub fn add(&mut self, cmd: &str) {
+        if self.buffer.is_full() {
+            self.buffer.remove(0);  // Remove oldest
+        }
+        let mut entry = String::new();
+        entry.push_str(cmd).ok();
+        self.buffer.push(entry).ok();
+        self.position = None;  // Reset navigation
+    }
+
+    pub fn previous(&mut self) -> Option<String<128>> {
+        if self.buffer.is_empty() {
+            return None;
+        }
+
+        let pos = match self.position {
+            None => self.buffer.len() - 1,
+            Some(0) => return None,  // Already at oldest
+            Some(p) => p - 1,
+        };
+
+        self.position = Some(pos);
+        self.buffer.get(pos).cloned()
+    }
+
+    pub fn next(&mut self) -> Option<String<128>> {
+        let pos = match self.position {
+            None => return None,  // Not navigating
+            Some(p) if p >= self.buffer.len() - 1 => {
+                // Reached newest, restore original
+                self.position = None;
+                return self.original_buffer.take();
+            }
+            Some(p) => p + 1,
+        };
+
+        self.position = Some(pos);
+        self.buffer.get(pos).cloned()
+    }
+
+    pub fn reset(&mut self) {
+        self.position = None;
+        self.original_buffer = None;
+    }
+
+    pub fn save_current(&mut self, buffer: String<128>) {
+        self.original_buffer = Some(buffer);
+    }
+}
+
+// Feature-disabled: Stub returns empty/no-op
+#[cfg(not(feature = "history"))]
+impl<const N: usize> CommandHistory<N> {
+    pub fn new() -> Self {
+        Self { _phantom: core::marker::PhantomData }
+    }
+
+    pub fn add(&mut self, _cmd: &str) {
+        // No-op
+    }
+
+    pub fn previous(&mut self) -> Option<String<128>> {
+        None  // No history available
+    }
+
+    pub fn next(&mut self) -> Option<String<128>> {
+        None  // No history available
+    }
+
+    pub fn reset(&mut self) {
+        // No-op
+    }
+
+    pub fn save_current(&mut self, _buffer: String<128>) {
+        // No-op
+    }
+}
+```
+
+```rust
+// src/cli/mod.rs
+pub mod history;
+pub use history::CommandHistory;
+
+pub struct CliService<'tree, L, IO, const HISTORY_SIZE: usize>
+where
+    L: AccessLevel,
+    IO: CharIo,
+{
+    history: CommandHistory<HISTORY_SIZE>,  // Always present
+    // ... other fields
+}
+
+// Single implementation - NO feature gates needed!
+impl<'tree, L, IO, const HISTORY_SIZE: usize> CliService<'tree, L, IO, HISTORY_SIZE> {
+    fn handle_up_arrow(&mut self) -> Result<(), CliError> {
+        // Works in both modes - stub returns None when disabled
+        if let Some(cmd) = self.history.previous() {
+            self.input_buffer = cmd;
+            self.redraw_line()?;
+        }
+        Ok(())
+    }
+
+    fn handle_down_arrow(&mut self) -> Result<(), CliError> {
+        if let Some(cmd) = self.history.next() {
+            self.input_buffer = cmd;
+            self.redraw_line()?;
+        }
+        Ok(())
+    }
+
+    fn handle_enter(&mut self) -> Result<(), CliError> {
+        let cmd = self.input_buffer.clone();
+
+        // Execute command...
+        let result = self.execute_command(&cmd)?;
+
+        // Add to history only if successful (stub no-ops when disabled)
+        if result.is_success() {
+            self.history.add(cmd.as_str());
+        }
+
+        self.history.reset();
+        Ok(())
+    }
+}
+```
+
+**Benefits of Stub Function Pattern:**
+- **Zero `#[cfg]` in main CLI service**: Single code path for input handling
+- **Zero overhead when disabled**: Entire struct and all methods optimized away
+- **Configurable capacity when enabled**: Use const generic `HISTORY_SIZE` (4, 10, etc.)
+- **Unified architecture alignment**: Behavior determined by return value (None), not feature flags
+- **Minimal `#[cfg]` surface**: Feature gates isolated to history module only
+- **Easy testing**: Toggle feature to test both interactive and minimal builds
+
+#### Build Examples
+
+```bash
+# Default build (history enabled with 10 entries)
+cargo build
+
+# Minimal build without history
+cargo build --no-default-features --features authentication
+
+# Embedded target with small history (4 entries)
+# Note: HISTORY_SIZE configured via type parameter, not feature flag
+cargo build --target thumbv6m-none-eabi --release
+
+# Embedded target without history (maximum size + RAM optimization)
+cargo build --target thumbv6m-none-eabi --release \
+  --no-default-features --features authentication
+
+# Test all feature combinations
+cargo test --all-features
+cargo test --no-default-features
+cargo test --features authentication,history
+```
+
+#### When to Enable/Disable
+
+**Enable history when:**
+- ✅ Interactive CLI usage by human operators
+- ✅ Development and debugging workflows
+- ✅ RAM available (>512 bytes free for N=4, >1.3KB for N=10)
+- ✅ Flash not critically constrained
+- ✅ Repeated command execution expected
+- ✅ Training/learning environment
+
+**Disable history when:**
+- ❌ Flash size is critically constrained (bootloaders, recovery mode)
+- ❌ RAM extremely limited (<16 KB total system RAM)
+- ❌ Only programmatic/scripted CLI access (commands sent once)
+- ❌ Read-only/kiosk mode (users shouldn't recall commands)
+- ❌ Headless operation with no interactive terminal
+- ❌ Minimal attack surface required
+
+**Security Considerations:**
+- History stores successfully executed commands only (not failed attempts)
+- Login credentials are never stored in history
+- History cleared on logout (when authentication enabled)
+- No sensitive data leakage through history recall
+- Minimal attack surface (simple circular buffer)
+- Safe to enable in most security contexts
+
+---
+
 ### Combined Feature Configuration
 
 Multiple features can be enabled or disabled in combination to suit different deployment scenarios.
@@ -619,7 +893,7 @@ Multiple features can be enabled or disabled in combination to suit different de
 ```toml
 # Full-featured build (default)
 [features]
-default = ["authentication", "completion"]
+default = ["authentication", "completion", "history"]
 
 # Minimal embedded (size-optimized)
 [features]
@@ -627,11 +901,16 @@ default = []
 
 # Interactive but unsecured (development only)
 [features]
-default = ["completion"]
+default = ["completion", "history"]
 
 # Secured but non-interactive (scripted access)
 [features]
 default = ["authentication"]
+
+# Interactive with minimal RAM (small history)
+[features]
+default = ["authentication", "completion", "history"]
+# Note: Set HISTORY_SIZE=4 via const generic to reduce RAM from 1.3KB to 0.5KB
 ```
 
 #### Build Examples by Scenario
@@ -640,15 +919,15 @@ default = ["authentication"]
 # Development workstation (full features, fast iteration)
 cargo build --all-features
 
-# Production embedded device (both features)
+# Production embedded device (all features)
 cargo build --target thumbv6m-none-eabi --release
 
-# Constrained device (authentication only, ~2KB saved)
+# Constrained device (authentication only, ~4-5KB flash + 1.3KB RAM saved)
 cargo build --target thumbv6m-none-eabi --release \
   --no-default-features --features authentication
 
-# Unsecured lab equipment (completion only, for ease of use)
-cargo build --no-default-features --features completion
+# Unsecured lab equipment (interactive features only, for ease of use)
+cargo build --no-default-features --features completion,history
 
 # Minimal bootloader/recovery (no optional features)
 cargo build --target thumbv6m-none-eabi --release --no-default-features
@@ -658,6 +937,10 @@ cargo test --all-features
 cargo test --no-default-features
 cargo test --features authentication
 cargo test --features completion
+cargo test --features history
+cargo test --features authentication,completion
+cargo test --features authentication,history
+cargo test --features completion,history
 ```
 
 #### Feature Dependencies
@@ -671,18 +954,25 @@ completion (independent)
   ├── No dependencies on other features
   └── Requires: No additional crates (uses heapless only)
 
-Note: Features are completely independent and can be
+history (independent)
+  ├── No dependencies on other features
+  └── Requires: No additional crates (uses heapless only)
+
+Note: All features are completely independent and can be
 enabled in any combination without conflicts.
 ```
 
 #### Code Size Comparison
 
-| Configuration | Estimated Flash | Use Case |
-|---------------|----------------|----------|
-| `--no-default-features` | Baseline | Absolute minimum |
-| `--features authentication` | Baseline + ~2KB | Secured, non-interactive |
-| `--features completion` | Baseline + ~2KB | Interactive, unsecured |
-| `--features authentication,completion` | Baseline + ~4KB | Full-featured (default) |
+| Configuration | Estimated Flash | Estimated RAM | Use Case |
+|---------------|----------------|---------------|----------|
+| `--no-default-features` | Baseline | Baseline | Absolute minimum |
+| `--features authentication` | +~2 KB | +0 bytes | Secured, non-interactive |
+| `--features completion` | +~2 KB | +0 bytes | Interactive, unsecured, stateless |
+| `--features history` | +~0.5-0.8 KB | +1.3 KB (N=10) | Non-interactive with recall |
+| `--features completion,history` | +~2.5-3 KB | +1.3 KB | Interactive, unsecured |
+| `--features authentication,completion` | +~4 KB | +0 bytes | Secured, interactive, stateless |
+| `--all-features` (default) | +~4.5-5 KB | +1.3 KB | Full-featured |
 
 *Note: Actual sizes depend on target architecture, optimization level, and LLVM version. Use `cargo size` to measure your specific build.*
 

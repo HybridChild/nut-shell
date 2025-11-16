@@ -114,6 +114,31 @@ impl<'tree, L, IO> CliService<'tree, L, IO> {
 - Compiler optimizes away stub calls
 - Aligns with unified architecture principle
 
+**Pattern Variations:**
+
+For stateful types (like `CommandHistory`):
+```rust
+// Feature-enabled: Full struct
+#[cfg(feature = "history")]
+pub struct CommandHistory<const N: usize> {
+    buffer: heapless::Vec<heapless::String<128>, N>,
+    position: Option<usize>,
+}
+
+// Feature-disabled: Zero-size stub
+#[cfg(not(feature = "history"))]
+pub struct CommandHistory<const N: usize> {
+    _phantom: core::marker::PhantomData<[(); N]>,
+}
+
+// Both modes implement identical API
+impl<const N: usize> CommandHistory<N> {
+    pub fn new() -> Self { /* ... */ }
+    pub fn add(&mut self, cmd: &str) { /* real or no-op */ }
+    pub fn previous(&mut self) -> Option<heapless::String<128>> { /* real or None */ }
+}
+```
+
 **Alternative (when stub pattern doesn't fit):**
 ```rust
 #[cfg(feature = "my_feature")]
@@ -361,6 +386,21 @@ buf.push_str(&long_string); // Can panic!
 buf.push_str(&long_string).map_err(|_| Error::BufferFull)?;
 ```
 
+### ❌ Using N=0 Instead of Feature Gating
+```rust
+// WRONG: Zero-capacity saves RAM but not flash
+type History = CommandHistory<0>;  // Code still compiled, just unused
+
+// RIGHT: Feature gate to eliminate code entirely
+#[cfg(feature = "history")]
+type History = CommandHistory<10>;
+
+#[cfg(not(feature = "history"))]
+type History = CommandHistory<0>;  // Stub compiled instead
+```
+
+**Rule of thumb:** If disabling functionality should save flash (not just RAM), use feature gating with stub pattern.
+
 ---
 
 ## Testing Patterns
@@ -416,17 +456,25 @@ Quick reference for frequent operations:
 ```bash
 # Development
 cargo check                              # Fast compile check
-cargo test                               # Run tests
+cargo test                               # Run tests (all features enabled by default)
 cargo clippy                             # Lint code
 cargo fmt                                # Format code
 
 # Feature testing
-cargo test --all-features                # Test with all features
-cargo test --no-default-features         # Test minimal configuration
+cargo test --all-features                # Test with all features (authentication, completion, history)
+cargo test --no-default-features         # Test minimal configuration (no optional features)
+cargo test --features authentication     # Test auth only
+cargo test --features completion,history # Test interactive features only
 
 # Embedded target
 cargo check --target thumbv6m-none-eabi  # Verify no_std compliance
+cargo build --target thumbv6m-none-eabi --release  # Release build (all features)
+cargo build --target thumbv6m-none-eabi --release --no-default-features  # Minimal build
 cargo size --target thumbv6m-none-eabi --release -- -A  # Measure binary size
+
+# Size optimization comparisons
+cargo size --target thumbv6m-none-eabi --release --all-features -- -A
+cargo size --target thumbv6m-none-eabi --release --no-default-features --features authentication -- -A
 
 # Pre-commit
 cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-features
