@@ -23,10 +23,10 @@ The architectural decisions and patterns documented here represent our current b
 
 | Need | Document | What You'll Find |
 |------|----------|------------------|
-| Exact behavior (I/O, auth, commands) | **docs/SPECIFICATION.md** | Terminal sequences, password masking, command syntax |
-| Why architecture chosen this way | **docs/ARCHITECTURE.md** | Design rationale, alternatives considered, feature gating |
+| Exact behavior (I/O, auth, commands) | **docs/SPECIFICATION.md** | Terminal sequences, password masking, command syntax, startup behavior |
+| Why architecture chosen this way | **docs/ARCHITECTURE.md** | Design rationale, unified architecture pattern, feature gating |
 | Implementation order and tasks | **docs/IMPLEMENTATION.md** | 10-phase roadmap, task breakdown, what to build next |
-| Security patterns and credential storage | **docs/SECURITY.md** | Password hashing, access control, credential providers |
+| Security patterns and credential storage | **docs/SECURITY.md** | Password hashing, access control, system user concept |
 
 ---
 
@@ -60,20 +60,45 @@ const SYSTEM_DIR: &[Node<MyAccessLevel>] = &[
 
 ### Implementing a Feature-Gated Module
 
-```rust
-// In Cargo.toml
-[features]
-my_feature = []
+For complete feature gating patterns, configuration examples, and build instructions, see ARCHITECTURE.md "Feature Gating & Optional Features" section.
 
-// In lib.rs
+**Quick example:**
+```rust
 #[cfg(feature = "my_feature")]
 pub mod my_module;
 
-// Provide no-op fallback when disabled
 #[cfg(not(feature = "my_feature"))]
 impl SomeType {
-    pub fn feature_method(&self) -> Result<()> {
-        Ok(()) // Silent no-op
+    pub fn feature_method(&self) -> Result<()> { Ok(()) }
+}
+```
+
+### Implementing AccessLevel Trait
+
+```rust
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MyAccessLevel {
+    Guest = 0,
+    User = 1,
+    Admin = 2,
+}
+
+impl AccessLevel for MyAccessLevel {
+    fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "Guest" => Some(Self::Guest),
+            "User" => Some(Self::User),
+            "Admin" => Some(Self::Admin),
+            _ => None,
+        }
+    }
+
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Guest => "Guest",
+            Self::User => "User",
+            Self::Admin => "Admin",
+        }
     }
 }
 ```
@@ -117,6 +142,43 @@ mod tests {
     }
 }
 ```
+
+---
+
+## Core Architecture Patterns
+
+### Unified Architecture (Auth-Enabled vs Auth-Disabled)
+
+**IMPORTANT: Use a single code path for both authentication modes. Do NOT create duplicate implementations.**
+
+**Implementation pattern:**
+```rust
+pub struct CliService<'tree, L, IO> {
+    current_user: Option<User<L>>,  // Always present (not feature-gated)
+    state: CliState,                // Always present (not feature-gated)
+
+    #[cfg(feature = "authentication")]
+    credential_provider: &'tree dyn CredentialProvider<L>,  // Only this field is conditional
+
+    // ... other fields
+}
+```
+
+**Constructor behavior:**
+- Auth enabled: `current_user = None`, `state = CliState::LoggedOut`
+- Auth disabled: `current_user = None`, `state = CliState::LoggedIn`
+
+**State and user semantics:**
+- `state = LoggedOut, current_user = None` → Awaiting login (auth enabled)
+- `state = LoggedIn, current_user = Some(user)` → Authenticated (auth enabled)
+- `state = LoggedIn, current_user = None` → Auth disabled (no user needed)
+
+**State-driven behavior (minimal `#[cfg]` branching):**
+- Let `CliState` variant determine behavior, not feature flags
+- Single `activate()`, `generate_prompt()`, `check_access()` implementation
+- Feature gates only where absolutely necessary (constructor, credential provider)
+
+**See ARCHITECTURE.md** for complete pattern with code examples.
 
 ---
 
@@ -174,25 +236,9 @@ where
 - **Zero overhead**: No runtime dispatch, fully inlined
 - **Lifetime `'tree`**: References tree data (static or const)
 
-### Feature Gating Pattern
-```rust
-// Field present only when feature enabled
-struct Service {
-    #[cfg(feature = "auth")]
-    current_user: Option<User>,
-}
-
-// Dual implementation
-#[cfg(feature = "auth")]
-impl Service { /* full auth logic */ }
-
-#[cfg(not(feature = "auth"))]
-impl Service { /* no-op stubs */ }
-```
-
 ### Module Structure
 
-See ARCHITECTURE.md for complete module structure and organization rationale.
+See ARCHITECTURE.md for complete module structure, feature gating patterns, and organization rationale.
 
 ---
 
@@ -200,13 +246,14 @@ See ARCHITECTURE.md for complete module structure and organization rationale.
 
 ### ❌ Forgetting Feature Gates
 ```rust
-// WRONG: Always compiles completion code
+// WRONG: Always compiles
 use crate::tree::completion;
 
-// RIGHT: Conditional import
+// RIGHT: Conditional
 #[cfg(feature = "completion")]
 use crate::tree::completion;
 ```
+See ARCHITECTURE.md for complete feature gating patterns.
 
 ### ❌ Using std Types
 ```rust

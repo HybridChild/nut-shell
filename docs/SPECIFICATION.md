@@ -61,7 +61,25 @@ The CLI recognizes ANSI escape sequences for terminal navigation.
 
 ## Authentication Flow
 
-### Login Process
+### Authentication Feature Status
+
+Authentication can be disabled at compile time via Cargo features (see ARCHITECTURE.md). The behavior differs based on this configuration:
+
+**When authentication is enabled (default):**
+- System starts in logged-out state requiring login
+- Welcome message displayed on activation
+- Login prompt shown: `> `
+- User must authenticate before accessing commands
+- Access control enforced based on user permissions
+
+**When authentication is disabled:**
+- System starts in logged-in state with implicit system access
+- Welcome message displayed without login instruction
+- Command prompt shown immediately: `@/> ` (no username before `@`)
+- All commands accessible without login
+- No access control enforcement
+
+### Login Process (Authentication Enabled)
 
 **Input format:** `username:password`
 
@@ -101,7 +119,7 @@ Output: a d m i n : * * * *
 
 ### Authentication States
 
-**State transitions:**
+**State transitions (authentication enabled):**
 
 ```
 Inactive → LoggedOut (on activate)
@@ -110,20 +128,33 @@ LoggedIn → LoggedOut (logout command)
 LoggedIn → Inactive (exit command)
 ```
 
+**State transitions (authentication disabled):**
+
+```
+Inactive → LoggedIn (on activate)
+LoggedIn → Inactive (exit command)
+```
+
 **State-dependent behavior:**
-- **LoggedOut**: Only accepts login attempts, password masking active, no tab/history
+- **LoggedOut** (auth enabled only): Only accepts login attempts, password masking active, no tab/history
 - **LoggedIn**: Full command access, tab completion, history navigation
 - **Inactive**: CLI not processing input
 
 ### Session Messages
 
-**Default messages:**
+**Default messages (authentication enabled):**
 ```
 Welcome: "Welcome to CLI Service. Please login."
 Logged in: "Logged in. Type 'help' for help."
 Logged out: "Logged out."
 Exit: "Exiting CLI Service."
 Invalid login: "Invalid login attempt. Please enter <username>:<password>"
+```
+
+**Default messages (authentication disabled):**
+```
+Welcome: "Welcome to CLI Service. Type 'help' for help."
+Exit: "Exiting CLI Service."
 ```
 
 All messages are customizable via configuration.
@@ -326,18 +357,28 @@ Commands can return custom error strings with appropriate status codes.
 
 ### Prompt Format
 
-**Prompt structure:** `username@path> `
+**Prompt structure (authentication enabled):** `username@path> `
 
-**Examples:**
+**Examples (authentication enabled):**
 ```
+> (logged out, no username yet)
 user@/>
 admin@/system>
 guest@/hw/sensors>
 ```
 
+**Prompt structure (authentication disabled):** `@path> `
+
+**Examples (authentication disabled):**
+```
+@/>
+@/system>
+@/hw/sensors>
+```
+
 **Components:**
-- Username: Current authenticated user
-- `@`: Separator
+- Username: Current authenticated user (empty when auth disabled)
+- `@`: Separator between username and path (always present)
 - Path: Current location in directory tree (always starts with `/`)
 - `> `: Command prompt indicator (space after `>`)
 
@@ -385,7 +426,7 @@ admin@/system> ?
 
 List all global commands available.
 
-**Format:**
+**Format (authentication enabled):**
 ```
 > help
 
@@ -395,22 +436,36 @@ List all global commands available.
   clear  - Clear screen
 ```
 
+**Format (authentication disabled):**
+```
+> help
+
+  help   - List global commands
+  ?      - Detail items in current directory
+  clear  - Clear screen
+```
+
 **Behavior:**
 - Always available when logged in
 - Lists global commands only (not tree-specific commands)
+- `logout` command only shown when authentication feature enabled
 - Indented output format
 - Brief descriptions
 
 ### `logout` - End Session
 
-Return to login prompt.
+Return to login prompt. **Only available when authentication feature is enabled.**
 
-**Behavior:**
+**Behavior (authentication enabled):**
 - Available when logged in
 - Clears current user
 - Transitions to LoggedOut state
 - Displays logout message
 - Clears command history (implementation-defined)
+
+**Behavior (authentication disabled):**
+- Command not available
+- Not listed in `help` output
 
 **Example:**
 ```

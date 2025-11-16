@@ -127,7 +127,7 @@ fn parse_input(input: &str) -> Result<Request, ParseError> {
 **Alternative Considered**: Trait objects (runtime overhead, no const init)
 
 ### 4. Authentication System
-**Decision**: Optional authentication with trait-based credential providers
+**Decision**: Optional authentication with trait-based credential providers, using a unified architecture that minimizes code branching
 
 **Rationale**: Different deployments have different security requirements:
 - Development/debugging environments may not need authentication
@@ -139,8 +139,34 @@ fn parse_input(input: &str) -> Result<Request, ParseError> {
 - `CredentialProvider` trait enables pluggable authentication backends
 - Password hashing (SHA-256 with salts) instead of plaintext storage
 - User credentials never hardcoded in source code
+- **Unified architecture**: Single state machine and code path for both auth-enabled and auth-disabled modes
 
-**Alternative Considered**: Mandatory authentication with fixed credential storage
+**Unified Architecture Pattern**:
+The implementation uses a single code path for both authentication modes to minimize complexity:
+
+- **Always track current user**: `current_user: Option<User<L>>` exists in both modes
+  - Auth enabled, logged out: `None` (awaiting login)
+  - Auth enabled, logged in: `Some(user)` (authenticated user)
+  - Auth disabled: `None` (no user needed, access checks skipped)
+
+- **Single state machine**: Same `CliState` enum, different initial state
+  - Auth enabled: Starts in `LoggedOut` state, transitions to `LoggedIn` after authentication
+  - Auth disabled: Starts in `LoggedIn` state immediately
+
+- **State and user combination determines behavior**:
+  - `state = LoggedOut, current_user = None` → Awaiting login (auth enabled)
+  - `state = LoggedIn, current_user = Some(user)` → Authenticated (auth enabled)
+  - `state = LoggedIn, current_user = None` → Auth disabled (no checks)
+
+- **Unified prompt generation**: Single `generate_prompt()` function
+  - Always uses format: `username@path> `
+  - `None` or empty username → `@path> `
+  - Authenticated user → `username@path> `
+
+- **Conditional fields only when necessary**: Only `credential_provider` requires feature gating
+  - State management, user tracking, and prompt logic work identically in both modes
+
+**Alternative Considered**: Separate implementations for auth-enabled/disabled (rejected due to code duplication)
 
 **Feature Gating**: Authentication is optional and can be disabled via Cargo features for unsecured development environments or when authentication is handled externally. When disabled, access control checks are eliminated and all commands are accessible. Estimated code savings: ~2KB for core auth logic, plus dependencies (sha2, subtle). See "Feature Gating & Optional Features" section below for detailed configuration patterns. See SECURITY.md for comprehensive security design and credential storage options.
 
@@ -209,15 +235,19 @@ subtle = { version = "2.5", default-features = false, optional = true }
 rp2040-flash = { version = "0.3", optional = true }
 ```
 
-#### Conditional Compilation
+#### Conditional Compilation - Unified Architecture
+
+The implementation minimizes code branching by using a unified architecture:
 
 ```rust
 // src/lib.rs
 #[cfg(feature = "authentication")]
 pub mod auth;
 
+pub use auth::{User, AccessLevel};  // Always available
+
 #[cfg(feature = "authentication")]
-pub use auth::{User, AccessLevel, CredentialProvider};
+pub use auth::CredentialProvider;
 
 // src/cli/mod.rs
 pub struct CliService<'tree, L, IO>
@@ -225,39 +255,124 @@ where
     L: AccessLevel,
     IO: CharIo,
 {
-    #[cfg(feature = "authentication")]
+    // UNIFIED: Always track current user (None = logged out, Some = logged in)
     current_user: Option<User<L>>,
 
+    // UNIFIED: Same state machine for both modes
+    state: CliState,
+
+    // CONDITIONAL: Only need provider when auth enabled
     #[cfg(feature = "authentication")]
     credential_provider: &'tree dyn CredentialProvider<L>,
 
-    #[cfg(feature = "authentication")]
-    state: CliState,  // LoggedOut | LoggedIn | Inactive
-
-    // When authentication disabled: CLI is always "active" (no login state)
-    // ... other fields
+    // ... other fields (tree, io, parser, history, etc.)
 }
 
+// State enum - same for both modes, different variants available
+pub enum CliState {
+    #[cfg(feature = "authentication")]
+    LoggedOut,  // Only exists when auth enabled
+
+    LoggedIn,   // Always available
+    Inactive,   // Always available
+}
+
+// Constructors differ based on feature
 #[cfg(feature = "authentication")]
 impl<'tree, L, IO> CliService<'tree, L, IO> {
-    pub fn login(&mut self, username: &str, password: &str) -> Result<(), CliError> {
-        // Authentication logic
+    pub fn new(
+        tree: &'tree Directory<L>,
+        provider: &'tree dyn CredentialProvider<L>,
+        io: IO
+    ) -> Self {
+        Self {
+            current_user: None,  // Start logged out
+            state: CliState::LoggedOut,
+            credential_provider: provider,
+            // ... other fields
+        }
     }
 }
 
 #[cfg(not(feature = "authentication"))]
 impl<'tree, L, IO> CliService<'tree, L, IO> {
-    // No-op login (always succeeds)
-    pub fn login(&mut self, _username: &str, _password: &str) -> Result<(), CliError> {
+    pub fn new(tree: &'tree Directory<L>, io: IO) -> Self {
+        Self {
+            current_user: None,  // No user needed when auth disabled
+            state: CliState::LoggedIn,  // Start in logged-in state
+            // ... other fields
+        }
+    }
+}
+
+// Unified activation - state determines behavior
+impl<'tree, L, IO> CliService<'tree, L, IO> {
+    pub fn activate(&mut self) -> Result<(), IO::Error> {
+        // Show welcome message based on state
+        match self.state {
+            #[cfg(feature = "authentication")]
+            CliState::LoggedOut => {
+                self.io.write_str("\r\nWelcome to CLI Service. Please login.\r\n\r\n")?;
+            }
+            CliState::LoggedIn => {
+                self.io.write_str("\r\nWelcome to CLI Service. Type 'help' for help.\r\n\r\n")?;
+            }
+            CliState::Inactive => {}
+        }
+
+        // Always show prompt (format depends on current_user)
+        self.show_prompt()?;
         Ok(())
     }
 
-    // Access control always allows
-    fn validate_access(&self, _node: &Node<L>) -> Result<(), CliError> {
+    // Unified prompt generation - simplified
+    fn generate_prompt(&self) -> heapless::String<64> {
+        let mut prompt = heapless::String::new();
+
+        // Get username (empty string if no current user or system user)
+        let username = self.current_user
+            .as_ref()
+            .map(|u| u.username.as_str())
+            .unwrap_or("");
+
+        // Always use format: username@path>
+        prompt.push_str(username).ok();
+        prompt.push('@').ok();
+        prompt.push_str(&self.current_path()).ok();
+        prompt.push_str("> ").ok();
+        prompt
+    }
+
+    // Unified access control
+    fn check_access(&self, node: &Node<L>) -> Result<(), CliError> {
+        #[cfg(feature = "authentication")]
+        {
+            let user = self.current_user
+                .as_ref()
+                .ok_or(CliError::NotLoggedIn)?;
+
+            if user.access_level < node.access_level() {
+                return Err(CliError::InvalidPath);  // Security: hide inaccessible
+            }
+        }
+
+        #[cfg(not(feature = "authentication"))]
+        {
+            let _ = node;  // Auth disabled, always allow
+        }
+
         Ok(())
     }
 }
 ```
+
+**Benefits of Unified Approach:**
+- Single state machine instead of divergent implementations
+- Simplified prompt generation (always `username@path>` format, username may be empty)
+- Same access control structure (just different enforcement)
+- Minimal `#[cfg]` blocks scattered throughout code
+- Easy to reason about behavior in both modes
+- Consistent user experience (always shows welcome message and `@` separator)
 
 #### Build Examples
 

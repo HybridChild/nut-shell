@@ -96,8 +96,13 @@ pub trait CredentialProvider<L: AccessLevel> {
 // User with generic access level and hashed credentials
 pub struct User<L: AccessLevel> {
     pub username: heapless::String<32>,
+
+    #[cfg(feature = "authentication")]
     pub password_hash: [u8; 32],  // SHA-256 hash
+
+    #[cfg(feature = "authentication")]
     pub salt: [u8; 16],           // User-specific salt
+
     pub access_level: L,
 }
 
@@ -487,7 +492,33 @@ const ROOT: &[Node<MyAccessLevel>] = &[
 
 ## Authentication Feature Gating
 
-Authentication can be disabled via Cargo features for unsecured development environments. When disabled, all access control checks are eliminated and all commands are accessible.
+Authentication can be disabled via Cargo features for unsecured development environments. When disabled, the system uses a unified architecture approach that minimizes code branching.
+
+### Unified Architecture Approach
+
+Instead of maintaining separate code paths, the implementation uses a unified state machine:
+
+**When authentication is disabled:**
+- `current_user` is `None` (no user object needed)
+- State machine starts in `LoggedIn` state (bypasses login flow)
+- All access control checks unconditionally pass (skipped via `#[cfg]`)
+- Prompt generation treats `None` as empty username → `@path>` format
+- Welcome message shown: "Welcome to CLI Service. Type 'help' for help."
+
+**State Semantics:**
+The combination of `state` and `current_user` determines behavior:
+- `state = LoggedOut, current_user = None` → Awaiting login (auth enabled)
+- `state = LoggedIn, current_user = Some(user)` → Authenticated user (auth enabled)
+- `state = LoggedIn, current_user = None` → Auth disabled (no user needed)
+
+**Benefits:**
+- Single state machine for both modes
+- Simplified prompt generation (always `username@path>`, username may be empty)
+- No artificial "system user" needed
+- Access control implementation naturally skips checks when auth disabled
+- Minimal code duplication
+- Consistent user experience across both modes
+- Easy to understand and maintain
 
 For detailed feature configuration patterns, conditional compilation examples, and build instructions, see the "Feature Gating & Optional Features" section in ARCHITECTURE.md.
 
@@ -496,7 +527,7 @@ For detailed feature configuration patterns, conditional compilation examples, a
 # With authentication (default)
 cargo build
 
-# Without authentication
+# Without authentication (uses system user)
 cargo build --no-default-features
 
 # See ARCHITECTURE.md for complete configuration options
