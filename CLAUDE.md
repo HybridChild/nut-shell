@@ -27,10 +27,12 @@ The architectural decisions and patterns documented here represent our current b
 
 | Need | Document | What You'll Find |
 |------|----------|------------------|
-| Exact behavior (I/O, auth, commands) | **docs/SPECIFICATION.md** | Terminal sequences, password masking, command syntax, startup behavior |
-| Why architecture chosen this way | **docs/ARCHITECTURE.md** | Design rationale, unified architecture pattern, feature gating |
-| Implementation order and tasks | **docs/IMPLEMENTATION.md** | 10-phase roadmap, task breakdown, what to build next |
-| Security patterns and credential storage | **docs/SECURITY.md** | Password hashing, access control, system user concept |
+| Exact behavior (I/O, auth, commands) | **[docs/SPECIFICATION.md](docs/SPECIFICATION.md)** | Terminal sequences, password masking, command syntax, startup behavior |
+| Why it's designed this way | **[docs/DESIGN.md](docs/DESIGN.md)** | Design rationale, unified architecture pattern, feature gating |
+| How system works at runtime | **[docs/INTERNALS.md](docs/INTERNALS.md)** | Complete data flow, state machines, pseudocode implementations |
+| Implementation order and tasks | **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** | 10-phase roadmap, task breakdown, what to build next |
+| Security patterns and credential storage | **[docs/SECURITY.md](docs/SECURITY.md)** | Password hashing, access control, authentication flow |
+| Design philosophy and feature criteria | **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** | What we include/exclude, decision framework |
 
 ---
 
@@ -91,7 +93,7 @@ fn help_command() -> Response {
 
 ### Implementing a Feature-Gated Module
 
-For complete feature gating patterns, configuration examples, and build instructions, see ARCHITECTURE.md "Feature Gating & Optional Features" section.
+For complete feature gating patterns, configuration examples, and build instructions, see DESIGN.md "Feature Gating & Optional Features" section.
 
 **Recommended Pattern: Stub Functions** (aligns with unified architecture)
 
@@ -323,7 +325,7 @@ pub struct CliService<'tree, L, IO> {
 - Single `activate()`, `generate_prompt()`, `check_access()` implementation
 - Feature gates only where absolutely necessary (constructor, credential provider)
 
-**See ARCHITECTURE.md** for complete pattern with code examples.
+**See DESIGN.md** for complete pattern with code examples.
 
 ---
 
@@ -383,7 +385,7 @@ where
 
 ### Module Structure
 
-See ARCHITECTURE.md for complete module structure, feature gating patterns, and organization rationale.
+See DESIGN.md for complete module structure, feature gating patterns, and organization rationale.
 
 ---
 
@@ -404,7 +406,7 @@ pub mod completion;  // No #[cfg] needed!
 use crate::tree::completion::suggest_completions;  // Works always
 ```
 
-**Prefer stub function pattern** (see "Implementing a Feature-Gated Module" above) to minimize `#[cfg]` branching. See ARCHITECTURE.md for complete feature gating patterns.
+**Prefer stub function pattern** (see "Implementing a Feature-Gated Module" above) to minimize `#[cfg]` branching. See DESIGN.md for complete feature gating patterns.
 
 ### ❌ Using std Types
 ```rust
@@ -600,8 +602,21 @@ cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-feat
 8. **Document public APIs** with doc comments
 
 **When stuck:**
-- SPECIFICATION.md for "what should this do?"
-- ARCHITECTURE.md for "why is it designed this way?"
-- SECURITY.md for authentication/access control specifics
-- This file (CLAUDE.md) for constraints and patterns
+- **[docs/SPECIFICATION.md](docs/SPECIFICATION.md)** for "what should this do?"
+- **[docs/DESIGN.md](docs/DESIGN.md)** for "why is it designed this way?"
+- **[docs/INTERNALS.md](docs/INTERNALS.md)** for "how does this work at runtime?"
+- **[docs/SECURITY.md](docs/SECURITY.md)** for authentication/access control specifics
+- **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** for "should we add this feature?"
+- **This file (CLAUDE.md)** for constraints and patterns
 - **If the documented approach seems problematic**: Ask! Design can evolve based on implementation insights
+
+---
+
+## Documentation Quick Links
+
+- **[docs/DESIGN.md](docs/DESIGN.md)** - Design decisions, rationale, feature gating
+- **[docs/INTERNALS.md](docs/INTERNALS.md)** - Runtime behavior, data flow, state machines
+- **[docs/SPECIFICATION.md](docs/SPECIFICATION.md)** - Complete behavioral specification
+- **[docs/SECURITY.md](docs/SECURITY.md)** - Authentication, access control security
+- **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** - Design philosophy, feature framework
+- **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** - Implementation roadmap, build commands

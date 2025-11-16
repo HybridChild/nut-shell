@@ -1,6 +1,6 @@
 # cli-service Rust Port - Implementation Plan
 
-**Status**: Planning Ongoing
+**Status**: Planning Ongoing  
 **Estimated Timeline**: 6-8 weeks
 
 ## Overview
@@ -14,9 +14,12 @@ This document tracks the implementation phases for cli-service. The implementati
 - Checking task completion status
 
 **Related Documentation:**
-- **ARCHITECTURE.md**: Design decisions and rationale
-- **SPECIFICATION.md**: Exact behavioral requirements for each feature
-- **CLAUDE.md**: Working patterns and practical guidance for implementing features
+- **[DESIGN.md](DESIGN.md)**: Design decisions and rationale
+- **[INTERNALS.md](INTERNALS.md)**: Complete runtime internals from input to output
+- **[SPECIFICATION.md](SPECIFICATION.md)**: Exact behavioral requirements for each feature
+- **[SECURITY.md](SECURITY.md)**: Security design for authentication features
+- **[PHILOSOPHY.md](PHILOSOPHY.md)**: Design philosophy and feature decision framework
+- **[../CLAUDE.md](../CLAUDE.md)**: Working patterns and practical guidance for implementing features
 
 ## Implementation Phases
 
@@ -24,8 +27,8 @@ This document tracks the implementation phases for cli-service. The implementati
 **Goal**: Runnable Rust project with basic structure
 
 **Tasks**:
-- [x] Create Cargo.toml with no_std support, heapless dependency
-- [x] Create src/lib.rs with feature gates and module declarations
+- [ ] Create Cargo.toml with no_std support, heapless dependency
+- [ ] Create src/lib.rs with feature gates and module declarations
 - [ ] Create directory structure (cli/, tree/ modules with placeholder files)
 - [ ] Verify `cargo build` on native target
 - [ ] Verify `cargo build --target thumbv6m-none-eabi` on embedded target
@@ -115,12 +118,13 @@ This document tracks the implementation phases for cli-service. The implementati
    - Handle partial path completion (`sys/de<TAB>` → `system/debug`)
    - Implement completion logic (~229 lines)
 
-2. Implement feature gating:
+2. Implement feature gating using stub function pattern (see DESIGN.md "Feature Gating & Optional Features"):
    - Add `completion` feature flag to Cargo.toml
-   - Add `#[cfg(feature = "completion")]` conditional compilation to module
-   - Implement dual `handle_tab()` methods (enabled/disabled versions)
-   - Ensure `Response` type supports completion when feature enabled
-   - Update parser to handle tab key appropriately when feature disabled
+   - Add `#[cfg(feature = "completion")]` conditional compilation within module contents
+   - Implement stub function pattern: `suggest_completions()` returns empty `Vec` when disabled
+   - Module always exists, contents are feature-gated
+   - Single `handle_tab()` implementation calls stub functions (no dual methods needed)
+   - Parser handles tab key identically in both modes (stub returns empty results)
 
 3. Tests for completion scenarios:
    - Single match completion
@@ -173,22 +177,28 @@ This document tracks the implementation phases for cli-service. The implementati
 **Tasks**:
 1. Implement `InputParser` in `cli/parser.rs`:
    - Character-by-character processing
-   - Escape sequence state machine (arrows, home, end, etc.)
+   - Escape sequence state machine (up/down arrows, double-ESC)
+   - Double-ESC clear buffer (always enabled, ~50-100 bytes, see PHILOSOPHY.md)
    - Backspace and delete handling
    - Tab key detection
    - Password masking mode for login
    - Buffer management with `heapless::String`
    - Convert buffer to Request when complete
    - Implement input parser (~397 lines)
+   - Note: Left/right arrows, Home/End keys are future additions (see PHILOSOPHY.md "Recommended Additions")
 
-2. Implement `CommandHistory` in `cli/history.rs`:
+2. Implement `CommandHistory` in `cli/history.rs` using stub type pattern (see DESIGN.md "Feature Gating & Optional Features"):
    - Circular buffer with const generic size
    - O(1) add, previous, next operations
    - Position tracking for navigation
    - Implement command history (~85 lines)
+   - Feature-gated: Type always exists, methods no-op when `history` feature disabled
+   - Zero-size stub type when disabled
 
 3. Comprehensive tests:
-   - Escape sequence parsing
+   - Escape sequence parsing (up/down arrows, double-ESC)
+   - Double-ESC clears buffer and exits history navigation
+   - ESC + [ starts escape sequence (not cleared)
    - Backspace in middle of line
    - History navigation
    - Password masking
@@ -196,7 +206,8 @@ This document tracks the implementation phases for cli-service. The implementati
 
 **Success Criteria**:
 - Correctly parse all terminal input
-- Handle arrows, backspace, tab
+- Handle arrows, backspace, tab, double-ESC
+- Double-ESC clears input buffer without clearing screen
 - O(1) history operations
 
 ---
@@ -205,30 +216,40 @@ This document tracks the implementation phases for cli-service. The implementati
 **Goal**: Bring it all together
 
 **Tasks**:
-1. Implement `CliService` in `cli/mod.rs`:
+1. Implement `CliService` in `cli/mod.rs` using unified architecture pattern (see DESIGN.md "Unified Architecture"):
    - Generic over `AccessLevel` and `CharIo`
    - Store root directory reference
    - Track current location (path stack of indices)
    - Store parser, history, current user
+   - **Unified architecture**: Single state machine for auth-enabled/disabled modes
+   - `current_user: Option<User<L>>` always present (not feature-gated)
+   - `state: CliState` always present (LoggedOut variant only when auth enabled)
+   - Only `credential_provider` field is feature-gated
+   - State determines behavior (LoggedOut vs LoggedIn), not feature flags
    - Process characters → requests → responses
    - Implement global commands: `?` (context help), `help` (global help), `logout` (auth feature), `clear` (optional)
    - Command execution with access control
    - Path resolution for navigation (absolute and relative paths)
-   - Tab completion integration (feature-gated)
-   - History navigation integration (arrow keys)
-   - Prompt generation (username@path format)
+   - Tab completion integration (calls stub functions)
+   - History navigation integration (calls stub methods)
+   - Prompt generation (username@path format, unified for both modes)
    - Implement service orchestration (~589 lines)
-   - Note: No `cd`, `ls`, `pwd`, or `tree` commands per syntax design (see ARCHITECTURE.md)
+   - Note: No `cd`, `ls`, `pwd`, or `tree` commands per syntax design (see DESIGN.md)
 
 2. Integration tests with mock I/O:
-   - Login flow
+   - Login flow (auth enabled)
    - Navigation between directories
    - Command execution
    - Access control enforcement
-   - Tab completion
-   - History navigation
+   - Tab completion (both enabled and disabled via stubs)
+   - History navigation (both enabled and disabled via stubs)
+   - Test unified architecture: auth-enabled vs auth-disabled modes
+   - Test feature combinations: all features, no features, individual features
 
-**Success Criteria**: End-to-end CLI functionality works
+**Success Criteria**:
+- End-to-end CLI functionality works with all feature combinations
+- Unified architecture correctly handles both auth modes
+- Stub patterns enable graceful degradation when features disabled
 
 ---
 

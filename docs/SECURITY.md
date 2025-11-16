@@ -446,20 +446,24 @@ impl AccessLevel for MyAccessLevel {
 ```rust
 impl<'tree, L: AccessLevel, IO: CharIo> CliService<'tree, L, IO> {
     fn validate_access(&self, node: &Node<L>) -> Result<(), CliError> {
+        // SAFETY: current_user is always Some() in LoggedIn state
+        // Access validation only occurs during command processing in LoggedIn state
         let current_user = self.current_user
             .as_ref()
-            .ok_or(CliError::NotLoggedIn)?;
+            .expect("BUG: validate_access called while not logged in");
 
         // Check node's required access level
         if current_user.access_level < node.access_level() {
-            return Err(CliError::AccessDenied);
+            // SECURITY: Return InvalidPath instead of AccessDenied to hide node existence
+            return Err(CliError::InvalidPath);
         }
 
         // Check entire path from node to root
         let mut current = Some(node);
         while let Some(n) = current {
             if current_user.access_level < n.access_level() {
-                return Err(CliError::AccessDenied);
+                // SECURITY: Return InvalidPath to hide inaccessible nodes
+                return Err(CliError::InvalidPath);
             }
             current = n.parent();
         }
@@ -519,7 +523,7 @@ The combination of `state` and `current_user` determines behavior:
 - Consistent user experience across both modes
 - Easy to understand and maintain
 
-For detailed feature configuration patterns, conditional compilation examples, and build instructions, see the "Feature Gating & Optional Features" section in ARCHITECTURE.md.
+For detailed feature configuration patterns, conditional compilation examples, and build instructions, see the "Feature Gating & Optional Features" section in [DESIGN.md](DESIGN.md). For runtime authentication flow, see [INTERNALS.md](INTERNALS.md).
 
 **Quick Reference:**
 ```bash
@@ -529,7 +533,7 @@ cargo build
 # Without authentication (uses system user)
 cargo build --no-default-features
 
-# See ARCHITECTURE.md for complete configuration options
+# See DESIGN.md for complete configuration options
 ```
 
 ---
@@ -871,6 +875,16 @@ If your threat model requires stronger protections:
   - Authentication system design
   - Password hashing approach (SHA-256)
   - Credential storage options
+
+---
+
+## See Also
+
+- **[DESIGN.md](DESIGN.md)** - Authentication feature gating and unified architecture
+- **[INTERNALS.md](INTERNALS.md)** - Complete authentication flow from login to access control
+- **[SPECIFICATION.md](SPECIFICATION.md)** - Authentication behavioral specification
+- **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Authentication implementation roadmap
 
 ---
 

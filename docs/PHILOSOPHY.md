@@ -538,11 +538,12 @@ If you can't answer these convincingly, the feature doesn't belong in cli-servic
 ## Related Documentation
 
 This philosophy is implemented across:
-- **ARCHITECTURE.md** - Design decisions and patterns implementing these principles
-- **SPECIFICATION.md** - Exact behavioral requirements for implemented features
-- **SECURITY.md** - Security-by-design principles in authentication system
-- **IMPLEMENTATION.md** - Phased implementation following these constraints
-- **CLAUDE.md** - Practical patterns for working within these constraints
+- **[DESIGN.md](DESIGN.md)** - Design decisions and patterns implementing these principles
+- **[INTERNALS.md](INTERNALS.md)** - Runtime internals showing principles in action
+- **[SPECIFICATION.md](SPECIFICATION.md)** - Exact behavioral requirements for implemented features
+- **[SECURITY.md](SECURITY.md)** - Security-by-design principles in authentication system
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Phased implementation following these constraints
+- **[../CLAUDE.md](../CLAUDE.md)** - Practical patterns for working within these constraints
 
 ---
 

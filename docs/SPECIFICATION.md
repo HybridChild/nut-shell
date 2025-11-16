@@ -2,6 +2,13 @@
 
 This document specifies the exact behavior of the cli-service library, serving as the authoritative reference for implementation.
 
+**Related Documentation:**
+- **[DESIGN.md](DESIGN.md)**: Design decisions and rationale for why behaviors work this way
+- **[INTERNALS.md](INTERNALS.md)**: Complete runtime internals showing how behaviors are implemented
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)**: Implementation roadmap for building these behaviors
+- **[SECURITY.md](SECURITY.md)**: Security design for authentication behaviors
+- **[PHILOSOPHY.md](PHILOSOPHY.md)**: Design philosophy behind feature selection
+
 ## Terminal I/O Behavior
 
 ### Character Echo
@@ -76,7 +83,7 @@ The CLI recognizes ANSI escape sequences for terminal navigation.
 
 ### Authentication Feature Status
 
-Authentication can be disabled at compile time via Cargo features (see ARCHITECTURE.md). The behavior differs based on this configuration:
+Authentication can be disabled at compile time via Cargo features (see DESIGN.md). The behavior differs based on this configuration:
 
 **When authentication is enabled (default):**
 - System starts in logged-out state requiring login
@@ -322,7 +329,7 @@ user@/> _                                                        # Cleared, exit
 
 ### Response Structure
 
-Commands return `CLIResponse` with message and formatting flags.
+Commands return `Response` with message and formatting flags.
 
 **Status codes:**
 - `Success` - Command completed successfully

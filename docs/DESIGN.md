@@ -380,9 +380,11 @@ impl<'tree, L, IO> CliService<'tree, L, IO> {
     fn check_access(&self, node: &Node<L>) -> Result<(), CliError> {
         #[cfg(feature = "authentication")]
         {
+            // SAFETY: current_user is always Some() in LoggedIn state
+            // Commands only processed when LoggedIn (see state machine)
             let user = self.current_user
                 .as_ref()
-                .ok_or(CliError::NotLoggedIn)?;
+                .expect("BUG: check_access called while not logged in");
 
             if user.access_level < node.access_level() {
                 return Err(CliError::InvalidPath);  // Security: hide inaccessible
@@ -1056,9 +1058,11 @@ src/
 - **Authentication**: Trait-based system in auth/ module (optional, pluggable backends)
 - **Completion**: Free functions in tree/completion.rs (optional, stateless logic)
 
-## References
+## See Also
 
-- **SPECIFICATION.md**: Complete behavioral specification
-- **IMPLEMENTATION.md**: Implementation tracking and phased development plan
-- **SECURITY.md**: Authentication, access control, and security design
-- **CLAUDE.md**: Working patterns and practical implementation guidance
+- **[SPECIFICATION.md](SPECIFICATION.md)**: Complete behavioral specification
+- **[INTERNALS.md](INTERNALS.md)**: Complete runtime internals from input to output
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)**: Implementation tracking and phased development plan
+- **[SECURITY.md](SECURITY.md)**: Authentication, access control, and security design
+- **[PHILOSOPHY.md](PHILOSOPHY.md)**: Design philosophy and feature decision framework
+- **[../CLAUDE.md](../CLAUDE.md)**: Working patterns and practical implementation guidance
