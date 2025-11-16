@@ -188,6 +188,23 @@ The implementation uses a single code path for both authentication modes to mini
 
 **Alternative Considered**: Separate state.rs file
 
+### 7. Double-ESC Clear Behavior
+**Decision**: ESC ESC clears input buffer and exits history navigation (not feature-gated)
+
+**Rationale**:
+- Significantly improves UX for interactive users (quick cancel/clear without repeated backspace)
+- Minimal code overhead (~50-100 bytes flash, 0 bytes RAM)
+- Works naturally in no_std (pure state machine, no timers needed)
+- Avoids ambiguity with escape sequences (ESC [ for arrows still works)
+- Too small to justify feature gating
+
+**Implementation Pattern**: Double-ESC required to distinguish from escape sequence start
+- ESC ESC → clear buffer
+- ESC [ → begin escape sequence (arrow keys)
+- ESC + other → clear buffer, then process character
+
+**Alternative Considered**: Single ESC with timeout (rejected - requires timer, adds complexity, not suitable for no_std)
+
 ---
 
 ## Feature Gating & Optional Features

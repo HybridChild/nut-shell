@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Important**: Before adding to or modifying the information in this file, always consider the following:
+- This file should only contain information that is useful for Claude Code, not for human developers.
+- The information in this file should be formatted and presented in the way that is optimal for Claude Code, not for human developers.
+
 ## Project Overview
 
 **cli-service** is a lightweight library for adding a flexible command-line interface to embedded systems. The implementation targets **no_std** environments with static allocation, specifically designed for platforms like the Raspberry Pi Pico (RP2040).
@@ -57,6 +61,33 @@ const SYSTEM_DIR: &[Node<MyAccessLevel>] = &[
     // ... other nodes
 ];
 ```
+
+### Implementing Global Commands (help, ?, clear, logout)
+
+Global commands are reserved keywords handled outside the tree structure.
+
+**Help command output format:**
+```rust
+fn help_command() -> Response {
+    let mut output = heapless::String::<256>::new();
+
+    output.push_str("  help      - List global commands\r\n").ok();
+    output.push_str("  ?         - Detail items in current directory\r\n").ok();
+
+    #[cfg(feature = "authentication")]
+    output.push_str("  logout    - Exit current session\r\n").ok();
+
+    output.push_str("  clear     - Clear screen\r\n").ok();
+    output.push_str("  ESC ESC   - Clear input buffer\r\n").ok();
+
+    Response::success(&output)
+}
+```
+
+**Important:**
+- `ESC ESC` is not a command (it's a keyboard shortcut), but include it in `help` for discoverability
+- `logout` only shown when authentication feature enabled
+- Use consistent spacing/alignment for readability
 
 ### Implementing a Feature-Gated Module
 
@@ -199,6 +230,43 @@ impl CharIo for MyIo {
     }
 }
 ```
+
+### Implementing Double-ESC Clear
+
+Double-ESC clears the input buffer and exits history navigation. This is NOT feature-gated (always enabled).
+
+**Parser state machine:**
+```rust
+enum ParserState {
+    Normal,
+    EscapeStart,    // Saw first ESC
+    EscapeSequence, // Saw ESC [
+}
+
+match (self.state, c) {
+    // Double ESC = clear
+    (ParserState::EscapeStart, '\x1b') => {
+        buffer.clear();
+        self.state = ParserState::Normal;
+        Ok(ParseEvent::ClearAndRedraw)
+    }
+
+    // ESC [ = sequence start (arrow keys)
+    (ParserState::EscapeStart, '[') => {
+        self.state = ParserState::EscapeSequence;
+        Ok(ParseEvent::None)
+    }
+
+    // ESC + other = clear, then process char
+    (ParserState::EscapeStart, other) => {
+        buffer.clear();
+        self.state = ParserState::Normal;
+        self.process_char(other, buffer)  // Re-process
+    }
+}
+```
+
+**Why not feature-gated?** Minimal overhead (~50-100 bytes flash, 0 bytes RAM), high UX value.
 
 ### Testing a Module
 
@@ -444,6 +512,39 @@ fn test_login_and_command() {
     service.process_char('a');
     service.process_char('d');
     // ... assert state changes
+}
+```
+
+### Testing Escape Sequences
+```rust
+#[test]
+fn test_double_esc_clears_buffer() {
+    let mut parser = InputParser::new();
+    let mut buffer = heapless::String::<128>::new();
+    buffer.push_str("some input").unwrap();
+
+    // First ESC
+    let event = parser.process_char('\x1b', &mut buffer).unwrap();
+    assert_eq!(event, ParseEvent::None);  // Waiting for next char
+    assert_eq!(buffer.as_str(), "some input");  // Not cleared yet
+
+    // Second ESC
+    let event = parser.process_char('\x1b', &mut buffer).unwrap();
+    assert_eq!(event, ParseEvent::ClearAndRedraw);
+    assert_eq!(buffer.as_str(), "");  // Cleared!
+}
+
+#[test]
+fn test_esc_bracket_is_sequence() {
+    let mut parser = InputParser::new();
+    let mut buffer = heapless::String::<128>::new();
+
+    // ESC [ A (up arrow)
+    parser.process_char('\x1b', &mut buffer).unwrap();
+    parser.process_char('[', &mut buffer).unwrap();
+    let event = parser.process_char('A', &mut buffer).unwrap();
+
+    assert_eq!(event, ParseEvent::UpArrow);  // Not cleared!
 }
 ```
 

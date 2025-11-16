@@ -25,7 +25,8 @@ The CLI echoes all printable characters back to the terminal as they are typed, 
 | `ENTER_LF` | 0x0A | Submit input if buffer non-empty |
 | `ENTER_CR` | 0x0D | Submit input if buffer non-empty |
 | `TAB` | 0x09 | Trigger tab completion (only when logged in) |
-| `ESC` | 0x1B | Begin escape sequence |
+| `ESC` | 0x1B | Begin escape sequence (or clear if followed by ESC) |
+| `ESC ESC` | 0x1B 0x1B | Clear input buffer and exit history navigation |
 
 **Backspace behavior:**
 - Removes last character from input buffer
@@ -44,6 +45,7 @@ The CLI recognizes ANSI escape sequences for terminal navigation.
 **Supported sequences:**
 - `ESC [ A` - Up arrow (previous command in history)
 - `ESC [ B` - Down arrow (next command in history)
+- `ESC ESC` - Double-ESC: clear input buffer and exit history navigation
 
 **Escape sequence processing:**
 - Enters escape mode on receiving `ESC` (0x1B)
@@ -53,11 +55,22 @@ The CLI recognizes ANSI escape sequences for terminal navigation.
 - Unrecognized sequences are discarded after alphabetic terminator
 - Buffer overflow protection: resets to normal mode when buffer reaches 16 characters (discards incomplete sequence)
 
+**Double-ESC clear behavior:**
+- `ESC ESC` clears the input buffer and redraws the prompt
+- Exits history navigation mode if active (returns to empty prompt)
+- Does not interfere with escape sequences (ESC followed by `[` begins sequence as normal)
+- Single ESC followed by non-`[` character: clears buffer, then processes the character
+- Useful for quickly abandoning long input or exiting history navigation
+
 **State machine:**
 1. **Normal mode**: Process characters normally
-2. **Escape mode**: Triggered by ESC, buffer subsequent chars
-3. **Sequence completion**: After 2+ chars, check for valid sequence
-4. **Termination**: Alphabetic character ends sequence (recognized or discarded)
+2. **Escape mode**: Triggered by first ESC, wait for next character
+   - If next char is ESC → clear buffer and return to normal mode
+   - If next char is `[` → enter sequence mode
+   - If next char is other → clear buffer, process char in normal mode
+3. **Sequence mode**: Buffer subsequent chars for escape sequence
+4. **Sequence completion**: After 2+ chars, check for valid sequence
+5. **Termination**: Alphabetic character ends sequence (recognized or discarded)
 
 ## Authentication Flow
 
@@ -276,6 +289,7 @@ Commands are stored in a circular buffer for recall via arrow keys.
 3. Down arrow: move forward through history
 4. Down arrow past newest: restore original buffer (before history navigation began)
 5. Typing new input: exit history navigation, resume normal editing
+6. Double-ESC (ESC ESC): exit history navigation and clear buffer completely
 
 **State tracking:**
 - Current position in history buffer
@@ -291,6 +305,17 @@ Buffer: new_cmd<UP>      → Buffer shows: cmd3
 <DOWN>                   → Buffer shows: cmd2
 <DOWN>                   → Buffer shows: cmd3
 <DOWN>                   → Buffer shows: new_cmd (original)
+<ESC><ESC>               → Buffer cleared (exits history mode)
+```
+
+**Example: Double-ESC for quick clear:**
+```
+user@/> system/network/wifi/configure --long-argument<ESC><ESC>
+user@/> _                                                        # Cleared!
+
+user@/> test<UP>         → Shows: previous_command
+user@/> previous_command<ESC><ESC>
+user@/> _                                                        # Cleared, exited history
 ```
 
 ## Response Formatting
@@ -430,25 +455,28 @@ List all global commands available.
 ```
 > help
 
-  help   - List global commands
-  ?      - Detail items in current directory
-  logout - Exit current session
-  clear  - Clear screen
+  help      - List global commands
+  ?         - Detail items in current directory
+  logout    - Exit current session
+  clear     - Clear screen
+  ESC ESC   - Clear input buffer
 ```
 
 **Format (authentication disabled):**
 ```
 > help
 
-  help   - List global commands
-  ?      - Detail items in current directory
-  clear  - Clear screen
+  help      - List global commands
+  ?         - Detail items in current directory
+  clear     - Clear screen
+  ESC ESC   - Clear input buffer
 ```
 
 **Behavior:**
 - Always available when logged in
 - Lists global commands only (not tree-specific commands)
 - `logout` command only shown when authentication feature enabled
+- ESC ESC is not a command but a keyboard shortcut (always shown for discoverability)
 - Indented output format
 - Brief descriptions
 
