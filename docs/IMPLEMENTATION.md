@@ -7,7 +7,7 @@
 
 This document tracks the implementation phases for cli-service. The implementation prioritizes **idiomatic Rust patterns** while maintaining behavioral correctness.
 
-**⚠️ IMPORTANT**: Commands use **metadata/execution separation** pattern. `CommandMeta` (metadata) + `CommandHandlers` trait (execution). This enables both sync and async commands while maintaining const-initialization. See [DESIGN.md](DESIGN.md) section 1 for complete architecture details.
+**⚠️ IMPORTANT**: Commands use **metadata/execution separation pattern**. `CommandMeta` (metadata) + `CommandHandlers` trait (execution). This enables both sync and async commands while maintaining const-initialization. See [DESIGN.md](DESIGN.md) section 1 for complete architecture details.
 
 **When to use this document:**
 - Finding out what phase of implementation we're in
@@ -27,136 +27,13 @@ This document tracks the implementation phases for cli-service. The implementati
 
 ## Prerequisites: Essential Patterns
 
-**IMPORTANT**: Before starting implementation, you must understand these four architectural patterns. An implementer who discovers these mid-implementation will require significant refactoring.
+**IMPORTANT**: Before starting implementation, review these architectural patterns in DESIGN.md. Discovering these mid-implementation will require significant refactoring.
 
-### 1. Metadata/Execution Separation
-
-**Commands split into metadata (const-init) and execution logic (generic trait).**
-
-```rust
-// Metadata (const-initializable, in ROM)
-pub struct CommandMeta<L: AccessLevel> {
-    pub name: &'static str,
-    pub description: &'static str,
-    pub access_level: L,
-    pub kind: CommandKind,  // Sync or Async marker
-    pub min_args: usize,
-    pub max_args: usize,
-}
-
-// Execution logic (user-implemented trait)
-pub trait CommandHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
-
-    #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
-}
-
-// CliService is generic over handlers
-pub struct CliService<'tree, L, IO, H>
-where H: CommandHandlers { ... }
-```
-
-**Key principles**:
-- Metadata stays const-initializable (lives in ROM)
-- Execution via trait dispatch (monomorphized, zero-cost)
-- Enables async commands without heap allocation
-- Single codebase for both sync and async
-- Zero async machinery in sync-only builds (feature-gated)
-
-**Why this pattern?** Solves the async type system problem: can't store `async fn` in const data (each has unique `impl Future` type). Separation allows metadata in ROM while execution logic is provided via generic trait. See [DESIGN.md](DESIGN.md) section 1 for complete rationale, usage patterns, and trade-offs.
-
-### 2. Unified Architecture Pattern (Authentication)
-
-**Single code path for both auth-enabled and auth-disabled modes.**
-
-```rust
-pub struct CliService<'tree, L, IO> {
-    // ALWAYS present (not feature-gated)
-    current_user: Option<User<L>>,
-    state: CliState,
-
-    // ONLY this field is feature-gated
-    #[cfg(feature = "authentication")]
-    credential_provider: &'tree dyn CredentialProvider<L>,
-}
-
-// State variants
-pub enum CliState {
-    #[cfg(feature = "authentication")]
-    LoggedOut,  // Only exists when auth enabled
-
-    LoggedIn,   // Always available
-    Inactive,   // Always available
-}
-```
-
-**Key principle**: State determines behavior, not feature flags.
-- Auth enabled: Start in `LoggedOut`, transition to `LoggedIn` after authentication
-- Auth disabled: Start in `LoggedIn` immediately, `current_user = None`
-
-See DESIGN.md "Unified Architecture" for complete pattern.
-
-### 3. Stub Function Pattern (Feature Gating)
-
-**Provide identical function signatures for both feature-enabled and feature-disabled builds.**
-
-```rust
-// Feature-enabled: Full implementation
-#[cfg(feature = "completion")]
-pub fn suggest_completions<'a, L: AccessLevel>(
-    node: &'a Node<L>,
-    partial_input: &str,
-) -> Result<Vec<&'a str, MAX_SUGGESTIONS>, CliError> {
-    // Real implementation
-}
-
-// Feature-disabled: Stub returns empty results
-#[cfg(not(feature = "completion"))]
-pub fn suggest_completions<'a, L: AccessLevel>(
-    node: &'a Node<L>,
-    partial_input: &str,
-) -> Result<Vec<&'a str, MAX_SUGGESTIONS>, CliError> {
-    Ok(Vec::new())  // No suggestions
-}
-```
-
-**Benefits**:
-- Single code path in main service (no `#[cfg]` branching)
-- Behavior determined by return value, not feature flags
-- Compiler optimizes away stub calls when empty
-
-**Apply to**: `completion` and `history` features
-
-See DESIGN.md "Feature Gating & Optional Features" for complete pattern.
-
-### 4. Access Control Integration
-
-**Access control is checked at EVERY tree traversal, not as a separate step.**
-
-```rust
-fn resolve_path(&self, path: &Path) -> Result<&Node<L>, CliError> {
-    // Walk path segments
-    for segment in path.segments() {
-        let node = current_dir.find_child(segment)?;
-
-        // Check access at EACH segment
-        #[cfg(feature = "authentication")]
-        {
-            let user = self.current_user.as_ref().ok_or(CliError::NotLoggedIn)?;
-            if user.access_level < node.access_level() {
-                return Err(CliError::InvalidPath);  // Hide inaccessible
-            }
-        }
-
-        current_dir = node;
-    }
-}
-```
-
-**Security principle**: Inaccessible nodes return "Invalid path" (same as non-existent) to prevent revealing restricted commands.
-
-See SPECIFICATION.md and SECURITY.md for complete access control model.
+**Required reading:**
+1. **Metadata/Execution Separation Pattern** ([DESIGN.md](DESIGN.md) Section 1) - Commands split into const metadata + generic trait for sync/async support
+2. **Unified Architecture Pattern** ([DESIGN.md](DESIGN.md) Section 5.2) - Single code path for auth-enabled and auth-disabled modes
+3. **Stub Function Pattern** ([DESIGN.md](DESIGN.md) Feature Gating sections) - Feature-gated modules with identical signatures
+4. **Access Control Integration** ([INTERNALS.md](INTERNALS.md) Level 4) - Access checks during tree traversal
 
 ---
 

@@ -33,6 +33,7 @@ The architectural decisions and patterns documented here represent our current b
 | Implementation order and tasks | **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** | 10-phase roadmap, task breakdown, what to build next |
 | Security patterns and credential storage | **[docs/SECURITY.md](docs/SECURITY.md)** | Password hashing, access control, authentication flow |
 | Design philosophy and feature criteria | **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** | What we include/exclude, decision framework |
+| CharIo implementation and buffering | **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** | Sync/async I/O patterns, buffering model, platform adapters |
 
 ---
 
@@ -149,7 +150,7 @@ fn help_command() -> Response {
 
 For complete feature gating patterns, configuration examples, and build instructions, see DESIGN.md "Feature Gating & Optional Features" section.
 
-**Recommended Pattern: Stub Functions** (aligns with unified architecture)
+**Recommended Pattern: Stub Function Pattern** (aligns with unified architecture)
 
 ```rust
 // src/tree/my_feature.rs - Module always exists
@@ -195,11 +196,11 @@ impl<'tree, L, IO> CliService<'tree, L, IO> {
 }
 ```
 
-**Why this pattern?**
+**Why use the stub function pattern?**
 - Single code path (no duplicate implementations)
 - Zero `#[cfg]` in main service code
 - Compiler optimizes away stub calls
-- Aligns with unified architecture principle
+- Aligns with unified architecture pattern
 
 **Pattern Variations:**
 
@@ -226,7 +227,7 @@ impl<const N: usize> CommandHistory<N> {
 }
 ```
 
-**Alternative (when stub pattern doesn't fit):**
+**Alternative (when stub function pattern doesn't fit):**
 ```rust
 #[cfg(feature = "my_feature")]
 pub mod my_module;
@@ -414,7 +415,7 @@ mod tests {
 
 ## Core Architecture Patterns
 
-### Metadata/Execution Separation
+### Metadata/Execution Separation Pattern
 
 **IMPORTANT: Commands use metadata/execution separation pattern.** Command metadata (const in ROM) is separate from execution logic (generic trait). This enables both sync and async commands while maintaining const-initialization. See [docs/DESIGN.md](docs/DESIGN.md) section 1 for complete architecture details, rationale, and usage patterns.
 
@@ -563,7 +564,7 @@ use crate::tree::completion;
 #[cfg(feature = "completion")]
 use crate::tree::completion;
 
-// BETTER (stub pattern): Module always available, contents gated
+// BETTER (stub function pattern): Module always available, contents gated
 // src/tree/completion.rs provides stub when feature disabled
 pub mod completion;  // No #[cfg] needed!
 use crate::tree::completion::suggest_completions;  // Works always
@@ -770,8 +771,52 @@ cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-feat
 - **[docs/INTERNALS.md](docs/INTERNALS.md)** for "how does this work at runtime?"
 - **[docs/SECURITY.md](docs/SECURITY.md)** for authentication/access control specifics
 - **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** for "should we add this feature?"
+- **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** for "how do I implement CharIo?"
 - **This file (CLAUDE.md)** for constraints and patterns
 - **If the documented approach seems problematic**: Ask! Design can evolve based on implementation insights
+
+---
+
+## Documentation Terminology Conventions
+
+To maintain consistency across all documentation, follow these conventions:
+
+### Architecture Patterns
+- **"metadata/execution separation pattern"** ✅ - Always include "pattern" suffix
+- **"unified architecture pattern"** ✅ - Always include "pattern" suffix
+- **"stub function pattern"** ✅ - For stateless feature-gated modules
+- **"stub type pattern"** ✅ - For stateful feature-gated types (e.g., CommandHistory)
+
+### Compound Adjectives (Always Hyphenate)
+When used as adjectives before nouns, always hyphenate:
+- **"path-based navigation"** ✅ not "path based navigation"
+- **"feature-gated module"** ✅ not "feature gated module"
+- **"user-defined hierarchy"** ✅ not "user defined hierarchy"
+- **"const-initializable tree"** ✅ not "const initializable tree"
+
+### Tree Terminology
+- **"directory tree"** - Primary term for the hierarchical structure of directories and commands
+- **"tree"** - Shortened form when context is clear
+- **"command tree"** - Only use in example contexts (e.g., "example command tree")
+
+### Code Identifiers in Prose
+Use proper formatting when referring to code:
+- **`CliService`** - Struct name (with backticks, CamelCase)
+- **`CharIo`** - Trait name (with backticks, not `CharIO`)
+- **`AccessLevel`** - Trait type (CamelCase) vs "access level" - concept (lowercase)
+- **`no_std`** - Feature name (with backticks, even in prose, not "no-std")
+- **`CommandMeta`** - Struct name (CamelCase)
+- **`CommandHandlers`** - Trait name (CamelCase)
+
+### Project Names
+- **"cli-service"** - Project/library name (kebab-case)
+- **"CLI service"** or **"CLI"** - Prose reference to the service (sentence case)
+
+### Feature Names
+Always lowercase, no hyphens when referring to Cargo features:
+- **`authentication`** - Not "Authentication" or "auth"
+- **`completion`** - Not "Completion" or "auto-completion"
+- **`history`** - Not "History" or "command-history"
 
 ---
 
@@ -783,3 +828,4 @@ cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-feat
 - **[docs/SECURITY.md](docs/SECURITY.md)** - Authentication, access control security
 - **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** - Design philosophy, feature framework
 - **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** - Implementation roadmap, build commands
+- **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** - CharIo trait, buffering model, async patterns

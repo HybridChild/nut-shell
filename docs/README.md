@@ -12,11 +12,12 @@ Complete documentation for the cli-service embedded CLI library.
 | **[IMPLEMENTATION.md](IMPLEMENTATION.md)** | Implementation roadmap | Finding what to build next, build commands |
 | **[SECURITY.md](SECURITY.md)** | Authentication and security | Implementing auth, credential storage, access control |
 | **[PHILOSOPHY.md](PHILOSOPHY.md)** | Design philosophy | Evaluating feature requests, understanding project scope |
+| **[IO_DESIGN.md](IO_DESIGN.md)** | CharIo trait and buffering model | Implementing I/O adapters for sync/async environments |
 
 ## Documentation Overview
 
 ### [SPECIFICATION.md](SPECIFICATION.md) - WHAT the System Does
-**35KB • Behavioral Specification**
+**24KB • Behavioral Specification**
 
 Authoritative reference for exact system behavior:
 - Terminal I/O (character echo, control sequences, escape sequences)
@@ -34,12 +35,12 @@ Authoritative reference for exact system behavior:
 ---
 
 ### [DESIGN.md](DESIGN.md) - WHY It's Designed This Way
-**37KB • Design Decisions & Rationale**
+**32KB • Design Decisions & Rationale**
 
 Design decisions and architectural patterns:
-- Command syntax rationale (path-based, no trailing slash, reserved keywords)
-- Key design decisions (6 major decisions with alternatives considered)
-- Feature gating patterns (authentication, completion, history)
+- Command syntax rationale (path-based, positional arguments)
+- Key design decisions (8 decisions with alternatives considered)
+- Feature gating patterns (async, authentication, completion, history)
 - Unified architecture approach (single code path for auth-enabled/disabled)
 - Stub function pattern (minimizing `#[cfg]` branching)
 - Module structure (14 modules, organization rationale)
@@ -50,7 +51,7 @@ Design decisions and architectural patterns:
 ---
 
 ### [INTERNALS.md](INTERNALS.md) - HOW the System Works
-**35KB • Runtime Internals**
+**40KB • Runtime Internals**
 
 Complete data flow from character input to terminal output:
 - High-level system overview (7-layer architecture)
@@ -75,7 +76,7 @@ Complete data flow from character input to terminal output:
 ---
 
 ### [IMPLEMENTATION.md](IMPLEMENTATION.md) - Implementation Roadmap
-**14KB • Task Tracking & Build Commands**
+**24KB • Task Tracking & Build Commands**
 
 Phased implementation plan and build workflows:
 - 10 implementation phases (Foundation → Polish)
@@ -96,7 +97,7 @@ Phased implementation plan and build workflows:
 ---
 
 ### [SECURITY.md](SECURITY.md) - Security Design
-**25KB • Authentication & Access Control**
+**28KB • Authentication & Access Control**
 
 Security architecture and best practices:
 - Security vulnerabilities analysis (plaintext passwords, hardcoded credentials, etc.)
@@ -118,7 +119,7 @@ Security architecture and best practices:
 ---
 
 ### [PHILOSOPHY.md](PHILOSOPHY.md) - Design Philosophy
-**17KB • Feature Decision Framework**
+**20KB • Feature Decision Framework**
 
 Project philosophy and feature criteria:
 - Core principle: Essential CLI primitives only
@@ -174,6 +175,9 @@ Project philosophy and feature criteria:
 ### "How do I feature-gate a module?"
 → See **[DESIGN.md](DESIGN.md)** (Feature Gating & Optional Features)
 
+### "How do I implement CharIo for my platform?"
+→ See **[IO_DESIGN.md](IO_DESIGN.md)** (Buffering Model & Sync/Async Patterns)
+
 ---
 
 ## Document Relationships
@@ -215,12 +219,13 @@ Project philosophy and feature criteria:
 
 | Document | Size | Lines | Primary Focus |
 |----------|------|-------|---------------|
-| DESIGN.md | 37KB | ~1065 | Design rationale, feature gating |
-| INTERNALS.md | 35KB | ~979 | Runtime behavior, data flow |
-| SECURITY.md | 25KB | ~891 | Authentication, security |
-| SPECIFICATION.md | 22KB | ~807 | Behavioral requirements |
-| PHILOSOPHY.md | 17KB | ~550 | Design philosophy |
-| IMPLEMENTATION.md | 14KB | ~453 | Implementation roadmap |
+| INTERNALS.md | 40KB | ~1079 | Runtime behavior, data flow |
+| DESIGN.md | 32KB | ~768 | Design rationale, feature gating |
+| SECURITY.md | 28KB | ~900 | Authentication, security |
+| SPECIFICATION.md | 24KB | ~789 | Behavioral requirements |
+| IMPLEMENTATION.md | 24KB | ~657 | Implementation roadmap |
+| PHILOSOPHY.md | 20KB | ~555 | Design philosophy |
+| IO_DESIGN.md | 27KB | ~737 | CharIo trait, buffering model |
 
 ---
 
@@ -233,7 +238,3 @@ See **[../CLAUDE.md](../CLAUDE.md)** for:
 - Common pitfalls & solutions
 - Testing patterns
 - Build command quick reference
-
----
-
-**Last Updated:** 2025-11-16

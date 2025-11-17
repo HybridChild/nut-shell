@@ -411,13 +411,15 @@ impl<L: AccessLevel> CredentialProvider<L> for LdapProvider {
 
 ### Generic AccessLevel Trait
 
+**Note:** Use `AccessLevel` (CamelCase) when referring to the trait type, "access level" (lowercase) when discussing the concept.
+
 ```rust
 pub trait AccessLevel: Copy + Clone + PartialEq + PartialOrd {
     fn from_str(s: &str) -> Option<Self>;
     fn as_str(&self) -> &'static str;
 }
 
-// User-defined enum
+// User-defined enum (implement your own hierarchy)
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MyAccessLevel {
     Guest = 0,
@@ -510,111 +512,28 @@ const ROOT: &[Node<MyAccessLevel>] = &[
 
 ## Authentication Feature Gating & Unified Architecture
 
-Authentication can be disabled via Cargo features for unsecured development environments. The implementation uses a **unified architecture approach** that maintains a single code path for both authentication-enabled and authentication-disabled modes.
+Authentication can be disabled via Cargo features for unsecured development environments.
 
-### Unified Architecture Principles
+**Architecture:** The implementation uses a unified architecture approach with a single code path for both auth-enabled and auth-disabled modes. See [DESIGN.md](DESIGN.md) Section 5.2 "Unified Architecture Pattern" for complete details on the state machine, field organization, and implementation benefits.
 
-Instead of maintaining separate implementations, the system uses a single state machine with consistent semantics:
+**Access Control Flow:** See [INTERNALS.md](INTERNALS.md) Level 4 "Path Parsing & Tree Navigation" for the complete access control enforcement implementation during tree traversal.
 
-**Core Design:**
-- `current_user: Option<User<L>>` field is **always present** (NOT feature-gated)
-- `state: CliState` enum drives behavior (same structure, different initial state)
-- Only the `credential_provider` field is conditionally compiled
+**Security-Specific Considerations:**
 
-**State and User Combinations:**
+1. **InvalidPath Error Hiding**: When access is denied, the system returns `CliError::InvalidPath` (same as non-existent paths) to prevent revealing the existence of restricted commands to unauthorized users.
 
-| `state` | `current_user` | Mode | Meaning |
-|---------|----------------|------|---------|
-| `LoggedOut` | `None` | Auth enabled | Awaiting login credentials |
-| `LoggedIn` | `Some(user)` | Auth enabled | Authenticated as specific user |
-| `LoggedIn` | `None` | Auth disabled | No authentication required |
+2. **Handler Dispatch Security**: Access control checks occur BEFORE dispatching to `CommandHandlers`. Handlers receive only pre-validated, accessible commands, centralizing security in CliService rather than distributing it across handler implementations.
 
-**Behavioral Implications:**
+3. **Build Configuration:**
+   ```bash
+   # With authentication (default)
+   cargo build
 
-When authentication is **enabled** (default):
-- System starts: `state = LoggedOut`, `current_user = None`
-- Welcome message: "Welcome to CLI Service. Please login."
-- Prompt: `>` (no username until logged in)
-- After login: `state = LoggedIn`, `current_user = Some(user)`
-- Prompt becomes: `username@path>`
-- Access control checks enforced via `#[cfg(feature = "authentication")]` blocks
+   # Without authentication (no login required)
+   cargo build --no-default-features
+   ```
 
-When authentication is **disabled**:
-- System starts: `state = LoggedIn`, `current_user = None`
-- Welcome message: "Welcome to CLI Service. Type 'help' for help."
-- Prompt: `@path>` (empty username before `@` separator)
-- Access control checks compiled out (always allow)
-- No user object needed or created
-
-**Implementation Benefits:**
-- **Single state machine**: Same `CliState` enum, different initial state
-- **Unified prompt generation**: Always `username@path>` format (username may be empty string)
-- **Minimal branching**: Feature gates isolated to access control enforcement
-- **No artificial types**: No "system user" or dummy user objects
-- **Consistent UX**: Always shows welcome message and `@` separator
-- **Easy to reason about**: Behavior determined by state + user combination, not scattered `#[cfg]`
-
-### Access Control Implementation Pattern
-
-**Correct implementation** (matches DESIGN.md and INTERNALS.md):
-
-```rust
-fn check_access(&self, node: &Node<L>) -> Result<(), CliError> {
-    #[cfg(feature = "authentication")]
-    {
-        // SAFETY: When authentication is enabled, current_user is guaranteed
-        // to be Some() in LoggedIn state. Commands are only processed in
-        // LoggedIn state (see state machine in INTERNALS.md).
-        let user = self.current_user
-            .as_ref()
-            .expect("BUG: check_access called while not logged in");
-
-        if user.access_level < node.access_level() {
-            // SECURITY: Return InvalidPath to hide node existence
-            return Err(CliError::InvalidPath);
-        }
-    }
-
-    #[cfg(not(feature = "authentication"))]
-    {
-        let _ = node;  // Auth disabled, always allow
-    }
-
-    Ok(())
-}
-```
-
-**Key points:**
-- Access checks use `#[cfg]` feature gates, not runtime conditionals
-- When auth disabled, entire check is compiled out (zero runtime cost)
-- `current_user.expect()` is safe because:
-  - Auth enabled: `LoggedOut` state doesn't call `check_access()`
-  - Auth disabled: This code block doesn't exist (compiled out)
-- **Handler dispatch security**: Access control checks occur BEFORE dispatching to `CommandHandlers`
-  - Handlers receive only pre-validated, accessible commands
-  - Handler implementations don't need to perform access checks
-  - CliService validates access level during command resolution and execution
-  - `CommandHandlers` trait methods receive pre-authorized command names
-  - This ensures security is centralized in CliService, not distributed across handler implementations
-  - See [DESIGN.md](DESIGN.md) for complete handler architecture and [INTERNALS.md](INTERNALS.md) for dispatch flow
-
-### Configuration & Build
-
-For complete feature configuration patterns, conditional compilation examples, and build instructions, see:
-- **[DESIGN.md](DESIGN.md)** - Feature gating patterns and unified architecture details
-- **[INTERNALS.md](INTERNALS.md)** - Complete authentication flow and state machine
-- **[SPECIFICATION.md](SPECIFICATION.md)** - Behavioral specification for both modes
-
-**Quick Reference:**
-```bash
-# With authentication (default)
-cargo build
-
-# Without authentication (no login required)
-cargo build --no-default-features
-
-# See DESIGN.md for complete configuration options
-```
+See [DESIGN.md](DESIGN.md) for feature gating patterns and [SPECIFICATION.md](SPECIFICATION.md) for behavioral specifications in both modes.
 
 ---
 
@@ -947,25 +866,6 @@ If your threat model requires stronger protections:
 
 ---
 
-## Changelog
-
-- **2025-11-16**: Major update - Unified architecture alignment
-  - Added comprehensive unified architecture section explaining state + current_user semantics
-  - Fixed incorrect SAFETY comments and access control implementation patterns
-  - Updated feature gating section with correct `#[cfg]` patterns matching DESIGN.md
-  - Added cross-references to DESIGN.md, INTERNALS.md, SPECIFICATION.md
-  - Corrected path-based access validation examples
-  - Clarified that `current_user` field is NOT feature-gated (always present)
-  - Documented state machine behavior for both auth-enabled and auth-disabled modes
-- **2025-11-16**: Documentation cleanup
-  - Removed migration guide (not applicable for new implementation)
-- **2025-11-09**: Initial security architecture document
-  - Authentication system design
-  - Password hashing approach (SHA-256)
-  - Credential storage options
-
----
-
 ## See Also
 
 - **[DESIGN.md](DESIGN.md)** - Unified architecture pattern, feature gating, and authentication design decisions
@@ -974,10 +874,3 @@ If your threat model requires stronger protections:
 - **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy and feature decision framework
 - **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Authentication implementation roadmap and testing strategy
 - **[../CLAUDE.md](../CLAUDE.md)** - Working patterns and practical implementation guidance
-
----
-
-**Document Status:** Draft
-**Last Updated:** 2025-11-16
-**Author:** cli-service Rust Port Team
-**Review Status:** Pending Security Review

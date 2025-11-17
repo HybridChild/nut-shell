@@ -999,16 +999,43 @@ Character Input
 │  CliService struct:                                 │
 │    - state: CliState                    (1 byte)    │
 │    - current_user: Option<User<L>>      (~64 bytes) │
-│    - input_buffer: String<128>          (128 bytes) │
-│    - history: CommandHistory<10>        (~1.3 KB)   │
+│    - input_buffer: String<MAX_INPUT>    (128 bytes) │
+│    - history: CommandHistory<HISTORY_SIZE> (~1.3 KB)│
 │    - parser: InputParser                (~20 bytes) │
-│    - current_path_stack: Vec<usize, 8>  (32 bytes)  │
+│    - current_path_stack: Vec<usize, MAX_PATH_DEPTH>│
+│                                         (32 bytes)  │
 │    - io: IO                             (variable)  │
 │    - tree: &'static Directory           (pointer)   │
 │                                                     │
 │  Total (approx):                        ~1.5-2 KB   │
 └─────────────────────────────────────────────────────┘
 ```
+
+### Configurable Const Generics
+
+These buffer sizes are const generics that can be configured at compile time for RAM optimization:
+
+| Constant | Default | Range | RAM Impact | Used In |
+|----------|---------|-------|------------|---------|
+| `MAX_INPUT` | 128 | 32-256 | N bytes | Input buffer capacity |
+| `MAX_PATH_DEPTH` | 8 | 4-16 | N × 4 bytes | Path stack (32 bytes default) |
+| `MAX_ARGS` | 16 | 8-32 | 0 bytes (stack only) | Argument parsing slice capacity |
+| `HISTORY_SIZE` | 10 | 0-20 | N × 130 bytes | Command history (1.3 KB default) |
+
+**Configuration example:**
+```rust
+type History = CommandHistory<4>;  // RAM: 4 × 130 = ~520 bytes (vs 1.3 KB)
+type PathStack = heapless::Vec<usize, 4>;  // RAM: 16 bytes (vs 32 bytes)
+type InputBuffer = heapless::String<64>;  // RAM: 64 bytes (vs 128 bytes)
+```
+
+**RAM-constrained configuration** (N=4, MAX_INPUT=64):
+- History: ~520 bytes (vs 1.3 KB) → saves ~800 bytes
+- Input: 64 bytes (vs 128 bytes) → saves 64 bytes
+- Path stack: 16 bytes (vs 32 bytes) → saves 16 bytes
+- **Total RAM**: ~880 bytes vs ~1.5 KB (saves ~600 bytes)
+
+**Note:** These are compile-time const generics, not runtime configuration. See [DESIGN.md](DESIGN.md) line 655 for usage in feature configuration examples.
 
 ## Performance Characteristics
 

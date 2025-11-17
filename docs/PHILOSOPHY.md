@@ -19,7 +19,7 @@ These features define what a CLI is and are non-negotiable:
 - **Input parsing** - Terminal I/O with basic line editing
 - **Error handling** - Type-safe response system
 - **Const initialization** - Zero runtime overhead, ROM placement
-- **Metadata/execution separation** - Commands split into const metadata and runtime handlers
+- **Metadata/execution separation pattern** - Commands split into const metadata and runtime handlers
 
 **Why:** Without these, it's not a functional CLI. These are the minimal primitives.
 
@@ -479,8 +479,7 @@ Users learn through interaction, not documentation:
 ### **When to Defer Features**
 1. No demonstrated user demand yet
 2. Unclear if implementation approach is optimal
-3. Waiting for Rust language features (const generics, etc.)
-4. Platform-specific (want to see demand across multiple platforms)
+3. Platform-specific (want to see demand across multiple platforms)
 
 ---
 

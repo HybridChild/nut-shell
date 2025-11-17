@@ -2,6 +2,12 @@
 
 This document explains the I/O abstraction design that enables cli-service to work efficiently in both bare-metal and async runtime environments (like Embassy).
 
+**Related Documentation:**
+- **[DESIGN.md](DESIGN.md)**: Metadata/execution separation pattern (Section 1) - enables async command support
+- **[SPECIFICATION.md](SPECIFICATION.md)**: Terminal I/O behavior specification
+- **[INTERNALS.md](INTERNALS.md)**: Complete data flow including I/O processing
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)**: CharIo implementation tasks (Phase 1)
+
 ## Design Problem
 
 The CLI needs to work in two very different environments:
@@ -299,7 +305,7 @@ async fn cli_task(uart: BufferedUart<'static, UART0>) {
     let mut cli = CliService::new(&TREE, &mut io);
 
     cli.activate();
-    io.flush().await.ok();
+    io.flush().await.ok();  // flush welcome message
 
     let mut buffer = [0u8; 64];
     loop {
@@ -332,8 +338,6 @@ where
     }
 }
 ```
-
-✅ **No change needed** to CliService implementation - it just calls `io.put_char()` as designed.
 
 ### 2. Zero-Cost for Bare-Metal
 
@@ -439,15 +443,6 @@ trait CharIo {
 ### ✅ Chosen: Explicit Buffering
 
 Simple, efficient, works everywhere.
-
-## Migration Path
-
-If the current design in INTERNALS.md doesn't specify buffering behavior:
-
-1. **Add documentation** to CharIo trait clarifying buffering expectations
-2. **Update INTERNALS.md** to show both immediate and deferred flush patterns
-3. **Provide reference implementations** for common platforms
-4. **No code changes** to CliService needed - just clarified semantics
 
 ## Common Issues and Solutions
 
