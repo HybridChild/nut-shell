@@ -12,13 +12,14 @@ This document provides a detailed analysis of cli-service runtime behavior, incl
        ▼
 ┌─────────────────────────────────────────────────────────┐
 │              CliService Main Loop                       │
-│  - State: Inactive/LoggedOut/LoggedIn                  │
-│  - CurrentUser: Option<User<L>>                        │
-│  - InputBuffer: heapless::String<128>                  │
-│  - History: CommandHistory<N>                          │
-│  - Parser: InputParser (escape sequence state machine) │
+│  - State: Inactive/LoggedOut/LoggedIn                   │
+│  - CurrentUser: Option<User<L>>                         │
+│  - Handlers: H (implements CommandHandlers trait)       │
+│  - InputBuffer: heapless::String<128>                   │
+│  - History: CommandHistory<N>                           │
+│  - Parser: InputParser (escape sequence state machine)  │
 └──────┬──────────────────────────────────────────────────┘
-       │ process_char(c)
+       │ process_char(c) or process_char_async(c)
        ▼
 ┌─────────────────┐
 │  InputParser    │ ← State machine for escape sequences
@@ -468,11 +469,106 @@ CliService::process_request(&mut self, request: Request)
                 )));
             }
 
-            // Execute command function
-            let response = (command.execute)(&args)?;
+            // Dispatch to handler based on command kind
+            let response = match command.kind {
+                CommandKind::Sync => {
+                    // Synchronous execution via handlers
+                    self.handlers.execute_sync(command.name, &args)?
+                }
+                CommandKind::Async => {
+                    // In sync mode (process_char), async commands not supported
+                    return Err(CliError::AsyncNotSupported);
+                }
+            };
 
             Ok(response)
         }
+    }
+}
+```
+
+**Note on Architecture:** Commands use the metadata/execution separation pattern:
+
+- **CommandMeta**: Const-initializable metadata (name, description, access_level, kind, arg counts) stored in ROM
+- **CommandHandlers trait**: User-implemented trait with `execute_sync()` and `execute_async()` methods
+- **CommandKind enum**: Marker indicating Sync or Async execution type
+- **Dispatch flow**: CliService validates access/args, then dispatches to appropriate handler method based on kind
+- **Benefits**: Enables async commands without heap, maintains const-initialization, zero-cost for sync-only builds
+
+This pattern allows both sync and async commands in a single codebase while preserving the no_std, const-initialization constraints. See [DESIGN.md](DESIGN.md) for complete architecture details and rationale.
+
+### Async Processing Flow (Embassy/RTIC)
+
+When using `process_char_async()`, async commands can be awaited inline:
+
+```rust
+#[cfg(feature = "async")]
+CliService::process_char_async(&mut self, c: char) -> Result<(), IO::Error>
+{
+    // Same parsing and event handling as process_char()...
+
+    match event {
+        ParseEvent::Enter => {
+            self.handle_command_input_async().await?;  // Async version
+        }
+        // ... other events identical
+    }
+}
+
+#[cfg(feature = "async")]
+CliService::process_request_async(&mut self, request: Request)
+    -> Result<Response, CliError>
+{
+    match request {
+        Request::Execute { command, args } => {
+            // Validate argument count (same as sync)
+            let arg_count = args.len();
+            if arg_count < command.min_args || arg_count > command.max_args {
+                return Ok(Response::error(&format!(
+                    "Invalid argument count. Expected {}-{}, got {}",
+                    command.min_args, command.max_args, arg_count
+                )));
+            }
+
+            // Dispatch to handler based on command kind
+            let response = match command.kind {
+                CommandKind::Sync => {
+                    // Sync commands still work in async mode
+                    self.handlers.execute_sync(command.name, &args)?
+                }
+                CommandKind::Async => {
+                    // Async commands are awaited inline
+                    self.handlers.execute_async(command.name, &args).await?
+                }
+            };
+
+            Ok(response)
+        }
+
+        Request::Navigate { .. } => {
+            // Navigation is synchronous (no await needed)
+            // ... same as sync version
+        }
+    }
+}
+```
+
+**Behavior differences:**
+- **Sync `process_char()`**: Async commands return `AsyncNotSupported` error
+- **Async `process_char_async()`**: Async commands awaited until complete
+- CLI blocks during async execution, but other Embassy tasks continue running
+- Natural error propagation via `?` operator
+
+**Usage example:**
+```rust
+#[embassy_executor::task]
+async fn cli_task(usb: UsbDevice) {
+    let mut cli = CliService::new(&ROOT, handlers, io);
+
+    loop {
+        let c = usb.read_char().await;  // Await input
+        cli.process_char_async(c).await.ok();  // May await on async commands
+        io.flush().await.ok();  // Flush output
     }
 }
 ```

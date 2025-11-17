@@ -1,11 +1,13 @@
 # cli-service Rust Port - Implementation Plan
 
-**Status**: Planning Ongoing  
+**Status**: Planning Ongoing
 **Estimated Timeline**: 6-8 weeks
 
 ## Overview
 
 This document tracks the implementation phases for cli-service. The implementation prioritizes **idiomatic Rust patterns** while maintaining behavioral correctness.
+
+**⚠️ IMPORTANT**: Commands use **metadata/execution separation** pattern. `CommandMeta` (metadata) + `CommandHandlers` trait (execution). This enables both sync and async commands while maintaining const-initialization. See [DESIGN.md](DESIGN.md) section 1 for complete architecture details.
 
 **When to use this document:**
 - Finding out what phase of implementation we're in
@@ -14,7 +16,7 @@ This document tracks the implementation phases for cli-service. The implementati
 - Checking task completion status
 
 **Related Documentation:**
-- **[DESIGN.md](DESIGN.md)**: Design decisions and rationale
+- **[DESIGN.md](DESIGN.md)**: Design decisions, command architecture, and rationale
 - **[INTERNALS.md](INTERNALS.md)**: Complete runtime internals from input to output
 - **[SPECIFICATION.md](SPECIFICATION.md)**: Exact behavioral requirements for each feature
 - **[SECURITY.md](SECURITY.md)**: Security design for authentication features
@@ -25,9 +27,46 @@ This document tracks the implementation phases for cli-service. The implementati
 
 ## Prerequisites: Essential Patterns
 
-**IMPORTANT**: Before starting implementation, you must understand these three architectural patterns. An implementer who discovers these mid-implementation will require significant refactoring.
+**IMPORTANT**: Before starting implementation, you must understand these four architectural patterns. An implementer who discovers these mid-implementation will require significant refactoring.
 
-### 1. Unified Architecture Pattern (Authentication)
+### 1. Metadata/Execution Separation
+
+**Commands split into metadata (const-init) and execution logic (generic trait).**
+
+```rust
+// Metadata (const-initializable, in ROM)
+pub struct CommandMeta<L: AccessLevel> {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub access_level: L,
+    pub kind: CommandKind,  // Sync or Async marker
+    pub min_args: usize,
+    pub max_args: usize,
+}
+
+// Execution logic (user-implemented trait)
+pub trait CommandHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+}
+
+// CliService is generic over handlers
+pub struct CliService<'tree, L, IO, H>
+where H: CommandHandlers { ... }
+```
+
+**Key principles**:
+- Metadata stays const-initializable (lives in ROM)
+- Execution via trait dispatch (monomorphized, zero-cost)
+- Enables async commands without heap allocation
+- Single codebase for both sync and async
+- Zero async machinery in sync-only builds (feature-gated)
+
+**Why this pattern?** Solves the async type system problem: can't store `async fn` in const data (each has unique `impl Future` type). Separation allows metadata in ROM while execution logic is provided via generic trait. See [DESIGN.md](DESIGN.md) section 1 for complete rationale, usage patterns, and trade-offs.
+
+### 2. Unified Architecture Pattern (Authentication)
 
 **Single code path for both auth-enabled and auth-disabled modes.**
 
@@ -58,7 +97,7 @@ pub enum CliState {
 
 See DESIGN.md "Unified Architecture" for complete pattern.
 
-### 2. Stub Function Pattern (Feature Gating)
+### 3. Stub Function Pattern (Feature Gating)
 
 **Provide identical function signatures for both feature-enabled and feature-disabled builds.**
 
@@ -91,7 +130,7 @@ pub fn suggest_completions<'a, L: AccessLevel>(
 
 See DESIGN.md "Feature Gating & Optional Features" for complete pattern.
 
-### 3. Access Control Integration
+### 4. Access Control Integration
 
 **Access control is checked at EVERY tree traversal, not as a separate step.**
 
@@ -131,7 +170,8 @@ Phase 2:
   - src/auth/mod.rs (AccessLevel trait, User struct)
 
 Phase 3:
-  - src/tree/mod.rs (Node enum, Command struct, Directory struct)
+  - src/tree/mod.rs (Node enum, CommandMeta struct, Directory struct, CommandKind enum)
+  - src/cli/handlers.rs (CommandHandlers trait definition)
 
 Phase 4:
   - src/tree/path.rs (Path type)

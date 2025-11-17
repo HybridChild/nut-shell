@@ -621,38 +621,39 @@ For development or unsecured environments.
 
 **Rust implementation:**
 ```rust
-const INFO_CMD: Command<AccessLevel> = Command {
+// Command metadata (const-initializable, stored in ROM)
+const INFO_CMD: CommandMeta<AccessLevel> = CommandMeta {
     name: "info",
     description: "Show system information",
-    execute: info_fn,
     access_level: AccessLevel::Public,
+    kind: CommandKind::Sync,
     min_args: 0,
     max_args: 0,
 };
 
-const REBOOT_CMD: Command<AccessLevel> = Command {
+const REBOOT_CMD: CommandMeta<AccessLevel> = CommandMeta {
     name: "reboot",
     description: "Reboot the device",
-    execute: reboot_fn,
     access_level: AccessLevel::Public,
+    kind: CommandKind::Sync,
     min_args: 0,
     max_args: 0,
 };
 
-const CONFIG_GET: Command<AccessLevel> = Command {
+const CONFIG_GET: CommandMeta<AccessLevel> = CommandMeta {
     name: "get",
     description: "Get config value",
-    execute: config_get_fn,
     access_level: AccessLevel::Public,
+    kind: CommandKind::Sync,
     min_args: 1,
     max_args: 1,
 };
 
-const CONFIG_SET: Command<AccessLevel> = Command {
+const CONFIG_SET: CommandMeta<AccessLevel> = CommandMeta {
     name: "set",
     description: "Set config value",
-    execute: config_set_fn,
     access_level: AccessLevel::Public,
+    kind: CommandKind::Sync,
     min_args: 2,
     max_args: 2,
 };
@@ -675,7 +676,137 @@ const ROOT: Directory<AccessLevel> = Directory {
     ],
     access_level: AccessLevel::Public,
 };
+
+// Command execution (handlers implement the logic)
+struct MyHandlers;
+
+impl CommandHandlers for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "info" => info_fn(args),
+            "reboot" => reboot_fn(args),
+            "get" => config_get_fn(args),
+            "set" => config_set_fn(args),
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+
+// Usage
+let handlers = MyHandlers;
+let mut cli = CliService::new(&ROOT, handlers, io);
 ```
+
+**Note:** Commands use the metadata/execution separation pattern where `CommandMeta` defines the command metadata (const-initializable) and `CommandHandlers` trait provides the execution logic. This enables both sync and async commands while maintaining const-initialization. See [DESIGN.md](DESIGN.md) for complete architecture details.
+
+### Async Command Example (Embassy)
+
+For async runtimes like Embassy, commands can be marked as async and use natural `.await` syntax.
+
+**Structure with async commands:**
+```
+/
+├── reboot            # Sync command
+├── status            # Sync command
+└── network/
+    ├── http-get      # Async command (network I/O)
+    └── wifi-connect  # Async command (takes SSID, password)
+```
+
+**Rust implementation:**
+```rust
+// Metadata (same pattern, marked as async)
+const HTTP_GET: CommandMeta<AccessLevel> = CommandMeta {
+    name: "http-get",
+    description: "Fetch URL via HTTP",
+    access_level: AccessLevel::User,
+    kind: CommandKind::Async,  // Marked as async
+    min_args: 1,
+    max_args: 1,
+};
+
+const WIFI_CONNECT: CommandMeta<AccessLevel> = CommandMeta {
+    name: "wifi-connect",
+    description: "Connect to WiFi network",
+    access_level: AccessLevel::Admin,
+    kind: CommandKind::Async,
+    min_args: 2,
+    max_args: 2,
+};
+
+// Handler with async implementations
+struct EmbassyHandlers;
+
+impl CommandHandlers for EmbassyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "reboot" => reboot_fn(args),
+            "status" => status_fn(args),
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "http-get" => http_get_async(args).await,
+            "wifi-connect" => wifi_connect_async(args).await,
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+
+// Async command implementations (natural async/await)
+async fn http_get_async(args: &[&str]) -> Result<Response, CliError> {
+    let url = args[0];
+
+    match HTTP_CLIENT.get(url).await {
+        Ok(data) => Ok(Response::success(&data)),
+        Err(_) => Ok(Response::error("HTTP request failed")),
+    }
+}
+
+async fn wifi_connect_async(args: &[&str]) -> Result<Response, CliError> {
+    let ssid = args[0];
+    let password = args[1];
+
+    match WIFI.connect(ssid, password).await {
+        Ok(_) => Ok(Response::success("WiFi connected")),
+        Err(_) => Ok(Response::error("Connection failed")),
+    }
+}
+
+// Embassy task using process_char_async
+#[embassy_executor::task]
+async fn cli_task(usb_class: CdcAcmClass<'static, Driver<'static, USB>>) {
+    let mut io = EmbassyUsbIo::new(usb_class);
+    let handlers = EmbassyHandlers;
+    let mut cli = CliService::new(&ROOT, handlers, io);
+
+    cli.activate().ok();
+    io.flush().await.ok();
+
+    let mut buffer = [0u8; 64];
+    loop {
+        let n = io.class.read_packet(&mut buffer).await.unwrap();
+
+        // process_char_async awaits async commands inline
+        for &byte in &buffer[..n] {
+            cli.process_char_async(byte as char).await.ok();
+        }
+
+        io.flush().await.ok();
+    }
+}
+```
+
+**Behavior:**
+- User types: `network/http-get https://example.com`
+- CLI awaits the async HTTP request (blocks CLI, but other Embassy tasks continue)
+- Response displayed when complete
+- Natural error propagation via `?`
+
+**See [IO_DESIGN.md](IO_DESIGN.md) for additional async I/O patterns and [DESIGN.md](DESIGN.md) for architecture details.**
 
 ### Full-Featured Tree (With Authentication)
 

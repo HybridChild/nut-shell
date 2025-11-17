@@ -5,7 +5,7 @@
 This document describes the security architecture for authentication and access control in the Rust cli-service implementation, including rationale, implementation patterns, and best practices for embedded systems.
 
 **Related Documentation:**
-- **[DESIGN.md](DESIGN.md)** - Unified architecture pattern and feature gating details
+- **[DESIGN.md](DESIGN.md)** - Command architecture, unified auth pattern, and feature gating details
 - **[INTERNALS.md](INTERNALS.md)** - Complete authentication flow and state machine implementation
 - **[SPECIFICATION.md](SPECIFICATION.md)** - Behavioral specification for authentication (prompts, messages, login flow)
 - **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy and feature criteria
@@ -590,6 +590,13 @@ fn check_access(&self, node: &Node<L>) -> Result<(), CliError> {
 - `current_user.expect()` is safe because:
   - Auth enabled: `LoggedOut` state doesn't call `check_access()`
   - Auth disabled: This code block doesn't exist (compiled out)
+- **Handler dispatch security**: Access control checks occur BEFORE dispatching to `CommandHandlers`
+  - Handlers receive only pre-validated, accessible commands
+  - Handler implementations don't need to perform access checks
+  - CliService validates access level during command resolution and execution
+  - `CommandHandlers` trait methods receive pre-authorized command names
+  - This ensures security is centralized in CliService, not distributed across handler implementations
+  - See [DESIGN.md](DESIGN.md) for complete handler architecture and [INTERNALS.md](INTERNALS.md) for dispatch flow
 
 ### Configuration & Build
 

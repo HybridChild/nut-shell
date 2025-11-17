@@ -120,28 +120,171 @@ fn parse_input(input: &str) -> Result<Request, ParseError> {
 
 ## Key Design Decisions
 
-### 1. Path Resolution Location
+### 1. Command Architecture: Metadata/Execution Separation
+
+**Decision**: Separate command metadata (const in ROM) from execution logic (generic trait)
+
+**Rationale**: Solves the async command type system problem while maintaining const-initialization:
+- Command metadata (`CommandMeta`) is const-initializable and stored in ROM
+- Execution logic provided via `CommandHandlers` trait (user-implemented)
+- Trait methods can be async without heap allocation
+- Zero-cost for sync-only builds via monomorphization
+- Single codebase supports both sync and async commands
+
+**Architecture:**
+```rust
+// Metadata (const-initializable, in ROM)
+pub struct CommandMeta<L: AccessLevel> {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub access_level: L,
+    pub kind: CommandKind,  // Sync or Async marker
+    pub min_args: usize,
+    pub max_args: usize,
+}
+
+// Execution logic (generic trait)
+pub trait CommandHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+}
+
+// CliService generic over handlers
+pub struct CliService<'tree, L, IO, H>
+where H: CommandHandlers { ... }
+```
+
+**Alternatives Considered:**
+- Function pointers only (rejected: can't store async functions - each has unique `impl Future` type)
+- Enum with Async variant (rejected: can't const-initialize `impl Future` types)
+- Async trait with Pin<Box> (rejected: requires heap allocation, not available in no_std)
+- Two separate libraries (rejected: 90%+ code duplication, maintenance burden)
+
+**Usage Patterns:**
+
+*Bare-Metal (Sync Only):*
+```rust
+struct BareMetalHandlers;
+
+impl CommandHandlers for BareMetalHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "reboot" => reboot_fn(args),
+            "status" => status_fn(args),
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+
+// Main loop
+loop {
+    if let Ok(Some(c)) = io.get_char() {
+        cli.process_char(c).ok();  // Sync processing
+    }
+}
+```
+
+*Embassy/RTIC (Async Commands):*
+```rust
+struct EmbassyHandlers;
+
+impl CommandHandlers for EmbassyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "reboot" => reboot_fn(args),
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "http-get" => http_get_async(args).await,    // Natural async!
+            "wifi-connect" => wifi_connect_async(args).await,
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+
+// Embassy task
+#[embassy_executor::task]
+async fn cli_task(usb: UsbDevice) {
+    let mut cli = CliService::new(&ROOT, EmbassyHandlers, usb_io);
+
+    loop {
+        let c = usb_io.read_char().await;
+        cli.process_char_async(c).await.ok();  // Can await async commands
+    }
+}
+```
+
+**Benefits:**
+
+*For Sync Users (Bare-Metal):*
+- Zero async machinery compiled in (feature-gated)
+- Minimal code size increase (~200-300 bytes for dispatch logic)
+- Same const-initialized trees
+- No behavioral changes
+
+*For Async Users (Embassy, RTIC):*
+- Natural async/await in commands (no manual spawning/tracking)
+- No global state requirements
+- Direct error propagation via `?`
+- Clean, ergonomic code
+
+*For Library Maintainers:*
+- Single codebase (~95% shared code)
+- Unified architecture (same parsing, tree, auth, etc.)
+- Feature-gated async support
+- Manageable complexity increase
+
+**Trade-offs Accepted:**
+
+✅ **Command name duplication** - Name appears in both tree metadata and handler match
+  → Can be mitigated with future macro validation
+  → Explicit dispatch is debuggable and type-safe
+
+✅ **Additional generic parameter** - `CliService<'tree, L, IO, H>`
+  → Monomorphization means zero runtime cost
+  → Cleaner than alternatives (async traits, heap allocation)
+
+✅ **Manual match statements** - Handler implementations use match expressions
+  → Future macro can reduce boilerplate
+  → Explicit dispatch aids debugging
+
+**Code Size Impact (RP2040):**
+
+| Build Configuration | Flash Usage Delta |
+|---------------------|-------------------|
+| Sync only (no async feature) | +200-300 bytes (dispatch logic) |
+| With async feature enabled | +1.2-1.8KB (async machinery) |
+
+The ~200-300 byte increase for sync-only builds is acceptable given the improved architecture and future async support capability.
+
+### 2. Path Resolution Location
 **Decision**: Methods on `Directory` (`resolve_path`) and `Path` (parsing)
 
 **Rationale**: Emphasizes tree navigation, keeps related functionality together
 
 **Alternative Considered**: Separate PathResolver class
 
-### 2. Request Type Structure
+### 3. Request Type Structure
 **Decision**: Single enum in `cli/mod.rs`
 
 **Rationale**: Pattern matching provides type-safe dispatch, reduces file count
 
 **Alternative Considered**: Separate types with trait-based dispatch
 
-### 3. Node Polymorphism
-**Decision**: Enum with Command/Directory variants
+### 4. Node Polymorphism
+**Decision**: Enum with CommandMeta/Directory variants
 
-**Rationale**: Zero-cost dispatch, enables const initialization
+**Rationale**: Zero-cost dispatch, enables const initialization, metadata-only commands
 
 **Alternative Considered**: Trait objects (runtime overhead, no const init)
 
-### 4. Authentication System
+### 5. Authentication System
 **Decision**: Optional authentication with trait-based credential providers, using a unified architecture that minimizes code branching
 
 **Rationale**: Different deployments have different security requirements:
@@ -187,7 +330,7 @@ The implementation uses a single code path for both authentication modes to mini
 
 **Security Note**: When authentication is enabled, access control failures return "Invalid path" errors (same as non-existent paths) to prevent revealing the existence of restricted commands/directories. See SPECIFICATION.md for complete error handling behavior.
 
-### 5. Completion Implementation
+### 6. Completion Implementation
 **Decision**: Free functions or trait methods in `completion` module
 
 **Rationale**: No state needed, lightweight module organization
@@ -196,14 +339,14 @@ The implementation uses a single code path for both authentication modes to mini
 
 **Feature Gating**: Tab completion is optional and can be disabled via Cargo features to reduce code size (~2KB) in constrained environments. When disabled, the entire `completion` module is eliminated at compile time with zero runtime overhead. See "Feature Gating & Optional Features" section below for detailed configuration patterns and use cases
 
-### 6. State Management
+### 7. State Management
 **Decision**: Inline `CliState` enum in `cli/mod.rs`
 
 **Rationale**: Only 3 variants, too small for separate file
 
 **Alternative Considered**: Separate state.rs file
 
-### 7. Double-ESC Clear Behavior
+### 8. Double-ESC Clear Behavior
 **Decision**: ESC ESC clears input buffer and exits history navigation (not feature-gated)
 
 **Rationale**:
@@ -1026,7 +1169,7 @@ These architectural choices provide:
 
 ## Module Structure
 
-**Organized structure (~14 modules with all features):**
+**Organized structure (~15 modules with all features):**
 
 ```
 src/
@@ -1034,9 +1177,10 @@ src/
 ├── cli/
 │   ├── mod.rs          # CliService + Request enum + CliState enum
 │   ├── parser.rs       # InputParser (escape sequences, line editing)
-│   └── history.rs      # CommandHistory (circular buffer)
+│   ├── history.rs      # CommandHistory (circular buffer)
+│   └── handlers.rs     # CommandHandlers trait definition
 ├── tree/
-│   ├── mod.rs          # Node enum + Directory + Command structs
+│   ├── mod.rs          # Node enum + Directory + CommandMeta structs
 │   ├── path.rs         # Path type + resolution methods
 │   └── completion.rs   # Tab completion logic (optional, feature-gated)
 ├── auth/               # Authentication module (optional, feature-gated)
@@ -1055,14 +1199,16 @@ src/
 - **State management**: Inline in cli/mod.rs (small, tightly coupled with service)
 - **Path resolution**: Methods on existing types (tree navigation as core concern)
 - **Tree types**: Combined in tree/mod.rs (related const-init concerns)
+- **Command metadata**: `CommandMeta` in tree/mod.rs (metadata-only, const-init)
+- **Command execution**: `CommandHandlers` trait in cli/handlers.rs (user-implemented)
 - **Authentication**: Trait-based system in auth/ module (optional, pluggable backends)
 - **Completion**: Free functions in tree/completion.rs (optional, stateless logic)
 
 ## See Also
 
-- **[SPECIFICATION.md](SPECIFICATION.md)**: Complete behavioral specification
+- **[SPECIFICATION.md](SPECIFICATION.md)**: Complete behavioral specification with usage examples
 - **[INTERNALS.md](INTERNALS.md)**: Complete runtime internals from input to output
-- **[IMPLEMENTATION.md](IMPLEMENTATION.md)**: Implementation tracking and phased development plan
 - **[SECURITY.md](SECURITY.md)**: Authentication, access control, and security design
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)**: Implementation tracking and phased development plan
 - **[PHILOSOPHY.md](PHILOSOPHY.md)**: Design philosophy and feature decision framework
 - **[../CLAUDE.md](../CLAUDE.md)**: Working patterns and practical implementation guidance

@@ -40,29 +40,83 @@ The architectural decisions and patterns documented here represent our current b
 
 ### Adding a New Command
 
+**Commands use metadata/execution separation pattern** (CommandMeta + CommandHandlers trait). See [docs/DESIGN.md](docs/DESIGN.md) section 1 for complete architecture details.
+
 ```rust
-// 1. Define the command function
-fn reboot_fn<L: AccessLevel>(args: &[&str]) -> Result<Response, CliError> {
-    // Implementation
+// 1. Define the command function (sync or async)
+fn reboot_fn(args: &[&str]) -> Result<Response, CliError> {
+    // Synchronous implementation
     Ok(Response::success("Rebooting..."))
 }
 
-// 2. Create const command definition
-const REBOOT: Command<MyAccessLevel> = Command {
+async fn http_get_async(args: &[&str]) -> Result<Response, CliError> {
+    // Asynchronous implementation (requires async feature)
+    let response = HTTP_CLIENT.get(args[0]).await?;
+    Ok(Response::success(&response))
+}
+
+// 2. Create const command metadata (no execute function)
+const REBOOT: CommandMeta<MyAccessLevel> = CommandMeta {
     name: "reboot",
     description: "Reboot the device",
-    execute: reboot_fn,
     access_level: MyAccessLevel::Admin,
+    kind: CommandKind::Sync,  // Mark as sync
     min_args: 0,
     max_args: 0,
 };
 
+const HTTP_GET: CommandMeta<MyAccessLevel> = CommandMeta {
+    name: "http-get",
+    description: "Fetch URL via HTTP",
+    access_level: MyAccessLevel::User,
+    kind: CommandKind::Async,  // Mark as async
+    min_args: 1,
+    max_args: 1,
+};
+
 // 3. Add to tree
-const SYSTEM_DIR: &[Node<MyAccessLevel>] = &[
-    Node::Command(&REBOOT),
-    // ... other nodes
-];
+const SYSTEM_DIR: Directory<MyAccessLevel> = Directory {
+    name: "system",
+    children: &[
+        Node::Command(&REBOOT),
+        Node::Command(&HTTP_GET),
+        // ... other nodes
+    ],
+    access_level: MyAccessLevel::User,
+};
+
+// 4. Implement CommandHandlers trait (maps names to functions)
+struct MyHandlers;
+
+impl CommandHandlers for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "reboot" => reboot_fn(args),
+            // ... other sync commands
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "http-get" => http_get_async(args).await,
+            // ... other async commands
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+
+// 5. Instantiate CliService with handlers
+let handlers = MyHandlers;
+let mut cli = CliService::new(&SYSTEM_DIR, handlers, io);
 ```
+
+**Key points:**
+- Command metadata (tree) is separate from execution logic (handlers)
+- Commands marked as `Sync` or `Async` via `CommandKind`
+- Handler trait dispatches by name to actual functions
+- Async commands require `async` feature and use `process_char_async()`
 
 ### Implementing Global Commands (help, ?, clear, logout)
 
@@ -183,6 +237,72 @@ impl SomeType {
 }
 ```
 
+### Implementing CommandHandlers Trait
+
+The CommandHandlers trait maps command names to execution functions.
+
+```rust
+pub trait CommandHandlers {
+    /// Execute synchronous command
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+
+    /// Execute asynchronous command (optional, feature-gated)
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+}
+```
+
+**Basic implementation:**
+```rust
+struct MyHandlers;
+
+impl CommandHandlers for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "reboot" => reboot_fn(args),
+            "status" => status_fn(args),
+            "led-toggle" => led_toggle_fn(args),
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "http-get" => http_get_async(args).await,
+            "wifi-connect" => wifi_connect_async(args).await,
+            "flash-write" => flash_write_async(args).await,
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+```
+
+**Stateful handlers (using shared references):**
+```rust
+struct MyHandlers<'a> {
+    system: &'a SystemState,
+}
+
+impl<'a> CommandHandlers for MyHandlers<'a> {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "status" => {
+                let info = self.system.get_status();
+                Ok(Response::success(&info))
+            }
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+```
+
+**Best practices:**
+- Keep handler implementations simple (just dispatch)
+- Command functions can access statics or captured state
+- Use `CommandNotFound` for unrecognized commands
+- Handler doesn't need to validate args (CliService does this)
+
 ### Implementing AccessLevel Trait
 
 ```rust
@@ -294,15 +414,55 @@ mod tests {
 
 ## Core Architecture Patterns
 
+### Metadata/Execution Separation
+
+**IMPORTANT: Commands use metadata/execution separation pattern.** Command metadata (const in ROM) is separate from execution logic (generic trait). This enables both sync and async commands while maintaining const-initialization. See [docs/DESIGN.md](docs/DESIGN.md) section 1 for complete architecture details, rationale, and usage patterns.
+
+```rust
+// Metadata (const-initializable)
+pub struct CommandMeta<L: AccessLevel> {
+    pub name: &'static str,
+    pub description: &'static str,
+    pub access_level: L,
+    pub kind: CommandKind,  // Sync or Async marker
+    pub min_args: usize,
+    pub max_args: usize,
+}
+
+// Execution logic (user-implemented trait)
+pub trait CommandHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+}
+
+// CliService is generic over handlers
+pub struct CliService<'tree, L, IO, H>
+where
+    H: CommandHandlers,
+{
+    handlers: H,
+    // ... other fields
+}
+```
+
+**Benefits:**
+- Metadata stays const-initializable (lives in ROM)
+- Async commands supported naturally (trait method can be async)
+- Zero-cost for sync-only builds (monomorphization)
+- Single codebase for both sync and async
+
 ### Unified Architecture (Auth-Enabled vs Auth-Disabled)
 
 **IMPORTANT: Use a single code path for both authentication modes. Do NOT create duplicate implementations.**
 
 **Implementation pattern:**
 ```rust
-pub struct CliService<'tree, L, IO> {
+pub struct CliService<'tree, L, IO, H> {
     current_user: Option<User<L>>,  // Always present (not feature-gated)
     state: CliState,                // Always present (not feature-gated)
+    handlers: H,                    // Generic over CommandHandlers
 
     #[cfg(feature = "authentication")]
     credential_provider: &'tree dyn CredentialProvider<L>,  // Only this field is conditional
@@ -364,24 +524,27 @@ pub struct CliService<'tree, L, IO> {
 ### Node Type System
 ```rust
 enum Node<L: AccessLevel> {
-    Command(&'static Command<L>),
+    Command(&'static CommandMeta<L>),  // Metadata only
     Directory(&'static Directory<L>),
 }
 ```
 - **Zero-cost dispatch**: Pattern matching instead of vtable
 - **Const-friendly**: Can initialize at compile time
 - **ROM placement**: Entire tree lives in flash
+- **Metadata-only**: Execution logic separate (via CommandHandlers trait)
 
 ### Service Generics
 ```rust
-CliService<'tree, L, IO>
+CliService<'tree, L, IO, H>
 where
     L: AccessLevel,    // User-defined access hierarchy
     IO: CharIo,        // Platform-specific I/O
+    H: CommandHandlers, // Command execution (sync/async dispatch)
 ```
 - **Monomorphization**: Compiler generates specialized code per type
 - **Zero overhead**: No runtime dispatch, fully inlined
 - **Lifetime `'tree`**: References tree data (static or const)
+- **Handler generic**: Enables both sync and async execution patterns
 
 ### Module Structure
 

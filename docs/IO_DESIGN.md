@@ -606,10 +606,10 @@ for byte in batch {
 
 **Why:** Each flush is an I/O transaction (1-2ms on USB). Batch instead.
 
-### ❌ Don't: Block in Command Execute Functions
+### ❌ Don't: Block in Sync Command Execute Functions
 
 ```rust
-// AVOID - blocks entire CLI
+// AVOID - blocks entire CLI in sync mode
 fn bad_command(_args: &[&str]) -> Result<Response, CliError> {
     // Blocking operation
     for _ in 0..1000000 { }  // Blocks everything!
@@ -617,7 +617,9 @@ fn bad_command(_args: &[&str]) -> Result<Response, CliError> {
 }
 ```
 
-**Why:** CLI can't process input during blocking. Use background tasks instead (async platforms) or keep commands fast.
+**Why:** CLI can't process input during blocking. Solutions:
+- **Async platforms**: Use async commands with `process_char_async()` (see below)
+- **Bare-metal**: Keep commands fast, or spawn background tasks manually
 
 ### ❌ Don't: Allocate on Heap in Commands
 
@@ -631,6 +633,81 @@ fn bad_command(_args: &[&str]) -> Result<Response, CliError> {
 
 **Why:** Library is `no_std`. Use `heapless` collections instead.
 
+## Async Command Support
+
+With metadata/execution separation, commands can be naturally async without requiring manual spawning or global state.
+
+### Using Async Commands
+
+**Command definition:**
+```rust
+// Metadata marks command as async
+const HTTP_GET: CommandMeta<Level> = CommandMeta {
+    name: "http-get",
+    kind: CommandKind::Async,  // Marked as async
+    // ... other metadata
+};
+
+// Handler implementation with natural async/await
+impl CommandHandlers for MyHandlers {
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "http-get" => {
+                let url = args[0];
+                let response = HTTP_CLIENT.get(url).await?;  // Natural async!
+                Ok(Response::success(&response))
+            }
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+```
+
+**Embassy task with async commands:**
+```rust
+#[embassy_executor::task]
+async fn cli_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
+    let mut io = EmbassyUsbIo::new(usb);
+    let handlers = MyHandlers;
+    let mut cli = CliService::new(&ROOT, handlers, io);
+
+    cli.activate().ok();
+    io.flush().await.ok();
+
+    let mut buffer = [0u8; 64];
+    loop {
+        // 1. AWAIT input
+        let n = io.class.read_packet(&mut buffer).await.unwrap();
+
+        // 2. PROCESS (may await on async commands)
+        for &byte in &buffer[..n] {
+            cli.process_char_async(byte as char).await.ok();
+            // If async command: awaits until complete
+            // If sync command: returns immediately
+        }
+
+        // 3. FLUSH output
+        io.flush().await.ok();
+    }
+}
+```
+
+**Behavior:**
+- User types: `http-get https://example.com`
+- `process_char_async()` awaits the HTTP request
+- CLI blocked during request, but other Embassy tasks continue
+- Response displayed when complete
+- No manual spawning, no global state, no polling needed!
+
+**Benefits over manual spawning:**
+- ✅ No global `SPAWNER` statics
+- ✅ No global result tracking mutexes
+- ✅ No manual polling or status commands
+- ✅ Direct error propagation via `?`
+- ✅ 3 lines instead of 20+ lines
+
+Commands use the metadata/execution separation pattern (CommandMeta + CommandHandlers trait) which enables natural async command support. See [DESIGN.md](DESIGN.md) section 1 for complete architecture details.
+
 ## Summary
 
 **Design decision:** CharIo implementations MUST buffer output. Flush timing is platform-dependent:
@@ -638,16 +715,22 @@ fn bad_command(_args: &[&str]) -> Result<Response, CliError> {
 - **Bare-metal:** Immediate flush (blocking acceptable)
 - **Async:** Deferred flush (manual, after process_char)
 
+**Async command support:**
+- Commands can be marked as `Async` via `CommandKind`
+- Use `process_char_async()` to await async commands inline
+- Natural async/await without manual spawning
+
 **Benefits:**
 - ✅ Works in both bare-metal and async runtimes (Embassy, RTIC, etc.)
 - ✅ Zero overhead for bare-metal
 - ✅ Efficient batching for async
 - ✅ Single CliService implementation
-- ✅ No async trait complexity
+- ✅ No async trait complexity (uses handler pattern)
 - ✅ Stable Rust compatible
+- ✅ Natural async/await for async commands
 
 **Implementation:**
-- Bare-metal: `put_char()` writes to UART directly
-- Async: `put_char()` writes to buffer, `flush()` called externally
+- Bare-metal: `put_char()` writes to UART directly, sync commands only
+- Async: `put_char()` writes to buffer, `flush()` called externally, supports async commands
 
 **For complete examples:** See the `examples/` directory for reference implementations on different platforms.

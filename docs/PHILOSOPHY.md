@@ -14,13 +14,16 @@ Every feature must justify its existence through the lens of embedded constraint
 These features define what a CLI is and are non-negotiable:
 
 - **Path-based navigation** - Hierarchical command structure with Unix-style paths
-- **Command execution** - Execute commands with positional arguments
+- **Command execution** - Execute commands with positional arguments (sync and async)
 - **Access control** - User-defined permission hierarchies
 - **Input parsing** - Terminal I/O with basic line editing
 - **Error handling** - Type-safe response system
 - **Const initialization** - Zero runtime overhead, ROM placement
+- **Metadata/execution separation** - Commands split into const metadata and runtime handlers
 
 **Why:** Without these, it's not a functional CLI. These are the minimal primitives.
+
+**Note:** The metadata/execution separation pattern enables natural async command support (via `process_char_async()` and `CommandHandlers` trait) without compromising const-initialization or adding heap dependencies.
 
 ---
 
