@@ -219,13 +219,13 @@ Project philosophy and feature criteria:
 
 | Document | Size | Lines | Primary Focus |
 |----------|------|-------|---------------|
-| INTERNALS.md | 40KB | ~1079 | Runtime behavior, data flow |
-| DESIGN.md | 32KB | ~768 | Design rationale, feature gating |
-| SECURITY.md | 28KB | ~900 | Authentication, security |
-| SPECIFICATION.md | 24KB | ~789 | Behavioral requirements |
+| INTERNALS.md | 40KB | ~1106 | Runtime behavior, data flow |
+| DESIGN.md | 32KB | ~793 | Design rationale, feature gating |
+| SPECIFICATION.md | 24KB | ~657 | Behavioral requirements |
 | IMPLEMENTATION.md | 24KB | ~657 | Implementation roadmap |
-| PHILOSOPHY.md | 20KB | ~555 | Design philosophy |
-| IO_DESIGN.md | 27KB | ~737 | CharIo trait, buffering model |
+| SECURITY.md | 25KB | ~633 | Authentication, security |
+| PHILOSOPHY.md | 20KB | ~554 | Design philosophy |
+| IO_DESIGN.md | 12KB | ~301 | CharIo trait, buffering model |
 
 ---
 

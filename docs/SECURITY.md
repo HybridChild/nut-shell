@@ -204,206 +204,29 @@ struct StoredCredential {
 
 ## Credential Storage Options
 
-### 1. Build-Time Environment Variables (Default)
+The `CredentialProvider` trait enables multiple storage backends:
 
-**Use Case:** Production deployments with build-time configuration
-
-**Security Level:** ⭐⭐⭐⭐ (High)
-
-**Implementation:**
-```rust
-// build.rs
-fn main() {
-    // Read from secure build environment
-    let users = std::env::var("CLI_USERS")
-        .expect("CLI_USERS not set");
-
-    // Format: "username:hash:salt:level;username:hash:salt:level"
-    // Example: "admin:deadbeef...:cafebabe...:Admin"
-
-    println!("cargo:rustc-env=CLI_USERS={}", users);
-}
-
-// src/auth/providers/buildtime.rs
-pub struct BuildTimeProvider<L> {
-    users: heapless::Vec<User<L>, MAX_USERS>,
-}
-
-impl<L: AccessLevel> BuildTimeProvider<L> {
-    pub const fn new() -> Self {
-        // Parse CLI_USERS at compile time
-        // Store as const data in ROM
-    }
-}
-```
-
-**Advantages:**
-- ✅ No credentials in source code
-- ✅ Different credentials per build/deployment
-- ✅ Credentials in ROM (not modifiable at runtime)
-- ✅ Can be set by CI/CD securely
-- ✅ Zero runtime overhead
-
-**Disadvantages:**
-- ⚠️ Requires rebuild to change credentials
-- ⚠️ Same credentials for all devices in build batch
-- ⚠️ Hash visible in binary (requires `strings` to extract)
-
-**Best For:**
-- Single-device or small-batch deployments
-- Environments where credentials rarely change
-- When rebuild process is acceptable for rotation
+### 1. Build-Time Environment Variables
+- Credentials configured via environment variables during build
+- Const data stored in ROM
+- Suitable for single-device or small-batch deployments
+- No credentials in source control
 
 ### 2. Flash Storage (Production Recommended)
-
-**Use Case:** Production embedded systems requiring per-device credentials
-
-**Security Level:** ⭐⭐⭐⭐⭐ (Highest)
-
-**Implementation:**
-```rust
-use rp2040_flash::{flash, FLASH_SIZE};
-
-// Dedicate last 4KB sector for credentials
-const CREDENTIAL_SECTOR: u32 = (FLASH_SIZE - 4096) as u32;
-
-pub struct FlashProvider<L> {
-    _phantom: PhantomData<L>,
-}
-
-impl<L: AccessLevel> FlashProvider<L> {
-    pub fn load_users(&self) -> Result<Vec<User<L>>, FlashError> {
-        let data = flash::read_sector(CREDENTIAL_SECTOR)?;
-        self.parse_credentials(data)
-    }
-
-    pub fn update_user(&mut self, user: &User<L>) -> Result<(), FlashError> {
-        // Admin-only command to update credentials
-        flash::erase_sector(CREDENTIAL_SECTOR)?;
-        flash::write_sector(CREDENTIAL_SECTOR, &self.serialize(user))?;
-        Ok(())
-    }
-}
-```
-
-**Advantages:**
-- ✅ Per-device unique credentials
-- ✅ Updateable without recompilation
-- ✅ Survives firmware updates (separate flash sector)
-- ✅ Can implement credential rotation
-- ✅ No credentials in source or binary
-
-**Disadvantages:**
-- ⚠️ Requires flash write capability (admin command)
-- ⚠️ Wear leveling considerations (flash has limited writes)
-- ⚠️ Initial provisioning process needed
-
-**Best For:**
-- Production deployments with many devices
-- Systems requiring credential rotation
-- High-security environments
-- Devices with unique per-device identities
-
-**Provisioning Process:**
-```rust
-// During manufacturing/first boot
-impl<L: AccessLevel> FlashProvider<L> {
-    pub fn provision(&mut self, admin_password: &str) -> Result<(), FlashError> {
-        // Generate unique salt from hardware RNG
-        let salt = self.get_hardware_random_salt();
-
-        // Hash provided password
-        let hash = Sha256Hasher.hash(admin_password, &salt);
-
-        // Store in flash
-        let admin = User {
-            username: heapless::String::from("admin"),
-            password_hash: hash,
-            salt,
-            access_level: L::admin(),
-        };
-
-        self.update_user(&admin)
-    }
-}
-```
+- Per-device unique credentials
+- Updateable without recompilation
+- Survives firmware updates (separate flash sector)
+- Requires provisioning process and flash write capability
 
 ### 3. Const Provider (Examples/Testing Only)
-
-**Use Case:** Examples, prototypes, testing
-
-**Security Level:** ⭐ (Low - NOT for production)
-
-**Implementation:**
-```rust
-// examples/basic_auth.rs
-const EXAMPLE_USERS: &[User<ExampleAccessLevel>] = &[
-    User {
-        username: heapless::String::from_str("admin").unwrap(),
-        password_hash: [0xde, 0xad, 0xbe, 0xef, /* ... */],
-        salt: [0xca, 0xfe, 0xba, 0xbe, /* ... */],
-        access_level: ExampleAccessLevel::Admin,
-    },
-];
-
-pub struct ConstProvider {
-    users: &'static [User<ExampleAccessLevel>],
-}
-```
-
-**Advantages:**
-- ✅ Simple implementation
-- ✅ No build-time dependencies
-- ✅ Good for examples/documentation
-
-**Disadvantages:**
-- ❌ Hardcoded in binary
-- ❌ Same credentials everywhere
-- ❌ NOT suitable for production
-
-**Best For:**
-- Example code
-- Unit/integration tests
-- Prototyping
-- Documentation
+- Hardcoded credentials in binary
+- Simple implementation for examples and tests
+- NOT suitable for production
 
 ### 4. Custom Trait-Based Provider
-
-**Use Case:** Specialized backends (LDAP, external auth, HSM)
-
-**Security Level:** Depends on implementation
-
-**Implementation:**
-```rust
-// User implements custom provider
-pub struct LdapProvider {
-    server: &'static str,
-    // LDAP configuration
-}
-
-impl<L: AccessLevel> CredentialProvider<L> for LdapProvider {
-    type Error = LdapError;
-
-    fn find_user(&self, username: &str) -> Result<Option<User<L>>, Self::Error> {
-        // Query LDAP server
-        // Return user with access level mapping
-    }
-
-    fn verify_password(&self, user: &User<L>, password: &str) -> bool {
-        // Delegate to LDAP bind
-    }
-}
-```
-
-**Advantages:**
-- ✅ Maximum flexibility
-- ✅ Can integrate with existing infrastructure
-- ✅ Supports complex scenarios (2FA, federation, etc.)
-
-**Best For:**
-- Integration with existing auth systems
-- Complex multi-device deployments
-- Specialized security requirements
+- Maximum flexibility for specialized backends
+- Can integrate with existing infrastructure (LDAP, HSM, etc.)
+- Implementation-specific security properties
 
 ---
 
@@ -537,87 +360,26 @@ See [DESIGN.md](DESIGN.md) for feature gating patterns and [SPECIFICATION.md](SP
 
 ---
 
-## Implementation Patterns
+## Implementation Requirements
 
 ### Login Flow
+1. Parse login request (username:password format)
+2. Find user via `CredentialProvider::find_user()`
+3. Verify password using constant-time comparison
+4. Rate limit failed attempts (minimum 1 second delay)
+5. Update session state on success
 
-```rust
-// 1. Parse login request
-let login_request = match parser.parse_line(&input) {
-    ParseResult::LoginRequest { username, password } => (username, password),
-    _ => return Err(CliError::InvalidFormat),
-};
+### Password Masking
+- Echo characters normally until colon detected
+- Mask all characters after colon with asterisks
+- Backspace must properly handle masked characters
+- See SPECIFICATION.md for complete terminal behavior
 
-// 2. Find user
-let user = credential_provider
-    .find_user(&login_request.username)?
-    .ok_or(CliError::InvalidCredentials)?;
-
-// 3. Verify password (constant-time comparison)
-if !credential_provider.verify_password(&user, &login_request.password) {
-    // Rate limiting: delay after failed attempt
-    delay_ms(1000);
-    return Err(CliError::InvalidCredentials);
-}
-
-// 4. Update session state
-self.current_user = Some(user);
-self.state = CliState::LoggedIn;
-
-Ok(Response::success("Logged in"))
-```
-
-### Password Masking During Input
-
-```rust
-impl InputParser {
-    fn echo_character(&mut self, c: char) -> Result<(), IoError> {
-        if self.state == CliState::LoggedOut {
-            // Check if we've seen a colon (username:password)
-            if let Some(colon_pos) = self.buffer.find(':') {
-                // Mask password characters with '*'
-                if self.buffer.len() > colon_pos + 1 {
-                    return self.io.put_char('*');
-                }
-            }
-        }
-
-        // Echo normally
-        self.io.put_char(c)
-    }
-}
-```
-
-### Credential Hashing Helper
-
-```rust
-// Tool for generating hashed credentials
-// Usage: cargo run --bin hash-password -- "mypassword"
-
-use sha2::{Sha256, Digest};
-use rand::RngCore;
-
-fn main() {
-    let password = std::env::args().nth(1).expect("Usage: hash-password <password>");
-
-    // Generate random salt
-    let mut salt = [0u8; 16];
-    rand::thread_rng().fill_bytes(&mut salt);
-
-    // Hash password
-    let mut hasher = Sha256::new();
-    hasher.update(&salt);
-    hasher.update(password.as_bytes());
-    let hash = hasher.finalize();
-
-    // Output in format for CLI_USERS env var
-    println!("Salt: {}", hex::encode(&salt));
-    println!("Hash: {}", hex::encode(&hash));
-    println!();
-    println!("Format for CLI_USERS:");
-    println!("username:{}:{}:AccessLevel", hex::encode(&hash), hex::encode(&salt));
-}
-```
+### Access Control Enforcement
+- Check access level at every path segment during tree traversal
+- Return `CliError::InvalidPath` for both nonexistent and inaccessible nodes
+- Verify access before dispatching to CommandHandlers
+- See INTERNALS.md Level 4 for complete implementation details
 
 ---
 
@@ -807,36 +569,31 @@ If your threat model requires stronger protections:
 
 ---
 
-## Best Practices Summary
+## Security Requirements Summary
 
-### DO ✅
+**Password Hashing:**
+- Use SHA-256 with per-user salts
+- Generate unique 128-bit salts per user
+- Implement constant-time comparison to prevent timing attacks
+- Store hashed credentials only (never plaintext)
 
-- **Use SHA-256 with per-user salts** for embedded systems
-- **Store credentials in flash** for production deployments
-- **Use build-time env vars** to keep secrets out of source
-- **Implement constant-time comparison** for password verification
-- **Rate limit failed login attempts** (delay after failure)
-- **Mask password input** (show asterisks after colon)
-- **Validate access on entire path** (root to target node)
-- **Use feature gates** for optional authentication
-- **Generate unique salts** per user (hardware RNG)
-- **Provide password change command** for administrators
-- **Document security assumptions** clearly
-- **Test for timing attacks** in password verification
-- **Audit binaries** for plaintext credential leakage
+**Credential Storage:**
+- Keep credentials out of source control
+- Use build-time configuration or flash storage
+- Support per-device unique credentials
+- Enable credential rotation capability
 
-### DON'T ❌
+**Access Control:**
+- Validate access at every path segment during traversal
+- Return identical errors for nonexistent and inaccessible nodes
+- Enforce access before command dispatch
+- Use generic AccessLevel trait for user-defined hierarchies
 
-- **Never commit plaintext passwords** to version control
-- **Never use same credentials** across all devices
-- **Never skip salt** when hashing passwords
-- **Never use variable-time comparison** (enables timing attacks)
-- **Never store passwords** in easily extractable locations
-- **Never allow unlimited login attempts** without delays
-- **Never echo passwords** to console (even in debug builds)
-- **Never hardcode production credentials** in examples
-- **Never reuse salts** across users
-- **Never ignore failed login attempts** (should log/alert)
+**Authentication Flow:**
+- Rate limit failed login attempts (minimum 1 second delay)
+- Mask password input after colon character
+- Use unified architecture pattern (single code path)
+- Feature-gate authentication for optional use
 
 ---
 
