@@ -38,10 +38,10 @@ This document provides a detailed analysis of cli-service runtime behavior, incl
        ▼
 ┌─────────────────────────────────────────────────┐
 │         Request Handler                         │
-│  - Global commands (help, ?, logout, clear)    │
-│  - Navigate (change directory)                 │
-│  - Execute (run command with args)             │
-│  - Tab completion                              │
+│  - Global commands (help, ?, logout, clear)     │
+│  - Navigate (change directory)                  │
+│  - Execute (run command with args)              │
+│  - Tab completion                               │
 └──────┬──────────────────────────────────────────┘
        │ uses
        ▼
@@ -573,6 +573,50 @@ async fn cli_task(usb: UsbDevice) {
 }
 ```
 
+**Async Command Execution Behavior:**
+
+When `process_char_async()` is used (Embassy/RTIC environments):
+
+**During async command execution:**
+- CLI task blocks on the async command (awaits completion)
+- User input is NOT processed while command runs
+- CharIo may buffer incoming characters (implementation-dependent)
+- Other Embassy tasks continue running normally (CLI task is suspended)
+- No cancellation mechanism provided (command runs to completion)
+
+**User interaction:**
+- User CANNOT send new commands while async command executing
+- Characters typed during execution may be:
+  - Buffered by CharIo implementation (processed after command completes)
+  - Dropped (if CharIo buffer overflows)
+  - Implementation-dependent behavior
+- No visual feedback that command is running (command should provide its own)
+
+**Timeout handling:**
+- Library does NOT implement command timeouts
+- Command functions should implement their own timeouts using executor primitives:
+  ```rust
+  async fn http_get_async(args: &[&str]) -> Result<Response, CliError> {
+      embassy_time::with_timeout(Duration::from_secs(30), async {
+          HTTP_CLIENT.get(args[0]).await
+      })
+      .await
+      .map_err(|_| CliError::Timeout)?
+  }
+  ```
+
+**Task spawning from async commands:**
+- Async commands CAN spawn background tasks if needed
+- Spawned tasks are detached (CLI does not track them)
+- Command should return Response immediately after spawning
+- Background tasks MUST NOT access CliService (not thread-safe)
+- Example use case: Start long-running background operation, return immediately
+
+**Error propagation:**
+- Async command errors propagate normally via `?` operator
+- Same error handling as sync commands
+- Command not added to history on error
+
 ## Level 6: Interactive Features (Tab Completion & History)
 
 ```rust
@@ -1051,12 +1095,157 @@ type InputBuffer = heapless::String<64>;  // RAM: 64 bytes (vs 128 bytes)
 | History add | O(1) | Circular buffer push (amortized) |
 | Response formatting | O(n) | n = message length |
 
-## Thread Safety
+## Concurrency and Safety
 
-- **Single-threaded design**: No internal synchronization
-- **Non-reentrant**: process_char() should not be called recursively
-- **I/O safety**: CharIo implementation responsible for platform-specific locking
-- **State isolation**: Each CliService instance is independent
+### Thread Safety: NOT THREAD-SAFE
+
+**CliService is NOT Send or Sync:**
+- Cannot be shared between threads or tasks
+- Must be owned by a single task/thread
+- No internal synchronization mechanisms
+- Mutable state not protected by locks
+
+**Design principle:** Embedded systems typically single-threaded or use message-passing, not shared-state concurrency.
+
+### Interrupt Safety: NOT ISR-SAFE
+
+**`process_char()` MUST NOT be called from interrupt handlers:**
+- May allocate stack frames (not suitable for ISR stack)
+- Performs I/O operations (may block or take significant time)
+- Not designed for deterministic execution time
+
+**Correct pattern for interrupt-driven input:**
+```rust
+static RX_BUFFER: Mutex<RefCell<heapless::Deque<u8, 64>>> = ...;
+
+// ISR: Only buffer the character
+fn UART_IRQ() {
+    if uart.is_readable() {
+        RX_BUFFER.lock(|buf| buf.push_back(uart.read_byte()));
+    }
+}
+
+// Main loop: Process buffered characters
+fn main() {
+    loop {
+        if let Some(c) = RX_BUFFER.lock(|buf| buf.pop_front()) {
+            cli.process_char(c as char).ok();
+        }
+    }
+}
+```
+
+### Re-entrancy: NOT RE-ENTRANT
+
+**`process_char()` should not be called recursively:**
+- Command handlers should NOT call `process_char()` directly or indirectly
+- CharIo implementations should NOT trigger re-entrant calls
+- Safe to call from single context only
+
+**Why:** Would corrupt internal state (input buffer, parser state, path stack).
+
+### Embassy Multi-Task Usage
+
+**Correct pattern (single CLI task):**
+```rust
+#[embassy_executor::task]
+async fn cli_task(usb: UsbDevice) {
+    let handlers = MyHandlers;
+    let mut cli = CliService::new(&ROOT, handlers, usb_io);  // Owned by this task
+
+    loop {
+        if let Ok(Some(c)) = usb_io.get_char() {
+            cli.process_char_async(c).await.ok();
+        }
+        usb_io.flush().await.ok();
+        Timer::after(Duration::from_millis(10)).await;
+    }
+}
+
+#[embassy_executor::task]
+async fn sensor_task() {
+    // Completely independent task - no CLI access
+    loop {
+        read_sensors().await;
+        Timer::after(Duration::from_secs(1)).await;
+    }
+}
+```
+
+**INCORRECT pattern (DO NOT DO THIS):**
+```rust
+// WRONG: Trying to share CliService between tasks
+static CLI: Mutex<CliService> = ...;  // ERROR: CliService not designed for sharing
+
+// WRONG: Accessing CLI from multiple tasks
+async fn task_a() { CLI.lock().await.process_char('a'); }  // Race conditions!
+async fn task_b() { CLI.lock().await.process_char('b'); }  // Race conditions!
+```
+
+### CommandHandlers Thread Safety
+
+**Handler implementations should avoid shared mutable state:**
+```rust
+// SAFE: Stateless handler
+struct MyHandlers;
+impl CommandHandlers for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+        match name {
+            "status" => Ok(Response::success("OK")),
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+
+// SAFE: Read-only shared state
+struct MyHandlers<'a> {
+    config: &'a Config,  // Immutable reference - safe
+}
+
+// UNSAFE: Shared mutable state without synchronization
+struct MyHandlers {
+    counter: Cell<u32>,  // Mutable - NOT safe if CLI shared (which it shouldn't be)
+}
+```
+
+**Guideline:** If you need shared mutable state, use message-passing or channels to communicate with other tasks, don't share CliService itself.
+
+### CharIo Thread Safety
+
+**CharIo implementations are responsible for their own thread safety:**
+- If CharIo buffers are accessed from ISRs, use appropriate synchronization (Mutex, critical sections)
+- If multiple tasks write to same output, CharIo must handle interleaving
+- CliService assumes CharIo methods are safe to call from its context
+
+**Example: ISR-safe CharIo buffering:**
+```rust
+use cortex_m::interrupt::Mutex;
+
+static RX_QUEUE: Mutex<RefCell<heapless::Deque<u8, 64>>> = ...;
+static TX_QUEUE: Mutex<RefCell<heapless::Deque<u8, 256>>> = ...;
+
+impl CharIo for UartIo {
+    fn get_char(&mut self) -> Result<Option<char>, Self::Error> {
+        cortex_m::interrupt::free(|cs| {
+            RX_QUEUE.borrow(cs).borrow_mut().pop_front()
+        }).map(|b| b as char).ok_or(Error::NoData)
+    }
+
+    fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
+        cortex_m::interrupt::free(|cs| {
+            TX_QUEUE.borrow(cs).borrow_mut().push_back(c as u8)
+        }).map_err(|_| Error::BufferFull)
+    }
+}
+```
+
+### State Isolation
+
+**Each CliService instance is completely independent:**
+- No global state shared between instances
+- Multiple instances can coexist (on different I/O channels)
+- Tree structures are const (shared read-only is safe)
+- Handlers are passed by value/reference (user controls sharing)
 
 ## Error Handling Strategy
 

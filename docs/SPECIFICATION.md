@@ -603,6 +603,86 @@ Every node has an associated access level requirement.
 - Return "Invalid path" error (same as non-existent nodes)
 - Do not reveal node existence through error messages
 
+## Error Handling & Recovery
+
+### Input Buffer Overflow
+
+When input buffer reaches capacity (default 128 bytes) and user continues typing:
+
+**Behavior:**
+- Subsequent characters are silently ignored
+- No error message displayed (would cause I/O recursion)
+- Backspace still functions to make room
+- User sees typed characters in terminal but they don't enter buffer
+
+**Rationale:** Terminal already shows typed characters, error message would be confusing and wasteful.
+
+### Output Buffer Overflow (Async Platforms)
+
+When response exceeds output buffer capacity in CharIo implementation:
+
+**Behavior:**
+- `put_char()` returns `Err(IO::Error::BufferFull)`
+- Error propagates to `process_char()` caller
+- Response is truncated at buffer boundary
+- Prompt generation uses separate fixed-size buffer (always succeeds)
+
+**Recovery:** Caller should flush output buffer and retry, or log error and continue.
+
+### Command Execution Errors
+
+When command returns error response:
+
+**State changes:**
+- Current directory: Unchanged (errors don't affect navigation)
+- Input buffer: Cleared
+- History navigation: Exits to normal mode (reset position)
+- Command history: Error commands NOT added to history
+
+**Display:**
+- Error message shown with standard formatting (indented, newlines)
+- Prompt displayed normally after error
+- User can immediately retry or try different command
+
+### Path Resolution Errors
+
+**Invalid path scenarios:**
+1. Path segment doesn't exist
+2. Path segment exists but user lacks access (returns same error)
+3. Path too deep (exceeds MAX_PATH_DEPTH)
+
+**Behavior:**
+- Returns `CliError::InvalidPath` for cases 1 and 2 (security: same error)
+- Returns `CliError::PathTooDeep` for case 3
+- Current directory unchanged
+- Input buffer cleared
+- Standard error display with prompt
+
+### Escape Sequence Parser Errors
+
+**Buffer overflow in escape sequence:**
+- Escape sequence buffer limited to 16 characters
+- Overflow causes parser to reset to normal mode
+- Incomplete sequence is discarded
+- No error message shown
+- User input continues normally
+
+**Malformed sequences:**
+- Unrecognized escape sequences are discarded silently
+- Parser returns to normal mode on alphabetic terminator
+- No error feedback (terminal sent invalid sequence)
+
+### CharIo Errors
+
+**Read errors (`get_char()`):**
+- Return error to caller (typically main loop)
+- CliService does not handle I/O errors internally
+- Caller decides: retry, reset, or terminate CLI
+
+**Write errors (`put_char()`, `write_str()`):**
+- Propagate to `process_char()` return value
+- Caller should handle (flush, retry, log, etc.)
+- CliService state remains consistent (safe to retry)
 
 ## Implementation Requirements
 
