@@ -25,7 +25,7 @@ Authoritative reference for exact system behavior:
 - Tab completion behavior (single/multiple matches, directory handling)
 - Command history (navigation, storage rules)
 - Response formatting (indentation, newlines, prompt control)
-- Global commands (`help`, `?`, `logout`, `clear`)
+- Global commands (`ls`, `?`, `logout`, `clear`)
 - Path resolution (absolute/relative, `.` and `..`)
 - Access control enforcement
 - Example command trees

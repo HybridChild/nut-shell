@@ -34,7 +34,7 @@ See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the current roadmap and
 - **Access control** - User-defined permission hierarchies
 - **Input parsing** - Terminal I/O with line editing (backspace, arrows, double-ESC clear)
 - **Const initialization** - Zero runtime overhead, ROM placement
-- **Global commands** - `help`, `?`, `logout`, `clear`
+- **Global commands** - `ls`, `?`, `logout`, `clear`
 
 ### Optional Features
 - **Async commands** (`async` feature) - Natural async/await for long-running operations like network requests, flash I/O, and timers. Compatible with Embassy, RTIC, and other async runtimes. Zero overhead when disabled. *(Default: disabled)*
@@ -276,7 +276,7 @@ When the `authentication` feature is enabled:
 ```rust
 // Login format
 > admin:********
-  Logged in. Type 'help' for help.
+  Logged in. Type ? for help.
 
 admin@/> system/reboot
   Rebooting...
@@ -401,7 +401,7 @@ Contributions are welcome! Before implementing new features, please review:
 5. **Security by design** - Either secure or explicitly unsecured
 6. **Zero-cost abstractions** - Generics compile to optimal code
 7. **Path-based philosophy** - Unix-style navigation
-8. **Interactive discovery** - Learn through `help`, `?`, tab completion
+8. **Interactive discovery** - Learn through `?`, `ls`, tab completion
 
 See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for complete framework.
 

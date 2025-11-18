@@ -165,7 +165,7 @@ LoggedIn → Inactive (exit command)
 **Default messages (authentication enabled):**
 ```
 Welcome: "Welcome to nut-shell. Please login."
-Logged in: "Logged in. Type 'help' for help."
+Logged in: "Logged in. Type ? for help."
 Logged out: "Logged out."
 Exit: "Exiting nut-shell."
 Invalid login: "Invalid login attempt. Please enter <username>:<password>"
@@ -173,7 +173,7 @@ Invalid login: "Invalid login attempt. Please enter <username>:<password>"
 
 **Default messages (authentication disabled):**
 ```
-Welcome: "Welcome to nut-shell. Type 'help' for help."
+Welcome: "Welcome to nut-shell. Type ? for help."
 Exit: "Exiting nut-shell."
 ```
 
@@ -422,13 +422,13 @@ guest@/hw/sensors>
 
 Reserved keywords that function at any location in the directory tree.
 
-### `?` - Context Help
+### `ls` - List Directory
 
 Display contents of current directory with descriptions.
 
 **Format:**
 ```
-> ?
+> ls
 
   <name> - <description>
   <name> - <description>
@@ -446,7 +446,7 @@ Display contents of current directory with descriptions.
 
 **Example:**
 ```
-admin@/system> ?
+admin@/system> ls
 
   debug - Debug system commands
   network - Network configuration
@@ -454,16 +454,16 @@ admin@/system> ?
   status - Show system status
 ```
 
-### `help` - Global Help
+### `?` - Global Help
 
 List all global commands available.
 
 **Format (authentication enabled):**
 ```
-> help
+> ?
 
-  help      - List global commands
-  ?         - Detail items in current directory
+  ?         - List global commands
+  ls        - Detail items in current directory
   logout    - Exit current session
   clear     - Clear screen
   ESC ESC   - Clear input buffer
@@ -471,10 +471,10 @@ List all global commands available.
 
 **Format (authentication disabled):**
 ```
-> help
+> ?
 
-  help      - List global commands
-  ?         - Detail items in current directory
+  ?         - List global commands
+  ls        - Detail items in current directory
   clear     - Clear screen
   ESC ESC   - Clear input buffer
 ```

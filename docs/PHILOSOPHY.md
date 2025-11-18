@@ -106,8 +106,8 @@ Features that significantly improve usability for interactive human operators:
 ### **Global Commands** (Always Enabled)
 Reserved keywords that work from any location:
 
-- `help` - List available global commands
-- `?` - Show current directory contents with descriptions
+- `?` - List available global commands
+- `ls` - Show current directory contents with descriptions
 - `logout` - End session (only when authentication enabled)
 - `clear` - Clear screen (platform-dependent, may be no-op)
 
@@ -409,8 +409,8 @@ Unix-style paths replace traditional commands:
 
 ### **8. Interactive Discovery**
 Users learn through interaction, not documentation:
-- `help` shows global commands
-- `?` shows current directory contents with descriptions
+- `?` shows global commands
+- `ls` shows current directory contents with descriptions
 - Tab completion reveals available options
 - Prompts show current context
 - Error messages are specific and actionable
@@ -422,7 +422,7 @@ Users learn through interaction, not documentation:
 ### **Core (Always Present)**
 - ✅ Path-based navigation
 - ✅ Command execution
-- ✅ Global commands (`help`, `?`)
+- ✅ Global commands (`ls`, `?`)
 - ✅ Basic line editing (backspace, enter)
 - ✅ Double-ESC clear
 - ✅ Access control framework

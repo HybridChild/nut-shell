@@ -407,8 +407,8 @@ Phase 9:
    - `execute_command()` - Run command with argument validation
 
    d. **Global commands**:
-   - `help` - List global commands
-   - `?` - Show current directory contents with descriptions
+   - `?` - List global commands
+   - `ls` - Show current directory contents with descriptions
    - `logout` - End session (only available when authentication enabled)
    - `clear` - Clear screen (platform-dependent)
 

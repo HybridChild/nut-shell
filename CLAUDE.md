@@ -121,17 +121,17 @@ let mut shell = Shell::new(&SYSTEM_DIR, handlers, io);
 - Handler trait dispatches by name to actual functions
 - Async commands require `async` feature and use `process_char_async()`
 
-### Implementing Global Commands (help, ?, clear, logout)
+### Implementing Global Commands (ls, ?, clear, logout)
 
 Global commands are reserved keywords handled outside the tree structure.
 
-**Help command output format:**
+**Help command (?) output format:**
 ```rust
 fn help_command() -> Response {
     let mut output = heapless::String::<256>::new();
 
-    output.push_str("  help      - List global commands\r\n").ok();
-    output.push_str("  ?         - Detail items in current directory\r\n").ok();
+    output.push_str("  ?         - List global commands\r\n").ok();
+    output.push_str("  ls        - Detail items in current directory\r\n").ok();
 
     #[cfg(feature = "authentication")]
     output.push_str("  logout    - Exit current session\r\n").ok();
@@ -144,7 +144,7 @@ fn help_command() -> Response {
 ```
 
 **Important:**
-- `ESC ESC` is not a command (it's a keyboard shortcut), but include it in `help` for discoverability
+- `ESC ESC` is not a command (it's a keyboard shortcut), but include it in `?` output for discoverability
 - `logout` only shown when authentication feature enabled
 - Use consistent spacing/alignment for readability
 

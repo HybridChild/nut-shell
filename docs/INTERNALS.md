@@ -38,7 +38,7 @@ This document provides a detailed analysis of nut-shell runtime behavior, includ
        ▼
 ┌─────────────────────────────────────────────────┐
 │         Request Handler                         │
-│  - Global commands (help, ?, logout, clear)     │
+│  - Global commands (ls, ?, logout, clear)       │
 │  - Navigate (change directory)                  │
 │  - Execute (run command with args)              │
 │  - Tab completion                               │
@@ -274,8 +274,8 @@ Shell::handle_command_input() -> Result<(), IO::Error>
 
     // 3. Check for global commands FIRST
     let response = match path_str {
-        "help" => self.handle_help(),
-        "?" => self.handle_context_help(),
+        "?" => self.handle_help(),
+        "ls" => self.handle_context_help(),
 
         #[cfg(feature = "authentication")]
         "logout" => self.handle_logout(),
@@ -852,8 +852,8 @@ Shell::current_path_string(&self) -> heapless::String<128>
        │                        ▼
        ▼              ┌─── Global command?
   Authenticate        │
-  with provider       ├─ "help" → list globals
-       │              ├─ "?" → list current dir
+  with provider       ├─ "?" → list globals
+       │              ├─ "ls" → list current dir
        │              ├─ "logout" → logout
        ▼              ├─ "clear" → clear screen
   Valid?              │
@@ -948,7 +948,7 @@ Shell::current_path_string(&self) -> heapless::String<128>
    ├─ Filter suggestions by access level
    └─ Only show accessible nodes
 
-3. Directory Listing (? command)
+3. Directory Listing (ls command)
    ├─ Filter children by access level
    └─ Only list accessible nodes
 
@@ -1002,7 +1002,7 @@ Character Input
     │       └─► LoggedIn: full processing
     │
     ├─► Command parsing
-    │       ├─► Global commands (help, ?, logout, clear)
+    │       ├─► Global commands (ls, ?, logout, clear)
     │       └─► Path-based commands
     │
     ├─► Path resolution

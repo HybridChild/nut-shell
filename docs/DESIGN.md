@@ -1,6 +1,6 @@
 # nut-shell - Architecture
 
-This document records the architectural decisions for nut-shell. It explains the rationale behind structural choices and documents alternatives considered.
+This document records the architectural decisions for **nut-shell**. It explains the rationale behind structural choices and documents alternatives considered.
 
 **When to use this document:**
 - Understanding why a design decision was made
@@ -50,15 +50,15 @@ user@/> /hw/led/set 255 0 0    # Execute with args using absolute path
 
 **Global Commands** (reserved keywords):
 ```
-?         # Show current directory contents with descriptions
-help      # List available global commands
+ls        # List current directory contents with descriptions
+?         # Show available global commands (help)
 logout    # End session (only when authentication feature enabled)
 clear     # Clear screen (optional, platform-dependent)
 ```
 
 ### Disambiguation Rules
 
-1. **Reserved keyword check**: Check if input matches reserved keywords (`help`, `?`, `logout`, `clear`)
+1. **Reserved keyword check**: Check if input matches reserved keywords (`ls`, `?`, `logout`, `clear`)
 2. **Path resolution**: Parse input as path + optional arguments
 3. **Tree lookup**: Walk tree structure to resolve path
 4. **Node type determines behavior**:
@@ -89,7 +89,7 @@ fn parse_input(input: &str) -> Result<Request, ParseError> {
 
     // 1. Check reserved keywords first
     match path_str {
-        "help" | "?" | "logout" | "clear" => return global_command(path_str),
+        "ls" | "?" | "logout" | "clear" => return global_command(path_str),
         _ => {}
     }
 
