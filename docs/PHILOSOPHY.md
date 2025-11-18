@@ -1,8 +1,8 @@
-# cli-service Design Philosophy
+# nut-shell Design Philosophy
 
 ## Core Principle
 
-> **cli-service provides the essential interactive CLI primitives for embedded systems - nothing more, nothing less.**
+> **nut-shell provides the essential interactive CLI primitives for embedded systems - nothing more, nothing less.**
 
 Every feature must justify its existence through the lens of embedded constraints: flash size, RAM usage, and runtime overhead. We favor simplicity and predictability over convenience and flexibility.
 
@@ -508,7 +508,7 @@ A successful CLI library for embedded systems should:
 
 ## Conclusion
 
-**cli-service is intentionally constrained.**
+**nut-shell is intentionally constrained.**
 
 We provide essential interactive CLI primitives for embedded systems - path navigation, command execution, access control, and optional UX features (completion, history, authentication).
 
@@ -533,7 +533,7 @@ Before proposing a feature addition, ask:
 9. **Does it require dynamic allocation?**
 10. **Is this a desktop shell behavior being cargo-culted?**
 
-If you can't answer these convincingly, the feature doesn't belong in cli-service.
+If you can't answer these convincingly, the feature doesn't belong in nut-shell.
 
 ---
 
@@ -549,6 +549,6 @@ This philosophy is implemented across:
 
 ---
 
-**Maintained by:** cli-service project
+**Maintained by:** nut-shell project
 **Purpose:** Guide feature decisions and maintain project focus
 **When to update:** When feature requests arise, when philosophy evolves

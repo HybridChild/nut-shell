@@ -1,11 +1,11 @@
-# cli-service Rust Port - Implementation Plan
+# nut-shell Rust Port - Implementation Plan
 
 **Status**: Planning Ongoing
 **Estimated Timeline**: 6-8 weeks
 
 ## Overview
 
-This document tracks the implementation phases for cli-service. The implementation prioritizes **idiomatic Rust patterns** while maintaining behavioral correctness.
+This document tracks the implementation phases for nut-shell. The implementation prioritizes **idiomatic Rust patterns** while maintaining behavioral correctness.
 
 **⚠️ IMPORTANT**: Commands use **metadata/execution separation pattern**. `CommandMeta` (metadata) + `CommandHandlers` trait (execution). This enables both sync and async commands while maintaining const-initialization. See [DESIGN.md](DESIGN.md) section 1 for complete architecture details.
 
@@ -48,7 +48,7 @@ Phase 2:
 
 Phase 3:
   - src/tree/mod.rs (Node enum, CommandMeta struct, Directory struct, CommandKind enum)
-  - src/cli/handlers.rs (CommandHandlers trait definition)
+  - src/shell/handlers.rs (CommandHandlers trait definition)
 
 Phase 4:
   - src/tree/path.rs (Path type)
@@ -58,14 +58,14 @@ Phase 5:
 
 Phase 6:
   - src/response.rs (Response type)
-  - src/cli/mod.rs (Request enum, CliState enum - partial)
+  - src/shell/mod.rs (Request enum, CliState enum - partial)
 
 Phase 7:
-  - src/cli/parser.rs (InputParser)
-  - src/cli/history.rs (CommandHistory with stub pattern)
+  - src/shell/parser.rs (InputParser)
+  - src/shell/history.rs (CommandHistory with stub pattern)
 
 Phase 8:
-  - src/cli/mod.rs (CliService implementation, complete)
+  - src/shell/mod.rs (Shell implementation, complete)
 
 Phase 9:
   - examples/basic.rs
@@ -80,7 +80,7 @@ Phase 9:
 **Tasks**:
 - [ ] Create Cargo.toml with no_std support, heapless dependency
 - [ ] Create src/lib.rs with feature gates and module declarations
-- [ ] Create directory structure (cli/, tree/ modules with placeholder files)
+- [ ] Create directory structure (shell/, tree/ modules with placeholder files)
 - [ ] Create testing infrastructure:
   - `tests/fixtures/mod.rs` with `MockIo` implementation for CharIo
   - `tests/fixtures/mod.rs` with simple test tree (used across all phases)
@@ -201,7 +201,7 @@ Phase 9:
    - Access checks happen at EVERY segment during traversal
    - Security principle: Return `Err(CliError::InvalidPath)` for both non-existent and inaccessible nodes
    - This prevents revealing existence of restricted commands
-   - Note: Full integration happens in Phase 8 when `CliService::resolve_path()` is implemented
+   - Note: Full integration happens in Phase 8 when `Shell::resolve_path()` is implemented
 
 4. Comprehensive tests:
    - Path parsing edge cases
@@ -260,14 +260,14 @@ Phase 9:
 **Why this phase comes first**: Phase 7 (Input Processing) needs to convert input buffers into `Request` types, so these types must exist first.
 
 **Tasks**:
-1. Implement `Request` enum in `cli/mod.rs`:
+1. Implement `Request` enum in `shell/mod.rs`:
    - `Login { username, password }` - Authentication attempt
    - `InvalidLogin` - Failed login
    - `Command { path, args, original }` - Execute command
    - `TabComplete { path }` - Request completions
    - `History { up, buffer }` - Navigate history
 
-2. Implement `CliState` enum in `cli/mod.rs`:
+2. Implement `CliState` enum in `shell/mod.rs`:
    - `Inactive` - CLI not active
    - `LoggedOut` - Awaiting authentication (feature-gated variant)
    - `LoggedIn` - Authenticated or auth-disabled mode
@@ -296,7 +296,7 @@ Phase 9:
 **Goal**: Terminal I/O with escape sequences
 
 **Tasks**:
-1. Implement `InputParser` in `cli/parser.rs`:
+1. Implement `InputParser` in `shell/parser.rs`:
    - Character-by-character processing
    - Escape sequence state machine (up/down arrows, double-ESC)
    - Double-ESC clear buffer (always enabled, ~50-100 bytes, see PHILOSOPHY.md)
@@ -308,7 +308,7 @@ Phase 9:
    - Implement input parser (~397 lines)
    - Note: Left/right arrows, Home/End keys are future additions (see PHILOSOPHY.md "Recommended Additions")
 
-2. Implement `CommandHistory` in `cli/history.rs` using stub type pattern (see DESIGN.md "Feature Gating & Optional Features"):
+2. Implement `CommandHistory` in `shell/history.rs` using stub type pattern (see DESIGN.md "Feature Gating & Optional Features"):
    - Circular buffer with const generic size
    - O(1) add, previous, next operations
    - Position tracking for navigation
@@ -333,15 +333,15 @@ Phase 9:
 
 ---
 
-### Phase 8: CLI Service Orchestration
+### Phase 8: Shell Orchestration
 **Goal**: Bring it all together with unified architecture
 
 **Tasks**:
-1. Implement `CliService` struct in `cli/mod.rs` using unified architecture pattern:
+1. Implement `Shell` struct in `shell/mod.rs` using unified architecture pattern:
 
    a. **Field definitions**:
    ```rust
-   pub struct CliService<'tree, L, IO>
+   pub struct Shell<'tree, L, IO>
    where
        L: AccessLevel,
        IO: CharIo,
@@ -366,7 +366,7 @@ Phase 9:
    ```rust
    // Constructor when authentication enabled
    #[cfg(feature = "authentication")]
-   impl<'tree, L, IO> CliService<'tree, L, IO> {
+   impl<'tree, L, IO> Shell<'tree, L, IO> {
        pub fn new(
            tree: &'tree Directory<L>,
            provider: &'tree dyn CredentialProvider<L>,
@@ -384,7 +384,7 @@ Phase 9:
 
    // Constructor when authentication disabled
    #[cfg(not(feature = "authentication"))]
-   impl<'tree, L, IO> CliService<'tree, L, IO> {
+   impl<'tree, L, IO> Shell<'tree, L, IO> {
        pub fn new(
            tree: &'tree Directory<L>,
            io: IO
@@ -416,7 +416,7 @@ Phase 9:
    - Tab completion: calls `completion::suggest_completions()` (returns empty when disabled)
    - History navigation: calls `history.previous()`/`history.next()` (no-op when disabled)
 
-   f. **Implement service orchestration** (~589 lines total)
+   f. **Implement Shell orchestration** (~589 lines total)
 
    Note: No `cd`, `ls`, `pwd`, or `tree` commands per syntax design (see DESIGN.md)
 
@@ -466,7 +466,7 @@ Phase 9:
 **Tasks**:
 1. Write comprehensive tests:
    - Tree operations test
-   - CLI service test
+   - CLI test
    - Input parser test
    - Tab completion test
    - Command history test
@@ -644,7 +644,7 @@ cargo expand --lib                       # Expand macros
 - ⬜ Phase 5: Tab Completion
 - ⬜ Phase 6: Request/Response Types
 - ⬜ Phase 7: Input Processing
-- ⬜ Phase 8: CLI Service Orchestration
+- ⬜ Phase 8: Shell Orchestration
 - ⬜ Phase 9: Examples
 - ⬜ Phase 10: Testing & Polish
 

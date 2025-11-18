@@ -1,6 +1,6 @@
-# cli-service Documentation
+# nut-shell Documentation
 
-Complete documentation for the cli-service embedded CLI library.
+Complete documentation for the nut-shell embedded CLI library.
 
 ## Quick Navigation
 

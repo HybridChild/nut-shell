@@ -1,6 +1,6 @@
-# cli-service - Runtime Internals
+# nut-shell - Runtime Internals
 
-This document provides a detailed analysis of cli-service runtime behavior, including complete pseudocode implementations, state machines, data flow, and performance characteristics.
+This document provides a detailed analysis of nut-shell runtime behavior, including complete pseudocode implementations, state machines, data flow, and performance characteristics.
 
 ## High-Level Overview
 
@@ -11,7 +11,7 @@ This document provides a detailed analysis of cli-service runtime behavior, incl
        │ get_char()
        ▼
 ┌─────────────────────────────────────────────────────────┐
-│              CliService Main Loop                       │
+│              Shell Main Loop                       │
 │  - State: Inactive/LoggedOut/LoggedIn                   │
 │  - CurrentUser: Option<User<L>>                         │
 │  - Handlers: H (implements CommandHandlers trait)       │
@@ -70,7 +70,7 @@ This document provides a detailed analysis of cli-service runtime behavior, incl
 
 ```rust
 // Main entry point
-CliService::process_char(c: char) -> Result<(), IO::Error>
+Shell::process_char(c: char) -> Result<(), IO::Error>
 {
     match self.state {
         Inactive => { /* Ignore input */ }
@@ -259,7 +259,7 @@ InputParser::process_char(c: char, buffer: &mut String) -> Result<ParseEvent>
 ## Level 3: Command Input Processing
 
 ```rust
-CliService::handle_command_input() -> Result<(), IO::Error>
+Shell::handle_command_input() -> Result<(), IO::Error>
 {
     // 1. Skip empty input (show prompt on same line)
     if self.input_buffer.is_empty() {
@@ -323,7 +323,7 @@ CliService::handle_command_input() -> Result<(), IO::Error>
 ## Level 4: Path Parsing & Tree Navigation
 
 ```rust
-CliService::parse_path_and_args(path_str: &str, args: &[&str])
+Shell::parse_path_and_args(path_str: &str, args: &[&str])
     -> Result<Request, CliError>
 {
     // 1. Parse path string into path segments
@@ -353,7 +353,7 @@ CliService::parse_path_and_args(path_str: &str, args: &[&str])
     }
 }
 
-CliService::resolve_path(&self, path: &Path)
+Shell::resolve_path(&self, path: &Path)
     -> Result<(&Node<L>, PathStack), CliError>
 {
     // Start from root or current directory
@@ -417,7 +417,7 @@ CliService::resolve_path(&self, path: &Path)
     Ok((Node::Directory(current), path_stack))
 }
 
-CliService::check_access(&self, node: &Node<L>) -> Result<(), CliError>
+Shell::check_access(&self, node: &Node<L>) -> Result<(), CliError>
 {
     #[cfg(feature = "authentication")]
     {
@@ -447,7 +447,7 @@ CliService::check_access(&self, node: &Node<L>) -> Result<(), CliError>
 ## Level 5: Request Processing
 
 ```rust
-CliService::process_request(&mut self, request: Request)
+Shell::process_request(&mut self, request: Request)
     -> Result<Response, CliError>
 {
     match request {
@@ -492,7 +492,7 @@ CliService::process_request(&mut self, request: Request)
 - **CommandMeta**: Const-initializable metadata (name, description, access_level, kind, arg counts) stored in ROM
 - **CommandHandlers trait**: User-implemented trait with `execute_sync()` and `execute_async()` methods
 - **CommandKind enum**: Marker indicating Sync or Async execution type
-- **Dispatch flow**: CliService validates access/args, then dispatches to appropriate handler method based on kind
+- **Dispatch flow**: Shell validates access/args, then dispatches to appropriate handler method based on kind
 - **Benefits**: Enables async commands without heap, maintains const-initialization, zero-cost for sync-only builds
 
 This pattern allows both sync and async commands in a single codebase while preserving the no_std, const-initialization constraints. See [DESIGN.md](DESIGN.md) for complete architecture details and rationale.
@@ -503,7 +503,7 @@ When using `process_char_async()`, async commands can be awaited inline:
 
 ```rust
 #[cfg(feature = "async")]
-CliService::process_char_async(&mut self, c: char) -> Result<(), IO::Error>
+Shell::process_char_async(&mut self, c: char) -> Result<(), IO::Error>
 {
     // Same parsing and event handling as process_char()...
 
@@ -516,7 +516,7 @@ CliService::process_char_async(&mut self, c: char) -> Result<(), IO::Error>
 }
 
 #[cfg(feature = "async")]
-CliService::process_request_async(&mut self, request: Request)
+Shell::process_request_async(&mut self, request: Request)
     -> Result<Response, CliError>
 {
     match request {
@@ -562,12 +562,12 @@ CliService::process_request_async(&mut self, request: Request)
 **Usage example:**
 ```rust
 #[embassy_executor::task]
-async fn cli_task(usb: UsbDevice) {
-    let mut cli = CliService::new(&ROOT, handlers, io);
+async fn shell_task(usb: UsbDevice) {
+    let mut shell = Shell::new(&ROOT, handlers, io);
 
     loop {
         let c = usb.read_char().await;  // Await input
-        cli.process_char_async(c).await.ok();  // May await on async commands
+        shell.process_char_async(c).await.ok();  // May await on async commands
         io.flush().await.ok();  // Flush output
     }
 }
@@ -578,10 +578,10 @@ async fn cli_task(usb: UsbDevice) {
 When `process_char_async()` is used (Embassy/RTIC environments):
 
 **During async command execution:**
-- CLI task blocks on the async command (awaits completion)
+- shell task blocks on the async command (awaits completion)
 - User input is NOT processed while command runs
 - CharIo may buffer incoming characters (implementation-dependent)
-- Other Embassy tasks continue running normally (CLI task is suspended)
+- Other Embassy tasks continue running normally (shell task is suspended)
 - No cancellation mechanism provided (command runs to completion)
 
 **User interaction:**
@@ -609,7 +609,7 @@ When `process_char_async()` is used (Embassy/RTIC environments):
 - Async commands CAN spawn background tasks if needed
 - Spawned tasks are detached (CLI does not track them)
 - Command should return Response immediately after spawning
-- Background tasks MUST NOT access CliService (not thread-safe)
+- Background tasks MUST NOT access Shell (not thread-safe)
 - Example use case: Start long-running background operation, return immediately
 
 **Error propagation:**
@@ -620,7 +620,7 @@ When `process_char_async()` is used (Embassy/RTIC environments):
 ## Level 6: Interactive Features (Tab Completion & History)
 
 ```rust
-CliService::handle_tab_completion() -> Result<(), IO::Error>
+Shell::handle_tab_completion() -> Result<(), IO::Error>
 {
     // Get current directory node
     let current = self.get_current_directory();
@@ -685,7 +685,7 @@ CliService::handle_tab_completion() -> Result<(), IO::Error>
     Ok(())
 }
 
-CliService::handle_history_previous() -> Result<(), IO::Error>
+Shell::handle_history_previous() -> Result<(), IO::Error>
 {
     // Save current buffer if entering history mode
     if !self.history.is_navigating() {
@@ -701,7 +701,7 @@ CliService::handle_history_previous() -> Result<(), IO::Error>
     Ok(())
 }
 
-CliService::handle_history_next() -> Result<(), IO::Error>
+Shell::handle_history_next() -> Result<(), IO::Error>
 {
     // Get next command or original buffer (stub returns None if disabled)
     if let Some(cmd) = self.history.next() {
@@ -716,7 +716,7 @@ CliService::handle_history_next() -> Result<(), IO::Error>
 ## Level 7: Response Formatting & Output
 
 ```rust
-CliService::display_response(&self, response: &Response)
+Shell::display_response(&self, response: &Response)
     -> Result<(), IO::Error>
 {
     // Prefix newline (default: true)
@@ -740,14 +740,14 @@ CliService::display_response(&self, response: &Response)
     Ok(())
 }
 
-CliService::show_prompt(&self) -> Result<(), IO::Error>
+Shell::show_prompt(&self) -> Result<(), IO::Error>
 {
     let prompt = self.generate_prompt();
     self.io.write_str(prompt.as_str())?;
     Ok(())
 }
 
-CliService::generate_prompt(&self) -> heapless::String<64>
+Shell::generate_prompt(&self) -> heapless::String<64>
 {
     let mut prompt = heapless::String::new();
 
@@ -766,7 +766,7 @@ CliService::generate_prompt(&self) -> heapless::String<64>
     prompt
 }
 
-CliService::current_path_string(&self) -> heapless::String<128>
+Shell::current_path_string(&self) -> heapless::String<128>
 {
     let mut path = heapless::String::new();
     path.push('/').ok();
@@ -809,7 +809,7 @@ CliService::current_path_string(&self) -> heapless::String<128>
                  └──────────┬───────────┘
                             │
                             ▼
-          Display: "Welcome to CLI Service. Please login."
+          Display: "Welcome to nut-shell. Please login."
                             │
                             ▼
                     Display prompt: "> "
@@ -982,7 +982,7 @@ CliService::current_path_string(&self) -> heapless::String<128>
 ### Stub Function Pattern
 - Completion, history modules always exist
 - Feature-disabled = stub returns empty/None
-- Single code path in main service (no `#[cfg]` branching)
+- Single code path in main Shell (no `#[cfg]` branching)
 
 ### Access Control
 - Checked at every tree traversal
@@ -1040,7 +1040,7 @@ Character Input
 ┌─────────────────────────────────────────────────────┐
 │                     RAM                             │
 ├─────────────────────────────────────────────────────┤
-│  CliService struct:                                 │
+│  Shell struct:                                 │
 │    - state: CliState                    (1 byte)    │
 │    - current_user: Option<User<L>>      (~64 bytes) │
 │    - input_buffer: String<MAX_INPUT>    (128 bytes) │
@@ -1099,7 +1099,7 @@ type InputBuffer = heapless::String<64>;  // RAM: 64 bytes (vs 128 bytes)
 
 ### Thread Safety: NOT THREAD-SAFE
 
-**CliService is NOT Send or Sync:**
+**Shell is NOT Send or Sync:**
 - Cannot be shared between threads or tasks
 - Must be owned by a single task/thread
 - No internal synchronization mechanisms
@@ -1129,7 +1129,7 @@ fn UART_IRQ() {
 fn main() {
     loop {
         if let Some(c) = RX_BUFFER.lock(|buf| buf.pop_front()) {
-            cli.process_char(c as char).ok();
+            shell.process_char(c as char).ok();
         }
     }
 }
@@ -1146,16 +1146,16 @@ fn main() {
 
 ### Embassy Multi-Task Usage
 
-**Correct pattern (single CLI task):**
+**Correct pattern (single shell task):**
 ```rust
 #[embassy_executor::task]
-async fn cli_task(usb: UsbDevice) {
+async fn shell_task(usb: UsbDevice) {
     let handlers = MyHandlers;
-    let mut cli = CliService::new(&ROOT, handlers, usb_io);  // Owned by this task
+    let mut shell = Shell::new(&ROOT, handlers, usb_io);  // Owned by this task
 
     loop {
         if let Ok(Some(c)) = usb_io.get_char() {
-            cli.process_char_async(c).await.ok();
+            shell.process_char_async(c).await.ok();
         }
         usb_io.flush().await.ok();
         Timer::after(Duration::from_millis(10)).await;
@@ -1164,7 +1164,7 @@ async fn cli_task(usb: UsbDevice) {
 
 #[embassy_executor::task]
 async fn sensor_task() {
-    // Completely independent task - no CLI access
+    // Completely independent task - no Shell access
     loop {
         read_sensors().await;
         Timer::after(Duration::from_secs(1)).await;
@@ -1174,12 +1174,12 @@ async fn sensor_task() {
 
 **INCORRECT pattern (DO NOT DO THIS):**
 ```rust
-// WRONG: Trying to share CliService between tasks
-static CLI: Mutex<CliService> = ...;  // ERROR: CliService not designed for sharing
+// WRONG: Trying to share Shell between tasks
+static SHELL: Mutex<Shell> = ...;  // ERROR: Shell not designed for sharing
 
-// WRONG: Accessing CLI from multiple tasks
-async fn task_a() { CLI.lock().await.process_char('a'); }  // Race conditions!
-async fn task_b() { CLI.lock().await.process_char('b'); }  // Race conditions!
+// WRONG: Accessing Shell from multiple tasks
+async fn task_a() { SHELL.lock().await.process_char('a'); }  // Race conditions!
+async fn task_b() { SHELL.lock().await.process_char('b'); }  // Race conditions!
 ```
 
 ### CommandHandlers Thread Safety
@@ -1204,18 +1204,18 @@ struct MyHandlers<'a> {
 
 // UNSAFE: Shared mutable state without synchronization
 struct MyHandlers {
-    counter: Cell<u32>,  // Mutable - NOT safe if CLI shared (which it shouldn't be)
+    counter: Cell<u32>,  // Mutable - NOT safe if Shell shared (which it shouldn't be)
 }
 ```
 
-**Guideline:** If you need shared mutable state, use message-passing or channels to communicate with other tasks, don't share CliService itself.
+**Guideline:** If you need shared mutable state, use message-passing or channels to communicate with other tasks, don't share Shell itself.
 
 ### CharIo Thread Safety
 
 **CharIo implementations are responsible for their own thread safety:**
 - If CharIo buffers are accessed from ISRs, use appropriate synchronization (Mutex, critical sections)
 - If multiple tasks write to same output, CharIo must handle interleaving
-- CliService assumes CharIo methods are safe to call from its context
+- Shell assumes CharIo methods are safe to call from its context
 
 **Example: ISR-safe CharIo buffering:**
 ```rust
@@ -1241,7 +1241,7 @@ impl CharIo for UartIo {
 
 ### State Isolation
 
-**Each CliService instance is completely independent:**
+**Each Shell instance is completely independent:**
 - No global state shared between instances
 - Multiple instances can coexist (on different I/O channels)
 - Tree structures are const (shared read-only is safe)
@@ -1269,16 +1269,16 @@ Error propagation:
 
 | Feature | Flash Impact | RAM Impact | Affected Modules |
 |---------|-------------|------------|------------------|
-| `authentication` | +~2 KB | 0 bytes | auth/, cli/mod.rs (minimal) |
+| `authentication` | +~2 KB | 0 bytes | auth/, shell/mod.rs (minimal) |
 | `completion` | +~2 KB | 0 bytes | tree/completion.rs |
-| `history` | +~0.5-0.8 KB | +1.3 KB (N=10) | cli/history.rs |
+| `history` | +~0.5-0.8 KB | +1.3 KB (N=10) | shell/history.rs |
 | All disabled | Baseline | Baseline | Minimal CLI only |
 
 **Stub Pattern Benefits:**
 - Authentication: Unified state machine (LoggedIn always exists)
 - Completion: suggest_completions() always callable (returns empty Vec)
 - History: CommandHistory type always exists (methods no-op)
-- Result: Minimal `#[cfg]` branching in main CLI service code
+- Result: Minimal `#[cfg]` branching in main CLI code
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Authentication & Access Control Security Design
 
-This document describes the security architecture for authentication and access control in the Rust cli-service implementation, including rationale, implementation patterns, and best practices for embedded systems.
+This document describes the security architecture for authentication and access control in the Rust nut-shell implementation, including rationale, implementation patterns, and best practices for embedded systems.
 
 **Related Documentation:**
 - **[DESIGN.md](DESIGN.md)** - Command architecture, unified auth pattern, and feature gating details
@@ -50,7 +50,7 @@ This document describes the security architecture for authentication and access 
 
 #### 4. **Binary String Exposure**
 ```bash
-$ strings cli_service | grep admin
+$ strings nut_shell | grep admin
 admin
 admin123
 ```
@@ -278,7 +278,7 @@ impl AccessLevel for MyAccessLevel {
 Access control is enforced during path resolution, checking each segment as the tree is traversed:
 
 ```rust
-impl<'tree, L: AccessLevel, IO: CharIo> CliService<'tree, L, IO> {
+impl<'tree, L: AccessLevel, IO: CharIo> Shell<'tree, L, IO> {
     fn resolve_path(&self, path: &Path) -> Result<&Node<L>, CliError> {
         let mut current = self.get_current_directory();
 
@@ -345,7 +345,7 @@ Authentication can be disabled via Cargo features for unsecured development envi
 
 1. **InvalidPath Error Hiding**: When access is denied, the system returns `CliError::InvalidPath` (same as non-existent paths) to prevent revealing the existence of restricted commands to unauthorized users.
 
-2. **Handler Dispatch Security**: Access control checks occur BEFORE dispatching to `CommandHandlers`. Handlers receive only pre-validated, accessible commands, centralizing security in CliService rather than distributing it across handler implementations.
+2. **Handler Dispatch Security**: Access control checks occur BEFORE dispatching to `CommandHandlers`. Handlers receive only pre-validated, accessible commands, centralizing security in Shell rather than distributing it across handler implementations.
 
 3. **Build Configuration:**
    ```bash
@@ -439,18 +439,18 @@ fn test_login_flow() {
         ("admin", "hashed_password", AccessLevel::Admin),
     ]);
 
-    let mut service = CliService::new(root, provider, test_io);
+    let mut shell = Shell::new(root, provider, test_io);
 
     // Should start logged out
-    assert_eq!(service.state(), CliState::LoggedOut);
+    assert_eq!(shell.state(), CliState::LoggedOut);
 
     // Invalid login
-    assert!(service.login("admin", "wrong").is_err());
-    assert_eq!(service.state(), CliState::LoggedOut);
+    assert!(shell.login("admin", "wrong").is_err());
+    assert_eq!(shell.state(), CliState::LoggedOut);
 
     // Valid login
-    assert!(service.login("admin", "correct").is_ok());
-    assert_eq!(service.state(), CliState::LoggedIn);
+    assert!(shell.login("admin", "correct").is_ok());
+    assert_eq!(shell.state(), CliState::LoggedIn);
 }
 
 #[test]
@@ -460,17 +460,17 @@ fn test_access_control() {
         ("admin", "hash", AccessLevel::Admin),
     ]);
 
-    let mut service = CliService::new(root, provider, test_io);
+    let mut shell = Shell::new(root, provider, test_io);
 
     // Login as user
-    service.login("user", "password").unwrap();
+    shell.login("user", "password").unwrap();
 
     // Can access User-level commands
-    assert!(service.execute("system info").is_ok());
+    assert!(shell.execute("system info").is_ok());
 
     // Cannot access Admin-level commands
     assert_eq!(
-        service.execute("system reboot"),
+        shell.execute("system reboot"),
         Err(CliError::AccessDenied)
     );
 }
@@ -482,7 +482,7 @@ fn test_access_control() {
 #[test]
 fn test_no_plaintext_in_binary() {
     // Ensure passwords are not stored in plaintext
-    let binary = include_bytes!(env!("CARGO_BIN_FILE_CLI_SERVICE"));
+    let binary = include_bytes!(env!("CARGO_BIN_FILE_NUT_SHELL"));
     let binary_str = String::from_utf8_lossy(binary);
 
     // Should not find plaintext passwords

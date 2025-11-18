@@ -1,6 +1,6 @@
-# cli-service - Architecture
+# nut-shell - Architecture
 
-This document records the architectural decisions for cli-service. It explains the rationale behind structural choices and documents alternatives considered.
+This document records the architectural decisions for nut-shell. It explains the rationale behind structural choices and documents alternatives considered.
 
 **When to use this document:**
 - Understanding why a design decision was made
@@ -141,8 +141,8 @@ pub trait CommandHandlers {
     async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
 }
 
-// CliService generic over handlers
-pub struct CliService<'tree, L, IO, H>
+// Shell generic over handlers
+pub struct Shell<'tree, L, IO, H>
 where H: CommandHandlers { ... }
 ```
 
@@ -171,7 +171,7 @@ impl CommandHandlers for BareMetalHandlers {
 // Main loop
 loop {
     if let Ok(Some(c)) = io.get_char() {
-        cli.process_char(c).ok();  // Sync processing
+        shell.process_char(c).ok();  // Sync processing
     }
 }
 ```
@@ -200,12 +200,12 @@ impl CommandHandlers for EmbassyHandlers {
 
 // Embassy task
 #[embassy_executor::task]
-async fn cli_task(usb: UsbDevice) {
-    let mut cli = CliService::new(&ROOT, EmbassyHandlers, usb_io);
+async fn shell_task(usb: UsbDevice) {
+    let mut shell = Shell::new(&ROOT, EmbassyHandlers, usb_io);
 
     loop {
         let c = usb_io.read_char().await;
-        cli.process_char_async(c).await.ok();  // Can await async commands
+        shell.process_char_async(c).await.ok();  // Can await async commands
     }
 }
 ```
@@ -236,7 +236,7 @@ async fn cli_task(usb: UsbDevice) {
   → Can be mitigated with future macro validation
   → Explicit dispatch is debuggable and type-safe
 
-✅ **Additional generic parameter** - `CliService<'tree, L, IO, H>`
+✅ **Additional generic parameter** - `Shell<'tree, L, IO, H>`
   → Monomorphization means zero runtime cost
   → Cleaner than alternatives (async traits, heap allocation)
 
@@ -261,7 +261,7 @@ The ~200-300 byte increase for sync-only builds is acceptable given the improved
 **Alternative Considered**: Separate PathResolver class
 
 ### 3. Request Type Structure
-**Decision**: Single enum in `cli/mod.rs`
+**Decision**: Single enum in `shell/mod.rs`
 
 **Rationale**: Pattern matching provides type-safe dispatch, reduces file count
 
@@ -330,7 +330,7 @@ The implementation uses a single code path for both authentication modes to mini
 **Feature Gating**: Tab completion is optional and can be disabled via Cargo features to reduce code size (~2KB) in constrained environments. When disabled, the entire `completion` module is eliminated at compile time with zero runtime overhead. See "Feature Gating & Optional Features" section below for detailed configuration patterns and use cases
 
 ### 7. State Management
-**Decision**: Inline `CliState` enum in `cli/mod.rs`
+**Decision**: Inline `CliState` enum in `shell/mod.rs`
 
 **Rationale**: Only 3 variants, too small for separate file
 
@@ -394,7 +394,7 @@ This section explains the two main patterns used for feature gating. Individual 
 
 **Example (simplified):**
 ```rust
-pub struct CliService<'tree, L, IO> {
+pub struct Shell<'tree, L, IO> {
     current_user: Option<User<L>>,  // Always present
     state: CliState,                // Always present
 
@@ -411,14 +411,14 @@ pub enum CliState {
 
 // Constructor differs
 #[cfg(feature = "authentication")]
-impl CliService {
+impl Shell {
     pub fn new(tree, provider, io) -> Self {
         Self { state: CliState::LoggedOut, current_user: None, ... }
     }
 }
 
 #[cfg(not(feature = "authentication"))]
-impl CliService {
+impl Shell {
     pub fn new(tree, io) -> Self {
         Self { state: CliState::LoggedIn, current_user: None, ... }
     }
@@ -435,7 +435,7 @@ impl CliService {
 - Module always exists, contents conditionally compiled
 - Same function signature in both modes
 - Feature-disabled version returns empty (e.g., `Vec::new()`)
-- No feature-specific fields in main service
+- No feature-specific fields in main Shell
 - Behavior adapts naturally to empty results
 
 **Example (simplified):**
@@ -459,8 +459,8 @@ pub fn suggest_completions<'a, L>(node: &'a Node<L>, input: &str)
     Ok(Vec::new())  // Empty result
 }
 
-// src/cli/mod.rs - NO feature gates!
-impl CliService {
+// src/shell/mod.rs - NO feature gates!
+impl Shell {
     fn handle_tab(&mut self) -> Result<(), CliError> {
         let suggestions = completion::suggest_completions(node, input)?;
 
@@ -751,8 +751,8 @@ These architectural choices provide:
 ```
 src/
 ├── lib.rs              # Public API and feature gates
-├── cli/
-│   ├── mod.rs          # CliService + Request enum + CliState enum
+├── shell/
+│   ├── mod.rs          # Shell + Request enum + CliState enum
 │   ├── parser.rs       # InputParser (escape sequences, line editing)
 │   ├── history.rs      # CommandHistory (circular buffer)
 │   └── handlers.rs     # CommandHandlers trait definition
@@ -775,11 +775,11 @@ src/
 
 **Rationale for consolidation:**
 - **Request types**: Single enum provides type-safe dispatch via pattern matching
-- **State management**: Inline in cli/mod.rs (small, tightly coupled with service)
+- **State management**: Inline in shell/mod.rs (small, tightly coupled with Shell)
 - **Path resolution**: Methods on existing types (tree navigation as core concern)
 - **Tree types**: Combined in tree/mod.rs (related const-init concerns)
 - **Command metadata**: `CommandMeta` in tree/mod.rs (metadata-only, const-init)
-- **Command execution**: `CommandHandlers` trait in cli/handlers.rs (user-implemented)
+- **Command execution**: `CommandHandlers` trait in shell/handlers.rs (user-implemented)
 - **Authentication**: Trait-based system in auth/ module (optional, pluggable backends)
 - **Completion**: Free functions in tree/completion.rs (optional, stateless logic)
 

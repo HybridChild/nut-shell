@@ -1,4 +1,6 @@
-# cli-service
+# nut-shell
+
+> _A complete CLI framework for embedded systems, in a nutshell._
 
 A lightweight, embedded-first command-line interface library for `no_std` Rust environments with native sync/async support.
 
@@ -10,7 +12,7 @@ A lightweight, embedded-first command-line interface library for `no_std` Rust e
 
 ## Overview
 
-**cli-service** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers like the Raspberry Pi Pico (RP2040), it offers an interactive command-line interface over serial connections (UART/USB) with **first-class async/await support** for long-running operations (Embassy, RTIC compatible), alongside optional features for authentication, tab completion, and command history.
+**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers like the Raspberry Pi Pico (RP2040), it offers an interactive command-line interface over serial connections (UART/USB) with **first-class async/await support** for long-running operations (Embassy, RTIC compatible), alongside optional features for authentication, tab completion, and command history.
 
 **Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat. See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for our feature decision framework.
 
@@ -56,7 +58,7 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for rationale.
 ### Basic Example (Bare-Metal)
 
 ```rust
-use cli_service::{CliService, CommandMeta, CommandKind, Directory, Node, AccessLevel};
+use nut_shell::{Shell, CommandMeta, CommandKind, Directory, Node, AccessLevel};
 
 // Define access levels
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
@@ -130,13 +132,13 @@ fn main() -> ! {
     let uart = setup_uart();
     let mut io = UartIo::new(uart);
     let handlers = MyHandlers;
-    let mut cli = CliService::new(&ROOT, handlers, &mut io);
+    let mut shell = Shell::new(&ROOT, handlers, &mut io);
 
-    cli.activate().ok();
+    shell.activate().ok();
 
     loop {
         if let Ok(Some(c)) = io.get_char() {
-            cli.process_char(c).ok();
+            shell.process_char(c).ok();
         }
     }
 }
@@ -183,12 +185,12 @@ impl CommandHandlers for MyHandlers {
 }
 
 #[embassy_executor::task]
-async fn cli_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
+async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
     let mut io = EmbassyUsbIo::new(usb);
     let handlers = MyHandlers;
-    let mut cli = CliService::new(&ROOT, handlers, io);
+    let mut shell = Shell::new(&ROOT, handlers, io);
 
-    cli.activate().ok();
+    shell.activate().ok();
     io.flush().await.ok();
 
     let mut buffer = [0u8; 64];
@@ -196,7 +198,7 @@ async fn cli_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
         let n = io.class.read_packet(&mut buffer).await.unwrap();
 
         for &byte in &buffer[..n] {
-            cli.process_char_async(byte as char).await.ok();
+            shell.process_char_async(byte as char).await.ok();
         }
 
         io.flush().await.ok();
@@ -299,10 +301,10 @@ See [docs/SECURITY.md](docs/SECURITY.md) for security architecture and threat mo
 
 ```toml
 [dependencies]
-cli-service = { version = "0.1", features = ["authentication", "completion", "history", "async"] }
+nut-shell = { version = "0.1", features = ["authentication", "completion", "history", "async"] }
 
 # Or minimal build
-cli-service = { version = "0.1", default-features = false }
+nut-shell = { version = "0.1", default-features = false }
 ```
 
 **Available features:**

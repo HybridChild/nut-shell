@@ -1,6 +1,6 @@
 # CharIo Design: Universal I/O Abstraction
 
-This document explains the I/O abstraction design that enables cli-service to work efficiently in both bare-metal and async runtime environments (like Embassy).
+This document explains the I/O abstraction design that enables nut-shell to work efficiently in both bare-metal and async runtime environments (like Embassy).
 
 **Related Documentation:**
 - **[DESIGN.md](DESIGN.md)**: Metadata/execution separation pattern (Section 1) - enables async command support
@@ -48,7 +48,7 @@ loop {
 ### CharIo Trait Design
 
 ```rust
-/// Character I/O abstraction for CLI service.
+/// Character I/O abstraction for CLI.
 ///
 /// # Buffering Model
 ///
@@ -136,12 +136,12 @@ pub trait CharIo {
 
 ## Why This Design Works
 
-### 1. Respects CliService Ownership Model
+### 1. Respects Shell Ownership Model
 
-From INTERNALS.md, `CliService` owns/references the `CharIo`:
+From INTERNALS.md, `Shell` owns/references the `CharIo`:
 
 ```rust
-impl<'tree, L, IO> CliService<'tree, L, IO>
+impl<'tree, L, IO> Shell<'tree, L, IO>
 where
     IO: CharIo,
 {
@@ -169,7 +169,7 @@ Async implementations batch output:
 
 ### 4. Single Codebase
 
-Same `CliService` code works everywhere:
+Same `Shell` code works everywhere:
 - No `#[cfg(async)]` feature flags needed for core
 - CharIo trait is platform-agnostic
 - Implementations handle platform-specific details
@@ -189,14 +189,14 @@ Recommended sizes based on expected output:
 
 **Note:** Buffer overflows should be rare if sized correctly. If overflow occurs:
 - Return error from `put_char()`
-- CliService will propagate error
+- Shell will propagate error
 - Alternatively: flush mid-process (complex, not recommended)
 
 ### Input Buffer (Both Platforms)
 
-Fixed at **128 bytes** (defined in CliService):
+Fixed at **128 bytes** (defined in Shell):
 - Sufficient for command paths + arguments
-- `heapless::String<128>` in CliService struct
+- `heapless::String<128>` in Shell struct
 
 ## Performance Comparison
 
@@ -265,7 +265,7 @@ Commands can be marked as `Async` via `CommandKind` in their metadata. When usin
 **Architecture:**
 - Command metadata marks execution mode (`CommandKind::Sync` or `CommandKind::Async`)
 - Handler trait provides both `execute_sync()` and `execute_async()` methods
-- CliService dispatches based on command kind
+- Shell dispatches based on command kind
 
 **Benefits:**
 - ✅ Natural async/await without manual spawning
@@ -279,9 +279,9 @@ See [DESIGN.md](DESIGN.md) section 1 for complete architecture details and imple
 
 ### Buffer Sizing Constraints
 
-**Input buffer (CliService):**
+**Input buffer (Shell):**
 - Default: 128 bytes (heapless::String<128>)
-- Configurable via const generic: `CliService<'tree, L, IO, H, MAX_INPUT, ...>`
+- Configurable via const generic: `Shell<'tree, L, IO, H, MAX_INPUT, ...>`
 - Overflow: Characters silently ignored, no error displayed
 - Range: 64-256 bytes typical
 
@@ -291,7 +291,7 @@ See [DESIGN.md](DESIGN.md) section 1 for complete architecture details and imple
 - Overflow: Return `Err(BufferFull)`, response truncated
 - Bare-metal: No output buffer needed (immediate flush)
 
-**Other CliService const generics:**
+**Other Shell const generics:**
 - MAX_PATH_DEPTH: 8 (default), 4-16 range, affects path stack size
 - MAX_ARGS: 16 (default), 8-32 range, stack-only during parsing
 - HISTORY_SIZE: 10 (default), 0-20 range, each entry ~130 bytes RAM
@@ -312,7 +312,7 @@ See [DESIGN.md](DESIGN.md) section 1 for complete architecture details and imple
 - ✅ Works in both bare-metal and async runtimes (Embassy, RTIC, etc.)
 - ✅ Zero overhead for bare-metal
 - ✅ Efficient batching for async
-- ✅ Single CliService implementation
+- ✅ Single Shell implementation
 - ✅ No async trait complexity (uses handler pattern)
 - ✅ Stable Rust compatible
 - ✅ Natural async/await for async commands
@@ -498,9 +498,9 @@ impl CharIo for UartIo {
 
 **Key implementation concerns:**
 - DMA efficiency: Zero-copy transfers for both RX and TX
-- Task separation: Separate read task and CLI task
+- Task separation: Separate read task and shell task
 - Shared state: CharIo buffer access may need synchronization (Mutex/channels)
-- Error handling: UART errors should not crash CLI task
+- Error handling: UART errors should not crash shell task
 
 **Reference implementation:**
 

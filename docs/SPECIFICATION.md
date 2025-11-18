@@ -1,6 +1,6 @@
-# cli-service - Behavioral Specification
+# nut-shell - Behavioral Specification
 
-This document specifies the exact behavior of the cli-service library, serving as the authoritative reference for implementation.
+This document specifies the exact behavior of the nut-shell library, serving as the authoritative reference for implementation.
 
 **Related Documentation:**
 - **[DESIGN.md](DESIGN.md)**: Design decisions and rationale for why behaviors work this way
@@ -164,17 +164,17 @@ LoggedIn → Inactive (exit command)
 
 **Default messages (authentication enabled):**
 ```
-Welcome: "Welcome to CLI Service. Please login."
+Welcome: "Welcome to nut-shell. Please login."
 Logged in: "Logged in. Type 'help' for help."
 Logged out: "Logged out."
-Exit: "Exiting CLI Service."
+Exit: "Exiting nut-shell."
 Invalid login: "Invalid login attempt. Please enter <username>:<password>"
 ```
 
 **Default messages (authentication disabled):**
 ```
-Welcome: "Welcome to CLI Service. Type 'help' for help."
-Exit: "Exiting CLI Service."
+Welcome: "Welcome to nut-shell. Type 'help' for help."
+Exit: "Exiting nut-shell."
 ```
 
 All messages are customizable via configuration.
@@ -676,13 +676,13 @@ When command returns error response:
 
 **Read errors (`get_char()`):**
 - Return error to caller (typically main loop)
-- CliService does not handle I/O errors internally
+- Shell does not handle I/O errors internally
 - Caller decides: retry, reset, or terminate CLI
 
 **Write errors (`put_char()`, `write_str()`):**
 - Propagate to `process_char()` return value
 - Caller should handle (flush, retry, log, etc.)
-- CliService state remains consistent (safe to retry)
+- Shell state remains consistent (safe to retry)
 
 ## Implementation Requirements
 

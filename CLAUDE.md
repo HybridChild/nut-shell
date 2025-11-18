@@ -8,7 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**cli-service** is a lightweight library for adding a flexible command-line interface to embedded systems. The implementation targets **no_std** environments with static allocation, specifically designed for platforms like the Raspberry Pi Pico (RP2040).
+**nut-shell** is a lightweight library for adding a flexible command-line interface to embedded systems. The implementation targets **no_std** environments with static allocation, specifically designed for platforms like the Raspberry Pi Pico (RP2040).
+
+_A complete CLI framework for embedded systems, in a nutshell._
 
 **Current Status:** Architecture complete, implementation in progress (see IMPLEMENTATION.md for roadmap).
 
@@ -108,9 +110,9 @@ impl CommandHandlers for MyHandlers {
     }
 }
 
-// 5. Instantiate CliService with handlers
+// 5. Instantiate Shell with handlers
 let handlers = MyHandlers;
-let mut cli = CliService::new(&SYSTEM_DIR, handlers, io);
+let mut shell = Shell::new(&SYSTEM_DIR, handlers, io);
 ```
 
 **Key points:**
@@ -180,8 +182,8 @@ pub fn do_something<L: AccessLevel>(
 pub mod my_feature;  // Always include (contents are gated)
 pub use my_feature::do_something;
 
-// src/cli/mod.rs - NO feature gates needed!
-impl<'tree, L, IO> CliService<'tree, L, IO> {
+// src/shell/mod.rs - NO feature gates needed!
+impl<'tree, L, IO> Shell<'tree, L, IO> {
     fn some_method(&mut self) -> Result<(), CliError> {
         // Works in both modes - stub returns empty when disabled
         let results = my_feature::do_something(node, input)?;
@@ -198,7 +200,7 @@ impl<'tree, L, IO> CliService<'tree, L, IO> {
 
 **Why use the stub function pattern?**
 - Single code path (no duplicate implementations)
-- Zero `#[cfg]` in main service code
+- Zero `#[cfg]` in main Shell code
 - Compiler optimizes away stub calls
 - Aligns with unified architecture pattern
 
@@ -302,7 +304,7 @@ impl<'a> CommandHandlers for MyHandlers<'a> {
 - Keep handler implementations simple (just dispatch)
 - Command functions can access statics or captured state
 - Use `CommandNotFound` for unrecognized commands
-- Handler doesn't need to validate args (CliService does this)
+- Handler doesn't need to validate args (Shell does this)
 
 ### Implementing AccessLevel Trait
 
@@ -438,8 +440,8 @@ pub trait CommandHandlers {
     async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
 }
 
-// CliService is generic over handlers
-pub struct CliService<'tree, L, IO, H>
+// Shell is generic over handlers
+pub struct Shell<'tree, L, IO, H>
 where
     H: CommandHandlers,
 {
@@ -460,7 +462,7 @@ where
 
 **Implementation pattern:**
 ```rust
-pub struct CliService<'tree, L, IO, H> {
+pub struct Shell<'tree, L, IO, H> {
     current_user: Option<User<L>>,  // Always present (not feature-gated)
     state: CliState,                // Always present (not feature-gated)
     handlers: H,                    // Generic over CommandHandlers
@@ -534,9 +536,9 @@ enum Node<L: AccessLevel> {
 - **ROM placement**: Entire tree lives in flash
 - **Metadata-only**: Execution logic separate (via CommandHandlers trait)
 
-### Service Generics
+### Shell Generics
 ```rust
-CliService<'tree, L, IO, H>
+Shell<'tree, L, IO, H>
 where
     L: AccessLevel,    // User-defined access hierarchy
     IO: CharIo,        // Platform-specific I/O
@@ -607,7 +609,7 @@ const CMD: Command = Command { execute: my_fn, ... };
 static mut STATE: State = State::new();
 
 // RIGHT: Use Mutex or atomic types (if needed at all)
-// Or better: pass as parameter through CliService
+// Or better: pass as parameter through Shell
 ```
 
 ### ⚠️ heapless Buffer Overflow
@@ -672,11 +674,11 @@ impl CharIo for MockIo {
 #[test]
 fn test_login_and_command() {
     let mut io = MockIo::new("admin:pass123\nsystem/reboot\n");
-    let mut service = CliService::new(&TREE, provider, &mut io);
+    let mut shell = Shell::new(&TREE, provider, &mut io);
 
     // Process login
-    service.process_char('a');
-    service.process_char('d');
+    shell.process_char('a');
+    shell.process_char('d');
     // ... assert state changes
 }
 ```
@@ -801,7 +803,7 @@ When used as adjectives before nouns, always hyphenate:
 
 ### Code Identifiers in Prose
 Use proper formatting when referring to code:
-- **`CliService`** - Struct name (with backticks, CamelCase)
+- **`Shell`** - Struct name (with backticks, CamelCase)
 - **`CharIo`** - Trait name (with backticks, not `CharIO`)
 - **`AccessLevel`** - Trait type (CamelCase) vs "access level" - concept (lowercase)
 - **`no_std`** - Feature name (with backticks, even in prose, not "no-std")
@@ -809,8 +811,8 @@ Use proper formatting when referring to code:
 - **`CommandHandlers`** - Trait name (CamelCase)
 
 ### Project Names
-- **"cli-service"** - Project/library name (kebab-case)
-- **"CLI service"** or **"CLI"** - Prose reference to the service (sentence case)
+- **"nut-shell"** - Project/library name (kebab-case)
+- **"Shell"** or **"CLI"** - Prose reference to the CLI shell (sentence case)
 
 ### Feature Names
 Always lowercase, no hyphens when referring to Cargo features:

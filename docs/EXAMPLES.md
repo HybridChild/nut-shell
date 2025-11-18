@@ -1,6 +1,6 @@
-# cli-service Examples and Tutorials
+# nut-shell Examples and Tutorials
 
-This document provides practical examples, configuration guidance, and tutorials for using cli-service in your embedded projects.
+This document provides practical examples, configuration guidance, and tutorials for using nut-shell in your embedded projects.
 
 **For implementation details and architecture, see:**
 - **[SPECIFICATION.md](SPECIFICATION.md)** - Complete behavioral specification
@@ -25,7 +25,7 @@ This document provides practical examples, configuration guidance, and tutorials
 ### Minimal Example (Native)
 
 ```rust
-use cli_service::{CliService, CharIo, CommandHandlers, Response, CliError};
+use nut_shell::{Shell, CharIo, CommandHandlers, Response, CliError};
 
 // Define your access levels
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -85,14 +85,14 @@ const ROOT: Directory<MyAccessLevel> = Directory {
 fn main() {
     let io = StdioIo::new();  // Your CharIo implementation
     let handlers = MyHandlers;
-    let mut cli = CliService::new(&ROOT, handlers, io);
+    let mut shell = Shell::new(&ROOT, handlers, io);
 
-    cli.activate().unwrap();
+    shell.activate().unwrap();
 
     // Main loop
     loop {
         if let Ok(Some(c)) = io.get_char() {
-            cli.process_char(c).ok();
+            shell.process_char(c).ok();
         }
     }
 }
@@ -104,7 +104,7 @@ fn main() {
 
 ### How to Choose Buffer Sizes
 
-Buffer sizes are configured via const generics when creating CliService. Getting them right balances RAM usage with functionality.
+Buffer sizes are configured via const generics when creating Shell. Getting them right balances RAM usage with functionality.
 
 #### Input Buffer (MAX_INPUT)
 
@@ -238,7 +238,7 @@ Add safety margin: 6 × 2 = 12
 For severely RAM-constrained environments:
 
 ```rust
-type MiniCli = CliService<
+type MiniShell = Shell<
     'static,
     MyAccessLevel,
     UartIo,
@@ -262,7 +262,7 @@ type MiniCli = CliService<
 Balanced for most embedded applications:
 
 ```rust
-type StandardCli = CliService<
+type StandardShell = Shell<
     'static,
     MyAccessLevel,
     UartIo,
@@ -286,7 +286,7 @@ type StandardCli = CliService<
 For systems with more RAM available:
 
 ```rust
-type HighCapacityCli = CliService<
+type HighCapacityShell = Shell<
     'static,
     MyAccessLevel,
     UsbIo,
@@ -399,16 +399,16 @@ fn main() -> ! {
     // Set up clocks, pins, UART...
     let uart = /* initialize UART */;
 
-    // Create CLI
+    // Create shell
     let io = UartIo { uart };
     let handlers = MyHandlers;
-    let mut cli = CliService::new(&ROOT, handlers, io);
+    let mut shell = Shell::new(&ROOT, handlers, io);
 
-    cli.activate().ok();
+    shell.activate().ok();
 
     loop {
         if let Ok(Some(c)) = io.get_char() {
-            cli.process_char(c).ok();
+            shell.process_char(c).ok();
         }
         cortex_m::asm::wfi(); // Sleep until interrupt
     }
@@ -489,11 +489,11 @@ async fn usb_read_task(class: &'static mut CdcAcmClass<'static, Driver<'static>>
 }
 
 #[embassy_executor::task]
-async fn cli_task(io: &'static Mutex<UsbCdcIo<'static>>) {
+async fn shell_task(io: &'static Mutex<UsbCdcIo<'static>>) {
     let handlers = MyHandlers;
-    let mut cli = CliService::new(&ROOT, handlers, /* need to solve ownership */);
+    let mut shell = Shell::new(&ROOT, handlers, /* need to solve ownership */);
 
-    cli.activate().ok();
+    shell.activate().ok();
 
     loop {
         let c = {
@@ -502,7 +502,7 @@ async fn cli_task(io: &'static Mutex<UsbCdcIo<'static>>) {
         };
 
         if let Some(c) = c {
-            cli.process_char_async(c).await.ok();
+            shell.process_char_async(c).await.ok();
             io.lock().await.flush().await.ok();
         } else {
             embassy_time::Timer::after(embassy_time::Duration::from_millis(10)).await;
@@ -514,7 +514,7 @@ async fn cli_task(io: &'static Mutex<UsbCdcIo<'static>>) {
 async fn main(spawner: Spawner) {
     // Initialize USB, spawn tasks...
     spawner.spawn(usb_read_task(class, io)).unwrap();
-    spawner.spawn(cli_task(io)).unwrap();
+    spawner.spawn(shell_task(io)).unwrap();
 }
 ```
 
@@ -548,13 +548,13 @@ impl CharIo for StdioIo {
 fn main() {
     let io = StdioIo;
     let handlers = MyHandlers;
-    let mut cli = CliService::new(&ROOT, handlers, io);
+    let mut shell = Shell::new(&ROOT, handlers, io);
 
-    cli.activate().unwrap();
+    shell.activate().unwrap();
 
     loop {
         if let Ok(Some(c)) = io.get_char() {
-            cli.process_char(c).ok();
+            shell.process_char(c).ok();
         }
     }
 }
@@ -610,7 +610,7 @@ impl CommandHandlers for MyHandlers {
 // Use process_char_async in main loop
 loop {
     if let Some(c) = io.get_char()? {
-        cli.process_char_async(c).await?;  // Async processing
+        shell.process_char_async(c).await?;  // Async processing
     }
 }
 ```
@@ -643,7 +643,7 @@ impl CommandHandlers for MyHandlers<'_> {
 let system_state = SystemState::new();
 let config = Config::load();
 let handlers = MyHandlers { system_state: &system_state, config: &config };
-let cli = CliService::new(&ROOT, handlers, io);
+let shell = Shell::new(&ROOT, handlers, io);
 ```
 
 ### Pattern: Custom Access Levels
@@ -711,7 +711,7 @@ impl CredentialProvider<MyAccessLevel> for BuildTimeProvider {
 
 **Solution:** Increase MAX_INPUT const generic
 ```rust
-type MyCli = CliService<'static, L, IO, H, 256, ...>;  // Increase from 128
+type MyShell = Shell<'static, L, IO, H, 256, ...>;  // Increase from 128
 ```
 
 ### Problem: Output Buffer Overflow (Async)
@@ -730,7 +730,7 @@ struct MyIo {
 **Symptom:** Stack overflow, allocation failures
 
 **Solutions:**
-1. Reduce HISTORY_SIZE: `CliService<..., 4>` instead of default 10
+1. Reduce HISTORY_SIZE: `Shell<..., 4>` instead of default 10
 2. Disable history entirely: `--no-default-features --features authentication,completion`
 3. Reduce MAX_INPUT: 64 bytes instead of 128
 4. Reduce MAX_PATH_DEPTH: 4 instead of 8
@@ -741,7 +741,7 @@ struct MyIo {
 
 **Solution:** Increase MAX_PATH_DEPTH
 ```rust
-type MyCli = CliService<'static, L, IO, H, 128, 12, ...>;  // Increase from 8
+type MyShell = Shell<'static, L, IO, H, 128, 12, ...>;  // Increase from 8
 ```
 
 ### Problem: Characters Dropped on UART
@@ -821,13 +821,13 @@ stty erase ^H
 // ✅ RIGHT
 loop {
     let c = read_char().await;  // Task suspends - zero CPU
-    cli.process_char(c)?;
+    shell.process_char(c)?;
 }
 
 // ❌ WRONG
 loop {
     if let Some(c) = try_read_char() {  // Wastes CPU
-        cli.process_char(c)?;
+        shell.process_char(c)?;
     }
 }
 ```
@@ -872,11 +872,11 @@ where
 ```rust
 let uart = setup_uart(); // Platform-specific initialization
 let io = UartIo { uart };
-let mut cli = CliService::new(&ROOT, handlers, io);
+let mut shell = Shell::new(&ROOT, handlers, io);
 
 loop {
     if let Ok(Some(c)) = io.get_char() {
-        cli.process_char(c).ok();
+        shell.process_char(c).ok();
     }
 }
 ```
@@ -918,16 +918,16 @@ impl<'d, D> EmbassyUsbIo<'d, D> {
 **Usage:**
 ```rust
 #[embassy_executor::task]
-async fn cli_task(usb: CdcAcmClass<'static, Driver<'static>>) {
+async fn shell_task(usb: CdcAcmClass<'static, Driver<'static>>) {
     let mut io = EmbassyUsbIo { class: usb, output_buffer: Vec::new() };
-    let mut cli = CliService::new(&ROOT, handlers, io);
+    let mut shell = Shell::new(&ROOT, handlers, io);
 
     let mut buffer = [0u8; 64];
     loop {
         let n = io.class.read_packet(&mut buffer).await.unwrap();
 
         for &byte in &buffer[..n] {
-            cli.process_char_async(byte as char).await.ok();
+            shell.process_char_async(byte as char).await.ok();
         }
 
         io.flush().await.ok();
@@ -1012,7 +1012,7 @@ No manual task spawning or global state needed!
 ```rust
 // Good - batch output, flush once
 for byte in batch {
-    cli.process_char(byte as char)?;
+    shell.process_char(byte as char)?;
 }
 io.flush().await?;
 ```
@@ -1048,7 +1048,7 @@ fn command(_args: &[&str]) -> Result<Response, CliError> {
 // Good - task suspends, zero CPU usage
 loop {
     let c = read_char().await;
-    cli.process_char_async(c).await?;
+    shell.process_char_async(c).await?;
 }
 ```
 
@@ -1068,7 +1068,7 @@ trait CharIo {
 ```rust
 // AVOID - inefficient for async platforms
 for byte in batch {
-    cli.process_char(byte as char)?;
+    shell.process_char(byte as char)?;
     io.flush().await?;  // Too many I/O operations!
 }
 ```
@@ -1102,7 +1102,7 @@ fn bad_command(_args: &[&str]) -> Result<Response, CliError> {
 // AVOID - wastes CPU
 loop {
     if let Some(c) = try_read_char() {  // Busy loop!
-        cli.process_char(c)?;
+        shell.process_char(c)?;
     }
 }
 ```
