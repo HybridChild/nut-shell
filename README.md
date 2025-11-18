@@ -5,8 +5,8 @@
 A lightweight, embedded-first command-line interface library for `no_std` Rust environments with native sync/async support.
 
 [![Status](https://img.shields.io/badge/status-in%20development-yellow)](docs/IMPLEMENTATION.md)
-[![Platform](https://img.shields.io/badge/platform-no__std-blue)](#platform-support)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-green)](#license)
+[![Platform](https://img.shields.io/badge/platform-no_std-blue)](#platform-support)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)](#license)
 
 ---
 

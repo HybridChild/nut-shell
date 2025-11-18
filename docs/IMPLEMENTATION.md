@@ -1,4 +1,4 @@
-# nut-shell Rust Port - Implementation Plan
+# nut-shell library - Implementation Plan
 
 **Status**: Planning Ongoing
 **Estimated Timeline**: 6-8 weeks
