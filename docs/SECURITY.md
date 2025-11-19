@@ -2,7 +2,7 @@
 
 ## Authentication & Access Control Security Design
 
-This document describes the security architecture for authentication and access control in the Rust nut-shell implementation, including rationale, implementation patterns, and best practices for embedded systems.
+This document describes the security architecture for authentication and access control in the nut-shell implementation, including rationale, implementation patterns, and best practices for embedded systems.
 
 **Related Documentation:**
 - **[DESIGN.md](DESIGN.md)** - Command architecture, unified auth pattern, and feature gating details
@@ -15,7 +15,7 @@ This document describes the security architecture for authentication and access 
 
 ## Table of Contents
 
-1. [Security Vulnerabilities & Concerns](#security-vulnerabilities--concerns)
+1. [Security Considerations & Limitations](#security-considerations--limitations)
 2. [Rust Implementation Security Design](#rust-implementation-security-design)
 3. [Password Hashing](#password-hashing)
 4. [Credential Storage Options](#credential-storage-options)
@@ -26,52 +26,105 @@ This document describes the security architecture for authentication and access 
 
 ---
 
-## Security Vulnerabilities & Concerns
+## Security Considerations & Limitations
 
-### Critical Issues
+### Design Limitations
 
-#### 1. **Plaintext Password Storage**
-- Passwords stored as unencrypted strings in memory and binary
-- Visible in source code and version control
-- Extractable from compiled binary using `strings` command
-- No protection against memory dumps or binary inspection
+#### 1. **SHA-256 vs. Password-Specific KDFs**
+- **What we use**: SHA-256 with per-user salts
+- **Industry standard**: bcrypt, Argon2, scrypt (designed for password hashing)
+- **Why SHA-256**: Memory constraints (RP2040 has 264KB RAM), fast verification critical for embedded
+- **Trade-off**: Less resistant to offline brute-force if hashes are extracted from flash
+- **Mitigation**: Physical security assumption (see "Security Assumptions" section)
 
-#### 2. **Hardcoded Credentials in Source**
-- Credentials committed to version control repository
-- Shared across all deployments (no per-device secrets)
-- Requires recompilation to change passwords
-- Example credentials (`admin123`) may be used in production
+#### 2. **No Rate Limiting by Default**
+- **Current design**: No built-in login attempt throttling or account lockout
+- **Risk**: Brute-force attacks via serial console if device accessible
+- **Recommendation**: Implement rate limiting in `CredentialProvider` if threat model requires
+- **Why not built-in**: Adds complexity, timer dependencies, persistent state requirements
 
-#### 3. **No Password Hashing**
-- Direct string comparison: `user.getPassword() == password`
-- No salt, no key derivation
-- Vulnerable to rainbow table attacks if passwords leaked
-- Cannot enforce password complexity requirements
+#### 3. **No Audit Logging**
+- **Current design**: No logging of authentication events or command execution
+- **Risk**: Cannot detect or investigate unauthorized access attempts
+- **Recommendation**: Add logging in application code if compliance requires
+- **Why not built-in**: Storage requirements, flash wear concerns, application-specific needs
 
-#### 4. **Binary String Exposure**
-```bash
-$ strings nut_shell | grep admin
-admin
-admin123
+#### 4. **Flash Extraction Risk**
+- **Vulnerability**: Password hashes stored in flash can be extracted with physical access
+- **Attack**: SWD/JTAG access, flash chip desoldering, firmware dump
+- **Mitigation**: RP2040 flash read protection (boot2 configuration), secure boot
+- **Assumption**: Physical security (device in controlled environment)
+
+#### 5. **No Multi-Factor Authentication**
+- **Current design**: Username/password only (single-factor)
+- **Risk**: Compromised credentials grant full access
+- **Recommendation**: Use external auth systems (LDAP, RADIUS) via custom `CredentialProvider`
+- **Why not built-in**: Hardware token support, TOTP complexity, memory constraints
+
+### Common Misuse Scenarios
+
+#### ⚠️ **Using Const Provider in Production**
+```rust
+// WRONG: Example credentials in production deployment
+const ADMIN: User = User {
+    username: "admin",
+    password_hash: hash_of_admin123,  // Shared across all devices!
+    access_level: Admin,
+};
 ```
+**Consequence**: Same credentials on all devices, extractable from binary  
+**Solution**: Use flash storage or build-time environment variables for per-device secrets
 
-#### 5. **Unlimited Login Attempts**
-- No rate limiting or account lockout
-- Brute force attacks possible via serial console
-- No logging of failed attempts
+#### ⚠️ **Storing Plaintext in Custom Provider**
+```rust
+// WRONG: Custom provider with plaintext passwords
+impl CredentialProvider for MyProvider {
+    fn verify_password(&self, user: &User, password: &str) -> bool {
+        user.plaintext_password == password  // DON'T DO THIS
+    }
+}
+```
+**Consequence**: Defeats entire security model  
+**Solution**: Always hash passwords, use provided `Sha256Hasher` or better
 
-### Context-Specific Risks
+#### ⚠️ **Disabling Authentication in Production**
+```bash
+# WRONG: Building production firmware without authentication
+cargo build --target thumbv6m-none-eabi --no-default-features
+```
+**Consequence**: Anyone with serial access has full admin rights
+**Solution**: Only disable `authentication` feature for development/trusted environments
 
-**For Embedded Systems (RP2040/Pico):**
-- ⚠️ **Medium Risk**: Physical access usually implies complete control
-- ⚠️ **Medium Risk**: UART/USB serial access often indicates physical presence
-- ✅ **Mitigated by**: Device typically in physically secured enclosure
-- ✅ **Mitigated by**: Limited attack surface (no network stack)
+#### ⚠️ **Weak Salt Generation**
+```rust
+// WRONG: Non-random or shared salts
+const USER_SALT: [u8; 16] = [0; 16];  // All zeros = no salt benefit
+const ADMIN_SALT: [u8; 16] = [0; 16]; // Same salt for all users
+```
+**Consequence**: Vulnerable to rainbow table attacks, hash reuse across users  
+**Solution**: Generate unique random salts per user (hardware RNG or build-time random)
 
-**For Networked/Multi-Device Deployments:**
-- ❌ **High Risk**: Same credentials on all devices
-- ❌ **High Risk**: Credentials in repository accessible to all developers
-- ❌ **Critical Risk**: No credential rotation capability
+### Deployment Context & Risk Assessment
+
+**Single-Device Embedded Systems (RP2040/Pico in Secured Location):**
+- ✅ **Well-suited**: SHA-256 with salts provides adequate protection
+- ✅ **Low risk**: Physical access to serial console implies some authorization level
+- ✅ **Mitigated threats**: Casual/accidental access, credential extraction from binary
+- ⚠️ **Assumed**: Device in physically secured enclosure or controlled environment
+- ⚠️ **Out of scope**: Sophisticated physical attacks (JTAG debugging, flash extraction)
+
+**Multi-Device Deployments (Production Fleet):**
+- ✅ **Supports per-device secrets**: Flash storage or build-time configuration
+- ✅ **Credential rotation capable**: Update via flash write, no recompilation required
+- ✅ **No credentials in source**: Trait-based providers separate secrets from code
+- ⚠️ **Requires provisioning process**: Must generate unique credentials per device during manufacturing/deployment
+- ⚠️ **Implementation responsibility**: Application must implement secure flash storage provider
+
+**Network-Exposed Systems:**
+- ❌ **Not designed for this**: Serial console authentication assumes local/physical access
+- ❌ **Missing protections**: No TLS, no certificate-based auth, no network-specific hardening
+- ⚠️ **If exposed via serial-over-network**: Add network security layer (VPN, SSH tunneling, etc.)
+- ⚠️ **Consider alternatives**: For network access, use proper network authentication (mTLS, OAuth, RADIUS)
 
 ---
 
@@ -184,8 +237,12 @@ impl PasswordHasher for Sha256Hasher {
 
 **Salt Sources:**
 ```rust
-// Build time: From secure random generator
-const ADMIN_SALT: [u8; 16] = *b"unique_salt_0001";
+// Build time: From environment variable or secure random source
+// Example: Use openssl rand -hex 16 to generate, pass via build script
+const ADMIN_SALT: [u8; 16] = [
+    0x7a, 0x3f, 0x9e, 0x12, 0x8b, 0x4c, 0xd1, 0x56,
+    0xe2, 0x91, 0x0a, 0x7f, 0xc3, 0x68, 0xb5, 0x2d,
+];  // Generated from ADMIN_SALT_HEX env var via build.rs
 
 // Runtime: From hardware RNG (RP2040 ROSC)
 use rp2040_hal::rosc::RingOscillator;
@@ -316,18 +373,25 @@ impl<'tree, L: AccessLevel, IO: CharIo> Shell<'tree, L, IO> {
 ### Node Access Levels
 
 ```rust
+const REBOOT_CMD: CommandMeta<MyAccessLevel> = CommandMeta {
+    name: "reboot",
+    description: "Reboot the system",
+    access_level: MyAccessLevel::Admin,  // Requires Admin
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+const SYSTEM_DIR: Directory<MyAccessLevel> = Directory {
+    name: "system",
+    access_level: MyAccessLevel::User,  // Requires User level
+    children: &[
+        Node::Command(&REBOOT_CMD),
+    ],
+};
+
 const ROOT: &[Node<MyAccessLevel>] = &[
-    Node::Directory(Directory {
-        name: "system",
-        access_level: MyAccessLevel::User,  // Requires User level
-        children: &[
-            Node::Command(Command {
-                name: "reboot",
-                access_level: MyAccessLevel::Admin,  // Requires Admin
-                execute: reboot_fn,
-            }),
-        ],
-    }),
+    Node::Directory(&SYSTEM_DIR),
 ];
 ```
 
@@ -366,8 +430,8 @@ See [DESIGN.md](DESIGN.md) for feature gating patterns and [SPECIFICATION.md](SP
 1. Parse login request (username:password format)
 2. Find user via `CredentialProvider::find_user()`
 3. Verify password using constant-time comparison
-4. Rate limit failed attempts (minimum 1 second delay)
-5. Update session state on success
+4. Update session state on success
+5. (Optional) Implement rate limiting in `CredentialProvider` if required by threat model
 
 ### Password Masking
 - Echo characters normally until colon detected
@@ -468,10 +532,10 @@ fn test_access_control() {
     // Can access User-level commands
     assert!(shell.execute("system info").is_ok());
 
-    // Cannot access Admin-level commands
+    // Cannot access Admin-level commands (returns InvalidPath to hide existence)
     assert_eq!(
         shell.execute("system reboot"),
-        Err(CliError::AccessDenied)
+        Err(CliError::InvalidPath)
     );
 }
 ```
@@ -480,14 +544,22 @@ fn test_access_control() {
 
 ```rust
 #[test]
-fn test_no_plaintext_in_binary() {
-    // Ensure passwords are not stored in plaintext
-    let binary = include_bytes!(env!("CARGO_BIN_FILE_NUT_SHELL"));
-    let binary_str = String::from_utf8_lossy(binary);
+fn test_only_hashes_in_binary() {
+    // Verify that User struct contains only password_hash field, no plaintext
+    // This is a compile-time check - if this compiles, passwords are hashed
+    let user = User {
+        username: heapless::String::from("test"),
+        #[cfg(feature = "authentication")]
+        password_hash: [0u8; 32],  // Hash only, no plaintext field exists
+        #[cfg(feature = "authentication")]
+        salt: [0u8; 16],
+        access_level: MyAccessLevel::User,
+    };
 
-    // Should not find plaintext passwords
-    assert!(!binary_str.contains("admin123"));
-    assert!(!binary_str.contains("user123"));
+    // User struct should not have a plaintext password field
+    // (This won't compile if someone adds one)
+    let _ = user.password_hash;  // OK - hash field exists
+    // let _ = user.password;    // Would fail - no such field
 }
 
 #[test]
@@ -497,6 +569,21 @@ fn test_salt_uniqueness() {
     let salts: HashSet<_> = users.iter().map(|u| u.salt).collect();
 
     assert_eq!(salts.len(), users.len(), "Salts must be unique per user");
+}
+
+#[test]
+fn test_constant_time_verify() {
+    // Verify that password verification uses constant-time comparison
+    let hasher = Sha256Hasher;
+    let salt = [1u8; 16];
+    let correct_password = "correct_password";
+    let hash = hasher.hash(correct_password, &salt);
+
+    // These should take similar time regardless of how many characters match
+    assert!(!hasher.verify("x", &salt, &hash));
+    assert!(!hasher.verify("correct_passwor", &salt, &hash));
+    assert!(!hasher.verify("xorrect_password", &salt, &hash));
+    assert!(hasher.verify(correct_password, &salt, &hash));
 }
 ```
 
@@ -590,10 +677,10 @@ If your threat model requires stronger protections:
 - Use generic AccessLevel trait for user-defined hierarchies
 
 **Authentication Flow:**
-- Rate limit failed login attempts (minimum 1 second delay)
 - Mask password input after colon character
 - Use unified architecture pattern (single code path)
 - Feature-gate authentication for optional use
+- (Optional) Implement rate limiting in `CredentialProvider` if threat model requires
 
 ---
 

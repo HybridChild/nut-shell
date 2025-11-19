@@ -275,6 +275,7 @@ The ~200-300 byte increase for sync-only builds is acceptable given the improved
 **Alternative Considered**: Trait objects (runtime overhead, no const init)
 
 ### 5. Authentication System
+
 **Decision**: Optional authentication with trait-based credential providers, using a unified architecture that minimizes code branching
 
 **Rationale**: Different deployments have different security requirements:
@@ -282,52 +283,26 @@ The ~200-300 byte increase for sync-only builds is acceptable given the improved
 - Production embedded systems require secure access control
 - Flexibility needed for various credential storage backends (build-time, flash, external)
 
-**Key Design Elements**:
-- Generic `AccessLevel` trait allows user-defined permission hierarchies
-- `CredentialProvider` trait enables pluggable authentication backends
-- Password hashing (SHA-256 with salts) instead of plaintext storage
-- User credentials never hardcoded in source code
-- **Unified architecture**: Single state machine and code path for both auth-enabled and auth-disabled modes
+**Implementation Approach**: Uses **Pattern 1: Unified Architecture** (see [Feature Gating Patterns](#pattern-1-unified-architecture-authentication)) - single code path for both auth-enabled and auth-disabled modes. State and field values determine behavior rather than `#[cfg]` branching. Core fields (`current_user`, `state`) always present; only credential provider is feature-gated.
 
-**Unified Architecture Pattern**:
-The implementation uses a single code path for both authentication modes to minimize complexity:
+**Alternative Considered**: Separate implementations for auth-enabled/disabled (rejected due to code duplication and maintenance burden)
 
-- **Always track current user**: `current_user: Option<User<L>>` exists in both modes
-  - Auth enabled, logged out: `None` (awaiting login)
-  - Auth enabled, logged in: `Some(user)` (authenticated user)
-  - Auth disabled: `None` (no user needed, access checks skipped)
-
-- **Single state machine**: Same `CliState` enum, different initial state
-  - Auth enabled: Starts in `LoggedOut` state, transitions to `LoggedIn` after authentication
-  - Auth disabled: Starts in `LoggedIn` state immediately
-
-- **State and user combination determines behavior**:
-  - `state = LoggedOut, current_user = None` → Awaiting login (auth enabled)
-  - `state = LoggedIn, current_user = Some(user)` → Authenticated (auth enabled)
-  - `state = LoggedIn, current_user = None` → Auth disabled (no checks)
-
-- **Unified prompt generation**: Single `generate_prompt()` function
-  - Always uses format: `username@path> `
-  - `None` or empty username → `@path> `
-  - Authenticated user → `username@path> `
-
-- **Conditional fields only when necessary**: Only `credential_provider` requires feature gating
-  - State management, user tracking, and prompt logic work identically in both modes
-
-**Alternative Considered**: Separate implementations for auth-enabled/disabled (rejected due to code duplication)
-
-**Feature Gating**: Authentication is optional and can be disabled via Cargo features for unsecured development environments or when authentication is handled externally. When disabled, access control checks are eliminated and all commands are accessible. Estimated code savings: ~2KB for core auth logic, plus dependencies (sha2, subtle). See "Feature Gating & Optional Features" section below for detailed configuration patterns. See SECURITY.md for comprehensive security design and credential storage options.
-
-**Security Note**: When authentication is enabled, access control failures return "Invalid path" errors (same as non-existent paths) to prevent revealing the existence of restricted commands/directories. See SPECIFICATION.md for complete error handling behavior.
+**See Also**:
+- Implementation pattern: [Pattern 1: Unified Architecture](#pattern-1-unified-architecture-authentication)
+- Feature details & usage guidance: [Authentication Feature](#authentication-feature)
+- Security architecture: [SECURITY.md](SECURITY.md)
 
 ### 6. Completion Implementation
+
 **Decision**: Free functions or trait methods in `completion` module
 
 **Rationale**: No state needed, lightweight module organization
 
+**Implementation Approach**: Uses **Pattern 2: Stub Function Pattern** (see [Feature Gating Patterns](#pattern-2-stub-function-pattern-completion-history)) - identical function signatures in both modes, feature-disabled version returns empty results
+
 **Alternative Considered**: Separate Completer type with stateful instance
 
-**Feature Gating**: Tab completion is optional and can be disabled via Cargo features to reduce code size (~2KB) in constrained environments. When disabled, the entire `completion` module is eliminated at compile time with zero runtime overhead. See "Feature Gating & Optional Features" section below for detailed configuration patterns and use cases
+**See Also**: [Auto-Completion Feature](#auto-completion-feature) for feature details and usage guidance
 
 ### 7. State Management
 **Decision**: Inline `CliState` enum in `shell/mod.rs`
@@ -362,7 +337,7 @@ The implementation uses a single code path for both authentication modes to mini
 The Rust implementation provides optional features that can be enabled or disabled at compile time to accommodate different deployment scenarios and resource constraints. This allows fine-grained control over code size, dependencies, and functionality.
 
 **Available Optional Features:**
-- **async**: Enable async command execution with `process_char_async()` and `CommandHandlers::execute_async()` (default: disabled, see Section 1 for complete architecture)
+- **async**: Enable async command execution with `process_char_async()` and `CommandHandlers::execute_async()` (default: disabled, see [Section 1](#1-command-architecture-metadataexecution-separation-pattern) for complete architecture)
 - **authentication**: User login and access control system (default: enabled)
 - **completion**: Tab completion for commands and paths (default: enabled)
 - **history**: Command history navigation with arrow keys (default: enabled)
@@ -379,7 +354,7 @@ The Rust implementation provides optional features that can be enabled or disabl
 
 This section explains the two main patterns used for feature gating. Individual features apply one of these patterns.
 
-**Note:** The **async** feature is documented separately in Section 1 "Command Architecture: Metadata/Execution Separation Pattern" as it extends the core execution model rather than adding optional functionality.
+**Note:** The **async** feature is documented separately in Section 1 [Command Architecture: Metadata/Execution Separation Pattern](#1-command-architecture-metadataexecution-separation-pattern) as it extends the core execution model rather than adding optional functionality.
 
 #### Pattern 1: Unified Architecture (Authentication)
 
