@@ -31,14 +31,13 @@ See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the current roadmap and
 ### Core Functionality (Always Present)
 - **Path-based navigation** - Unix-style hierarchical commands (`system/reboot`, `network/status`)
 - **Command execution** - Both synchronous and asynchronous command support
-- **Access control** - User-defined permission hierarchies
 - **Input parsing** - Terminal I/O with line editing (backspace, arrows, double-ESC clear)
 - **Const initialization** - Zero runtime overhead, ROM placement
-- **Global commands** - `ls`, `?`, `logout`, `clear`
+- **Global commands** - `ls`, `?`, `clear` (and `logout` when authentication enabled)
 
 ### Optional Features
 - **Async commands** (`async` feature) - Natural async/await for long-running operations like network requests, flash I/O, and timers. Compatible with Embassy, RTIC, and other async runtimes. Zero overhead when disabled. *(Default: disabled)*
-- **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management (~2KB flash) *(Default: enabled)*
+- **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement (~2KB flash) *(Default: enabled)*
 - **Tab completion** (`completion` feature) - Command and path prefix matching (~2KB flash) *(Default: enabled)*
 - **Command history** (`history` feature) - Arrow key navigation with configurable buffer (~0.5-1.3KB RAM) *(Default: enabled)*
 
