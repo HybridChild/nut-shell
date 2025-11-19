@@ -279,9 +279,39 @@ Phase 9:
      - `indent_message` - Indent output (2 spaces)
      - `postfix_newline` - Add newline after message
      - `show_prompt` - Display prompt after response
-   - Helper constructors: `Response::success()`, `Response::error()`
+     - `exclude_from_history` - Prevent input from being saved to history (feature-gated: `history`)
+   - Helper constructors: `Response::success()`, `Response::error()`, `Response::success_no_history()` (feature-gated)
+   - Builder method: `without_history()` - Chain to exclude from history (feature-gated)
    - Message content and status code
    - See INTERNALS.md Level 7 for complete response formatting
+   - Implementation example:
+     ```rust
+     pub struct Response {
+         pub message: heapless::String<256>,
+         pub is_success: bool,
+         pub prefix_newline: bool,
+         pub indent_message: bool,
+         pub postfix_newline: bool,
+         pub show_prompt: bool,
+         #[cfg(feature = "history")]
+         pub exclude_from_history: bool,
+     }
+
+     impl Response {
+         pub fn success(message: &str) -> Self { /* default: include in history */ }
+         pub fn error(message: &str) -> Self { /* default: include in history */ }
+
+         #[cfg(feature = "history")]
+         pub fn success_no_history(message: &str) -> Self { /* exclude from history */ }
+
+         #[cfg(feature = "history")]
+         pub fn without_history(mut self) -> Self {
+             self.exclude_from_history = true;
+             self
+         }
+     }
+     ```
+   - Shell integration: Check `exclude_from_history` before calling `history.add()` (see Phase 7)
 
 4. Tests for request/response handling
 
@@ -315,6 +345,14 @@ Phase 9:
    - Implement command history (~85 lines)
    - Feature-gated: Type always exists, methods no-op when `history` feature disabled
    - Zero-size stub type when disabled
+   - **Shell integration**: After command execution, check `Response.exclude_from_history` flag before calling `history.add()`:
+     ```rust
+     #[cfg(feature = "history")]
+     if !response.exclude_from_history {
+         self.history.add(&self.input_buffer);
+     }
+     ```
+   - This allows commands handling sensitive data (passwords, credentials) to prevent their input from being recorded
 
 3. Comprehensive tests:
    - Escape sequence parsing (up/down arrows, double-ESC)
