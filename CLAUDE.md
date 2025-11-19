@@ -33,6 +33,7 @@ The architectural decisions and patterns documented here represent our current b
 | Why it's designed this way | **[docs/DESIGN.md](docs/DESIGN.md)** | Design rationale, unified architecture pattern, feature gating |
 | How system works at runtime | **[docs/INTERNALS.md](docs/INTERNALS.md)** | Complete data flow, state machines, pseudocode implementations |
 | Implementation order and tasks | **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** | 10-phase roadmap, task breakdown, what to build next |
+| Exact type definitions and signatures | **[docs/TYPE_REFERENCE.md](docs/TYPE_REFERENCE.md)** | Complete struct fields, method signatures, constants, error types |
 | Security patterns and credential storage | **[docs/SECURITY.md](docs/SECURITY.md)** | Password hashing, access control, authentication flow |
 | Design philosophy and feature criteria | **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** | What we include/exclude, decision framework |
 | CharIo implementation and buffering | **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** | Sync/async I/O patterns, buffering model, platform adapters |
@@ -46,19 +47,22 @@ The architectural decisions and patterns documented here represent our current b
 **Commands use metadata/execution separation pattern** (CommandMeta + CommandHandlers trait). See [docs/DESIGN.md](docs/DESIGN.md) section 1 for complete architecture details.
 
 ```rust
-// 1. Define the command function (sync or async)
-fn reboot_fn(args: &[&str]) -> Result<Response, CliError> {
+// 1. Define configuration (choose or create custom)
+type MyConfig = DefaultConfig;  // or MinimalConfig, or custom
+
+// 2. Define the command function (sync or async)
+fn reboot_fn<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
     // Synchronous implementation
     Ok(Response::success("Rebooting..."))
 }
 
-async fn http_get_async(args: &[&str]) -> Result<Response, CliError> {
+async fn http_get_async<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
     // Asynchronous implementation (requires async feature)
     let response = HTTP_CLIENT.get(args[0]).await?;
     Ok(Response::success(&response))
 }
 
-// 2. Create const command metadata (no execute function)
+// 3. Create const command metadata (no execute function)
 const REBOOT: CommandMeta<MyAccessLevel> = CommandMeta {
     name: "reboot",
     description: "Reboot the device",
@@ -77,7 +81,7 @@ const HTTP_GET: CommandMeta<MyAccessLevel> = CommandMeta {
     max_args: 1,
 };
 
-// 3. Add to tree
+// 4. Add to tree
 const SYSTEM_DIR: Directory<MyAccessLevel> = Directory {
     name: "system",
     children: &[
@@ -88,31 +92,31 @@ const SYSTEM_DIR: Directory<MyAccessLevel> = Directory {
     access_level: MyAccessLevel::User,
 };
 
-// 4. Implement CommandHandlers trait (maps names to functions)
+// 5. Implement CommandHandlers trait (maps names to functions)
 struct MyHandlers;
 
-impl CommandHandlers for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl CommandHandlers<MyConfig> for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match name {
-            "reboot" => reboot_fn(args),
+            "reboot" => reboot_fn::<MyConfig>(args),
             // ... other sync commands
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match name {
-            "http-get" => http_get_async(args).await,
+            "http-get" => http_get_async::<MyConfig>(args).await,
             // ... other async commands
             _ => Err(CliError::CommandNotFound),
         }
     }
 }
 
-// 5. Instantiate Shell with handlers
+// 6. Instantiate Shell with handlers and config
 let handlers = MyHandlers;
-let mut shell = Shell::new(&SYSTEM_DIR, handlers, io);
+let mut shell: Shell<_, _, _, _, MyConfig> = Shell::new(&SYSTEM_DIR, handlers, io);
 ```
 
 **Key points:**
@@ -183,7 +187,11 @@ pub mod my_feature;  // Always include (contents are gated)
 pub use my_feature::do_something;
 
 // src/shell/mod.rs - NO feature gates needed!
-impl<'tree, L, IO> Shell<'tree, L, IO> {
+impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
+where
+    H: CommandHandlers<C>,
+    C: ShellConfig,
+{
     fn some_method(&mut self) -> Result<(), CliError> {
         // Works in both modes - stub returns empty when disabled
         let results = my_feature::do_something(node, input)?;
@@ -210,22 +218,22 @@ For stateful types (like `CommandHistory`):
 ```rust
 // Feature-enabled: Full struct
 #[cfg(feature = "history")]
-pub struct CommandHistory<const N: usize> {
-    buffer: heapless::Vec<heapless::String<128>, N>,
+pub struct CommandHistory<const N: usize, const INPUT_SIZE: usize> {
+    buffer: heapless::Vec<heapless::String<INPUT_SIZE>, N>,
     position: Option<usize>,
 }
 
 // Feature-disabled: Zero-size stub
 #[cfg(not(feature = "history"))]
-pub struct CommandHistory<const N: usize> {
+pub struct CommandHistory<const N: usize, const INPUT_SIZE: usize> {
     _phantom: core::marker::PhantomData<[(); N]>,
 }
 
 // Both modes implement identical API
-impl<const N: usize> CommandHistory<N> {
+impl<const N: usize, const INPUT_SIZE: usize> CommandHistory<N, INPUT_SIZE> {
     pub fn new() -> Self { /* ... */ }
     pub fn add(&mut self, cmd: &str) { /* real or no-op */ }
-    pub fn previous(&mut self) -> Option<heapless::String<128>> { /* real or None */ }
+    pub fn previous(&mut self) -> Option<heapless::String<INPUT_SIZE>> { /* real or None */ }
 }
 ```
 
@@ -242,39 +250,41 @@ impl SomeType {
 
 ### Implementing CommandHandlers Trait
 
-The CommandHandlers trait maps command names to execution functions.
+The CommandHandlers trait maps command names to execution functions. Generic over ShellConfig to match Response buffer sizes.
 
 ```rust
-pub trait CommandHandlers {
+pub trait CommandHandlers<C: ShellConfig> {
     /// Execute synchronous command
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     /// Execute asynchronous command (optional, feature-gated)
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 }
 ```
 
 **Basic implementation:**
 ```rust
+type MyConfig = DefaultConfig;  // Choose configuration
+
 struct MyHandlers;
 
-impl CommandHandlers for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl CommandHandlers<MyConfig> for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match name {
-            "reboot" => reboot_fn(args),
-            "status" => status_fn(args),
-            "led-toggle" => led_toggle_fn(args),
+            "reboot" => reboot_fn::<MyConfig>(args),
+            "status" => status_fn::<MyConfig>(args),
+            "led-toggle" => led_toggle_fn::<MyConfig>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match name {
-            "http-get" => http_get_async(args).await,
-            "wifi-connect" => wifi_connect_async(args).await,
-            "flash-write" => flash_write_async(args).await,
+            "http-get" => http_get_async::<MyConfig>(args).await,
+            "wifi-connect" => wifi_connect_async::<MyConfig>(args).await,
+            "flash-write" => flash_write_async::<MyConfig>(args).await,
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -283,12 +293,14 @@ impl CommandHandlers for MyHandlers {
 
 **Stateful handlers (using shared references):**
 ```rust
+type MyConfig = DefaultConfig;
+
 struct MyHandlers<'a> {
     system: &'a SystemState,
 }
 
-impl<'a> CommandHandlers for MyHandlers<'a> {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl<'a> CommandHandlers<MyConfig> for MyHandlers<'a> {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match name {
             "status" => {
                 let info = self.system.get_status();
@@ -432,18 +444,19 @@ pub struct CommandMeta<L: AccessLevel> {
     pub max_args: usize,
 }
 
-// Execution logic (user-implemented trait)
-pub trait CommandHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+// Execution logic (user-implemented trait, generic over config)
+pub trait CommandHandlers<C: ShellConfig> {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 }
 
-// Shell is generic over handlers
-pub struct Shell<'tree, L, IO, H>
+// Shell is generic over handlers and config
+pub struct Shell<'tree, L, IO, H, C>
 where
-    H: CommandHandlers,
+    H: CommandHandlers<C>,
+    C: ShellConfig,
 {
     handlers: H,
     // ... other fields
@@ -462,10 +475,10 @@ where
 
 **Implementation pattern:**
 ```rust
-pub struct Shell<'tree, L, IO, H> {
+pub struct Shell<'tree, L, IO, H, C> {
     current_user: Option<User<L>>,  // Always present (not feature-gated)
     state: CliState,                // Always present (not feature-gated)
-    handlers: H,                    // Generic over CommandHandlers
+    handlers: H,                    // Generic over CommandHandlers<C>
 
     #[cfg(feature = "authentication")]
     credential_provider: &'tree dyn CredentialProvider<L>,  // Only this field is conditional
@@ -538,11 +551,12 @@ enum Node<L: AccessLevel> {
 
 ### Shell Generics
 ```rust
-Shell<'tree, L, IO, H>
+Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,    // User-defined access hierarchy
     IO: CharIo,        // Platform-specific I/O
-    H: CommandHandlers, // Command execution (sync/async dispatch)
+    H: CommandHandlers<C>, // Command execution (sync/async dispatch)
+    C: ShellConfig,    // Buffer sizes and capacity limits
 ```
 - **Monomorphization**: Compiler generates specialized code per type
 - **Zero overhead**: No runtime dispatch, fully inlined
@@ -625,14 +639,14 @@ buf.push_str(&long_string).map_err(|_| Error::BufferFull)?;
 ### ❌ Using N=0 Instead of Feature Gating
 ```rust
 // WRONG: Zero-capacity saves RAM but not flash
-type History = CommandHistory<0>;  // Code still compiled, just unused
+type History = CommandHistory<0, 128>;  // Code still compiled, just unused
 
 // RIGHT: Feature gate to eliminate code entirely
 #[cfg(feature = "history")]
-type History = CommandHistory<10>;
+type History = CommandHistory<10, 128>;
 
 #[cfg(not(feature = "history"))]
-type History = CommandHistory<0>;  // Stub compiled instead
+type History = CommandHistory<0, 128>;  // Stub compiled instead
 ```
 
 **Rule of thumb:** If disabling functionality should save flash (not just RAM), use feature gating with stub pattern.
@@ -771,6 +785,7 @@ cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-feat
 - **[docs/SPECIFICATION.md](docs/SPECIFICATION.md)** for "what should this do?"
 - **[docs/DESIGN.md](docs/DESIGN.md)** for "why is it designed this way?"
 - **[docs/INTERNALS.md](docs/INTERNALS.md)** for "how does this work at runtime?"
+- **[docs/TYPE_REFERENCE.md](docs/TYPE_REFERENCE.md)** for "what fields does this type have?" or "what's the signature?"
 - **[docs/SECURITY.md](docs/SECURITY.md)** for authentication/access control specifics
 - **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** for "should we add this feature?"
 - **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** for "how do I implement CharIo?"
@@ -827,6 +842,7 @@ Always lowercase, no hyphens when referring to Cargo features:
 - **[docs/DESIGN.md](docs/DESIGN.md)** - Design decisions, rationale, feature gating
 - **[docs/INTERNALS.md](docs/INTERNALS.md)** - Runtime behavior, data flow, state machines
 - **[docs/SPECIFICATION.md](docs/SPECIFICATION.md)** - Complete behavioral specification
+- **[docs/TYPE_REFERENCE.md](docs/TYPE_REFERENCE.md)** - Complete type definitions, method signatures, constants
 - **[docs/SECURITY.md](docs/SECURITY.md)** - Authentication, access control security
 - **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** - Design philosophy, feature framework
 - **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** - Implementation roadmap, build commands

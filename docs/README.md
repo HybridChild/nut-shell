@@ -10,6 +10,7 @@ Complete documentation for the nut-shell embedded CLI library.
 | **[DESIGN.md](DESIGN.md)** | Design decisions and rationale | Understanding why design choices were made, feature gating |
 | **[INTERNALS.md](INTERNALS.md)** | Runtime behavior and data flow | Understanding how the system works internally |
 | **[IMPLEMENTATION.md](IMPLEMENTATION.md)** | Implementation roadmap | Finding what to build next, build commands |
+| **[TYPE_REFERENCE.md](TYPE_REFERENCE.md)** | Complete type definitions | Looking up exact struct fields, method signatures, constants |
 | **[SECURITY.md](SECURITY.md)** | Authentication and security | Implementing auth, credential storage, access control |
 | **[PHILOSOPHY.md](PHILOSOPHY.md)** | Design philosophy | Evaluating feature requests, understanding project scope |
 | **[IO_DESIGN.md](IO_DESIGN.md)** | CharIo trait and buffering model | Implementing I/O adapters for sync/async environments |
@@ -96,6 +97,24 @@ Phased implementation plan and build workflows:
 
 ---
 
+### [TYPE_REFERENCE.md](TYPE_REFERENCE.md) - Complete Type Definitions
+**32KB • Type Reference**
+
+Complete type specifications and method signatures:
+- Constants (buffer sizes, capacity limits, recommended values)
+- Core traits (`CharIo`, `AccessLevel`, `CommandHandlers`)
+- Tree types (`Node`, `CommandMeta`, `CommandKind`, `Directory`)
+- Request/Response types (all variants, formatting flags)
+- Shell types (`CliState`, `User`, `Shell` struct with all generics)
+- Parser types (`InputParser`, `CommandHistory`, `ParseEvent`)
+- Error types (`CliError` with all variants)
+- Method signatures (Shell core methods, path navigation, authentication)
+- Complete usage examples (end-to-end Shell creation)
+
+**Read this when:** You need exact field names, method signatures, or recommended constant values during implementation.
+
+---
+
 ### [SECURITY.md](SECURITY.md) - Security Design
 **28KB • Authentication & Access Control**
 
@@ -178,6 +197,12 @@ Project philosophy and feature criteria:
 ### "How do I implement CharIo for my platform?"
 → See **[IO_DESIGN.md](IO_DESIGN.md)** (Buffering Model & Sync/Async Patterns)
 
+### "What are the exact fields of struct X?"
+→ See **[TYPE_REFERENCE.md](TYPE_REFERENCE.md)** (Complete Type Definitions)
+
+### "What's the recommended value for constant Y?"
+→ See **[TYPE_REFERENCE.md](TYPE_REFERENCE.md)** (Constants section)
+
 ---
 
 ## Document Relationships
@@ -206,7 +231,12 @@ Project philosophy and feature criteria:
 ┌─────────────────┐
 │IMPLEMENTATION.md│  ← How to build it
 └────────┬────────┘
-         │ builds
+         │ builds             ┌──────────────────┐
+         │                    │TYPE_REFERENCE.md │  ← Exact type definitions
+         │                    └──────────────────┘
+         │                               ▲
+         │                               │ references
+         │───────────────────────────────┘
          ▼
 ┌─────────────────┐
 │   SECURITY.md   │  ← How authentication/access control works
@@ -221,9 +251,10 @@ Project philosophy and feature criteria:
 |----------|------|-------|---------------|
 | INTERNALS.md | 40KB | ~1106 | Runtime behavior, data flow |
 | DESIGN.md | 32KB | ~793 | Design rationale, feature gating |
+| TYPE_REFERENCE.md | 28KB | ~1090 | Complete type definitions, method signatures |
+| SECURITY.md | 25KB | ~633 | Authentication, security |
 | SPECIFICATION.md | 24KB | ~657 | Behavioral requirements |
 | IMPLEMENTATION.md | 24KB | ~657 | Implementation roadmap |
-| SECURITY.md | 25KB | ~633 | Authentication, security |
 | PHILOSOPHY.md | 20KB | ~554 | Design philosophy |
 | IO_DESIGN.md | 12KB | ~301 | CharIo trait, buffering model |
 

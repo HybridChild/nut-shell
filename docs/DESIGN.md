@@ -141,9 +141,12 @@ pub trait CommandHandlers {
     async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
 }
 
-// Shell generic over handlers
-pub struct Shell<'tree, L, IO, H>
-where H: CommandHandlers { ... }
+// Shell generic over handlers and config
+pub struct Shell<'tree, L, IO, H, C>
+where
+    H: CommandHandlers<C>,
+    C: ShellConfig,
+{ ... }
 ```
 
 **Alternatives Considered:**
@@ -236,7 +239,9 @@ async fn shell_task(usb: UsbDevice) {
   → Can be mitigated with future macro validation
   → Explicit dispatch is debuggable and type-safe
 
-✅ **Additional generic parameter** - `Shell<'tree, L, IO, H>`
+✅ **Additional generic parameters** - `Shell<'tree, L, IO, H, C>`
+  → H: CommandHandlers<C> for command execution
+  → C: ShellConfig for buffer sizes
   → Monomorphization means zero runtime cost
   → Cleaner than alternatives (async traits, heap allocation)
 
@@ -367,7 +372,7 @@ This section explains the two main patterns used for feature gating. Individual 
 - Constructor and initial state differ between modes
 - Single implementation for core methods (e.g., `activate()`, `generate_prompt()`)
 
-**Example (simplified):**
+**Example (simplified - omits H and C generics for clarity):**
 ```rust
 pub struct Shell<'tree, L, IO> {
     current_user: Option<User<L>>,  // Always present

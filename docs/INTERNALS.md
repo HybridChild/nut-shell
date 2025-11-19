@@ -2,6 +2,8 @@
 
 This document provides a detailed analysis of nut-shell runtime behavior, including complete pseudocode implementations, state machines, data flow, and performance characteristics.
 
+**Note**: This document uses pseudocode for clarity and may reference simplified type names. For exact type signatures including generic parameters (ShellConfig, etc.), see [TYPE_REFERENCE.md](TYPE_REFERENCE.md). The Request enum shown here uses Execute/Navigate variants for illustration; the actual implementation uses Command variant with a feature-gated `original` field.
+
 ## High-Level Overview
 
 ```
@@ -295,6 +297,9 @@ Shell::handle_command_input() -> Result<(), IO::Error>
     };
 
     // 6. Add successful commands to history (stub no-ops if disabled)
+    // Note: In actual implementation, use Request::Command::original field
+    // which is feature-gated to save RAM when history disabled
+    #[cfg(feature = "history")]
     if response.is_success() && !path_str.is_empty() {
         self.history.add(&self.input_buffer);
     }

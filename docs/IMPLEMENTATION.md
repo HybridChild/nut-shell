@@ -45,6 +45,7 @@ This shows which phase creates which file:
 Phase 2:
   - src/io.rs (CharIo trait)
   - src/auth/mod.rs (AccessLevel trait, User struct)
+  - src/config.rs (ShellConfig trait, DefaultConfig, MinimalConfig)
 
 Phase 3:
   - src/tree/mod.rs (Node enum, CommandMeta struct, Directory struct, CommandKind enum)
@@ -117,22 +118,34 @@ Phase 9:
    - Only `CredentialProvider` requires authentication feature
    - Unit tests
 
-**Success Criteria**: Can abstract I/O and access control with zero runtime cost
+3. Implement configuration in `config.rs` (see TYPE_REFERENCE.md "Configuration")
+   - `ShellConfig` trait with associated constants (MAX_INPUT, MAX_PATH_DEPTH, MAX_ARGS, MAX_PROMPT, MAX_RESPONSE, HISTORY_SIZE)
+   - `DefaultConfig` struct (balanced for typical embedded systems: 128/8/16/64/256/10)
+   - `MinimalConfig` struct (resource-constrained systems: 64/4/8/32/128/5)
+   - All constants are compile-time evaluated (zero runtime cost)
+   - Unit tests
+
+**Success Criteria**: Can abstract I/O, access control, and configuration with zero runtime cost
 
 ---
 
 ### Phase 3a: Tree Core Types
 **Goal**: Define foundational tree types with access control
 
+**IMPORTANT**: This phase implements the **metadata/execution separation pattern** (see DESIGN.md Section 1). Commands are split into `CommandMeta` (const metadata in ROM) and execution logic (provided via `CommandHandlers` trait in Phase 8).
+
 **Tasks**:
 1. Implement in `tree/mod.rs`:
    - `Node` enum with Command and Directory variants
-   - `Command` struct:
+   - `CommandMeta` struct (metadata only, no execute field):
      - `name: &'static str`
      - `description: &'static str`
-     - `execute: fn(&[&str]) -> Result<Response, CliError>` (function pointer)
      - `access_level: L` (generic over AccessLevel)
+     - `kind: CommandKind` (enum: Sync or Async marker)
      - `min_args: usize`, `max_args: usize`
+   - `CommandKind` enum:
+     - `Sync` - Synchronous command
+     - `Async` - Asynchronous command (requires `async` feature)
    - `Directory` struct:
      - `name: &'static str`
      - `children: &'static [Node<L>]` (array reference)
@@ -142,9 +155,10 @@ Phase 9:
 2. Unit tests for type construction and pattern matching
 
 **Success Criteria**:
-- Can define individual Command and Directory instances
+- Can define individual CommandMeta and Directory instances
 - Node enum enables zero-cost dispatch via pattern matching
 - Access level integration works with generic parameter
+- CommandMeta is const-initializable (no function pointers, metadata only)
 
 ---
 
@@ -153,11 +167,11 @@ Phase 9:
 
 **Tasks**:
 1. Implement const tree construction patterns:
-   - Define command functions as `fn` (not closures)
-   - Create const Command definitions
-   - Create const Directory definitions with child arrays
+   - Create const `CommandMeta` definitions (metadata only, no execute functions)
+   - Create const `Directory` definitions with child arrays
    - Nest directories to create hierarchical structure
    - Example: `/system/reboot`, `/hw/led/set`, etc.
+   - Note: Actual command execution functions are implemented later via `CommandHandlers` trait (Phase 8)
 
 2. Create example tree as test fixture in `tests/fixtures/mod.rs`:
    ```rust
@@ -260,22 +274,25 @@ Phase 9:
 **Why this phase comes first**: Phase 7 (Input Processing) needs to convert input buffers into `Request` types, so these types must exist first.
 
 **Tasks**:
-1. Implement `Request` enum in `shell/mod.rs`:
+1. Implement `Request<C: ShellConfig>` enum in `shell/mod.rs` (generic over config):
    - `Login { username, password }` - Authentication attempt
    - `InvalidLogin` - Failed login
-   - `Command { path, args, original }` - Execute command
-   - `TabComplete { path }` - Request completions
-   - `History { up, buffer }` - Navigate history
+   - `Command { path, args, #[cfg] original }` - Execute command (uses `C::MAX_INPUT`, `C::MAX_ARGS`)
+     - `original` field is feature-gated (`#[cfg(feature = "history")]`) to save ~128 bytes RAM when disabled
+   - `TabComplete { path }` - Request completions (uses `C::MAX_INPUT`)
+   - `History { direction, buffer }` - Navigate history (uses `HistoryDirection` enum, `C::MAX_INPUT`)
+   - See TYPE_REFERENCE.md for complete type definition and usage patterns
 
 2. Implement `CliState` enum in `shell/mod.rs`:
    - `Inactive` - CLI not active
    - `LoggedOut` - Awaiting authentication (feature-gated variant)
    - `LoggedIn` - Authenticated or auth-disabled mode
 
-3. Implement `Response` in `response.rs`:
+3. Implement `Response<C: ShellConfig>` in `response.rs` (generic over config):
    - Success/error variants
    - Formatting flags:
-     - `prefix_newline` - Add newline before message
+     - `inline_message` - Message is inline (don't echo newline after command input)
+     - `prefix_newline` - Add newline before message (in response formatter)
      - `indent_message` - Indent output (2 spaces)
      - `postfix_newline` - Add newline after message
      - `show_prompt` - Display prompt after response
@@ -284,11 +301,13 @@ Phase 9:
    - Builder method: `without_history()` - Chain to exclude from history (feature-gated)
    - Message content and status code
    - See INTERNALS.md Level 7 for complete response formatting
+   - Message uses `C::MAX_RESPONSE` buffer size
    - Implementation example:
      ```rust
-     pub struct Response {
-         pub message: heapless::String<256>,
+     pub struct Response<C: ShellConfig> {
+         pub message: heapless::String<C::MAX_RESPONSE>,
          pub is_success: bool,
+         pub inline_message: bool,
          pub prefix_newline: bool,
          pub indent_message: bool,
          pub postfix_newline: bool,
@@ -297,7 +316,7 @@ Phase 9:
          pub exclude_from_history: bool,
      }
 
-     impl Response {
+     impl<C: ShellConfig> Response<C> {
          pub fn success(message: &str) -> Self { /* default: include in history */ }
          pub fn error(message: &str) -> Self { /* default: include in history */ }
 
@@ -338,13 +357,14 @@ Phase 9:
    - Implement input parser (~397 lines)
    - Note: Left/right arrows, Home/End keys are future additions (see PHILOSOPHY.md "Recommended Additions")
 
-2. Implement `CommandHistory` in `shell/history.rs` using stub type pattern (see DESIGN.md "Feature Gating & Optional Features"):
-   - Circular buffer with const generic size
+2. Implement `CommandHistory<const N: usize, const INPUT_SIZE: usize>` in `shell/history.rs` using stub type pattern (see DESIGN.md "Feature Gating & Optional Features"):
+   - Circular buffer with two const generics: N (history size), INPUT_SIZE (buffer size per entry)
    - O(1) add, previous, next operations
    - Position tracking for navigation
    - Implement command history (~85 lines)
    - Feature-gated: Type always exists, methods no-op when `history` feature disabled
    - Zero-size stub type when disabled
+   - Used in Shell as: `CommandHistory<C::HISTORY_SIZE, C::MAX_INPUT>` where C: ShellConfig
    - **Shell integration**: After command execution, check `Response.exclude_from_history` flag before calling `history.add()`:
      ```rust
      #[cfg(feature = "history")]
@@ -379,24 +399,30 @@ Phase 9:
 
    a. **Field definitions**:
    ```rust
-   pub struct Shell<'tree, L, IO>
+   pub struct Shell<'tree, L, IO, H, C>
    where
        L: AccessLevel,
        IO: CharIo,
+       H: CommandHandlers<C>,
+       C: ShellConfig,
    {
        // ALWAYS present (not feature-gated)
        tree: &'tree Directory<L>,
        current_user: Option<User<L>>,
        state: CliState,
-       input_buffer: heapless::String<MAX_INPUT>,
-       current_path: heapless::Vec<usize, MAX_PATH_DEPTH>,
+       input_buffer: heapless::String<C::MAX_INPUT>,
+       current_path: heapless::Vec<usize, C::MAX_PATH_DEPTH>,
        parser: InputParser,
-       history: CommandHistory<HISTORY_SIZE>,
+       history: CommandHistory<C::HISTORY_SIZE, C::MAX_INPUT>,
        io: IO,
+       handlers: H,
 
        // ONLY this field is feature-gated
        #[cfg(feature = "authentication")]
        credential_provider: &'tree dyn CredentialProvider<L>,
+
+       // Config type marker (zero-size)
+       _config: core::marker::PhantomData<C>,
    }
    ```
 
@@ -404,17 +430,26 @@ Phase 9:
    ```rust
    // Constructor when authentication enabled
    #[cfg(feature = "authentication")]
-   impl<'tree, L, IO> Shell<'tree, L, IO> {
+   impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
+   where
+       L: AccessLevel,
+       IO: CharIo,
+       H: CommandHandlers<C>,
+       C: ShellConfig,
+   {
        pub fn new(
            tree: &'tree Directory<L>,
+           handlers: H,
            provider: &'tree dyn CredentialProvider<L>,
-           io: IO
+           io: IO,
        ) -> Self {
            Self {
                tree,
+               handlers,
                current_user: None,  // Start logged out
-               state: CliState::LoggedOut,
+               state: CliState::LoggedIn,
                credential_provider: provider,
+               _config: core::marker::PhantomData,
                // ... other fields
            }
        }
@@ -422,15 +457,24 @@ Phase 9:
 
    // Constructor when authentication disabled
    #[cfg(not(feature = "authentication"))]
-   impl<'tree, L, IO> Shell<'tree, L, IO> {
+   impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
+   where
+       L: AccessLevel,
+       IO: CharIo,
+       H: CommandHandlers<C>,
+       C: ShellConfig,
+   {
        pub fn new(
            tree: &'tree Directory<L>,
-           io: IO
+           handlers: H,
+           io: IO,
        ) -> Self {
            Self {
                tree,
+               handlers,
                current_user: None,  // No user needed
                state: CliState::LoggedIn,  // Start in logged-in state
+               _config: core::marker::PhantomData,
                // ... other fields
            }
        }
