@@ -1,13 +1,11 @@
 # nut-shell library - Implementation Plan
 
-**Status**: Planning Ongoing
+**Status**: Planning Ongoing  
 **Estimated Timeline**: 6-8 weeks
 
 ## Overview
 
 This document tracks the implementation phases for nut-shell. The implementation prioritizes **idiomatic Rust patterns** while maintaining behavioral correctness.
-
-**⚠️ IMPORTANT**: Commands use **metadata/execution separation pattern**. `CommandMeta` (metadata) + `CommandHandlers` trait (execution). This enables both sync and async commands while maintaining const-initialization. See [DESIGN.md](DESIGN.md) section 1 for complete architecture details.
 
 **When to use this document:**
 - Finding out what phase of implementation we're in
@@ -42,28 +40,38 @@ This document tracks the implementation phases for nut-shell. The implementation
 This shows which phase creates which file:
 
 ```
+Phase 1:
+  - tests/fixtures/mod.rs (MockIo, MockAccessLevel, TEST_TREE fixture)
+  - src/lib.rs (initial setup with feature gates)
+  - Cargo.toml (dependencies and features)
+
 Phase 2:
   - src/io.rs (CharIo trait)
-  - src/auth/mod.rs (AccessLevel trait, User struct)
+  - src/auth/mod.rs (AccessLevel trait, User struct, CredentialProvider trait, PasswordHasher trait)
+  - src/auth/password.rs (Sha256Hasher implementation)
+  - src/auth/providers/buildtime.rs (build-time credentials)
+  - src/auth/providers/const_provider.rs (hardcoded credentials for testing)
   - src/config.rs (ShellConfig trait, DefaultConfig, MinimalConfig)
+  - src/lib.rs or src/error.rs (CliError enum)
 
 Phase 3:
   - src/tree/mod.rs (Node enum, CommandMeta struct, Directory struct, CommandKind enum)
   - src/shell/handlers.rs (CommandHandlers trait definition)
+  - tests/fixtures/mod.rs (MockHandlers implementation - validates metadata/execution separation)
 
 Phase 4:
   - src/tree/path.rs (Path type)
 
 Phase 5:
-  - src/tree/completion.rs (with stub pattern)
+  - src/response.rs (Response type)
+  - src/shell/mod.rs (Request enum, HistoryDirection enum, CliState enum - partial)
 
 Phase 6:
-  - src/response.rs (Response type)
-  - src/shell/mod.rs (Request enum, CliState enum - partial)
+  - src/shell/parser.rs (ParseEvent enum, InputParser)
+  - src/shell/history.rs (CommandHistory with stub pattern)
 
 Phase 7:
-  - src/shell/parser.rs (InputParser)
-  - src/shell/history.rs (CommandHistory with stub pattern)
+  - src/tree/completion.rs (with stub pattern)
 
 Phase 8:
   - src/shell/mod.rs (Shell implementation, complete)
@@ -75,7 +83,7 @@ Phase 9:
 
 ## Implementation Phases
 
-### Phase 1: Project Foundation ✓
+### Phase 1: Project Foundation
 **Goal**: Runnable Rust project with basic structure and testing infrastructure
 
 **Tasks**:
@@ -104,28 +112,77 @@ Phase 9:
 **Goal**: Core traits everything depends on
 
 **Tasks**:
-1. Implement `CharIo` trait in `io.rs`
+1. Implement `CharIo` trait in `io.rs` (see IO_DESIGN.md for complete design)
    - Define trait with associated error type
-   - Character read/write methods
-   - Create `StdioStream` implementation for testing
+   - Character read/write methods:
+     * `get_char(&mut self) -> Result<Option<char>, Self::Error>` - Non-blocking read
+     * `put_char(&mut self, c: char) -> Result<(), Self::Error>` - Write to buffer
+     * `write_str(&mut self, s: &str) -> Result<(), Self::Error>` - Default impl using put_char
+   - Document buffering requirements (CRITICAL - see IO_DESIGN.md):
+     * All implementations MUST buffer output internally
+     * Bare-metal: May flush immediately in put_char() (blocking acceptable)
+     * Async: MUST buffer to memory only, flush externally after process_char()
+     * Recommended buffer sizes: 256 bytes for async platforms, 0 (immediate) for bare-metal
+     * put_char() and write_str() MUST NOT await or block indefinitely
+   - Create `StdioStream` implementation for testing (bare-metal pattern with immediate flush)
    - Add basic tests
 
-2. Implement access control in `auth/mod.rs` (see DESIGN.md "Module Structure")
+2. Implement `CliError` enum in `lib.rs` or `error.rs` (foundational error type):
+   - `CommandNotFound` - Command not found in tree
+   - `InvalidPath` - Path doesn't exist OR user lacks access (intentionally ambiguous for security)
+   - `InvalidArguments { expected_min, expected_max, received }` - Wrong argument count
+   - `BufferFull` - Buffer capacity exceeded
+   - `PathTooDeep` - Path exceeds MAX_PATH_DEPTH
+   - `AuthenticationFailed` (feature-gated: `authentication`) - Wrong credentials
+   - `NotAuthenticated` (feature-gated: `authentication`) - Tried to execute command while logged out
+   - `IoError` - I/O error occurred
+   - `AsyncNotSupported` (feature-gated: `async`) - Async command called in sync mode
+   - `Timeout` - Operation timed out (used by command implementations)
+   - `Other(heapless::String<MAX_RESPONSE>)` - Generic error with message
+   - Implement `core::fmt::Display` for user-friendly error messages
+   - **SECURITY NOTE**: Never create separate "AccessDenied" error - always use `InvalidPath` to hide node existence
+
+3. Implement access control in `auth/mod.rs` (see DESIGN.md "Module Structure")
    - `AccessLevel` trait with comparison operators
    - Example implementations (e.g., enum with Admin/User/Guest)
-   - `User` struct with username and access level
+   - `User` struct with complete field definition:
+     * `username: heapless::String<32>` (always present)
+     * `access_level: L` (always present)
+     * `password_hash: [u8; 32]` (feature-gated: `authentication`)
+     * `salt: [u8; 16]` (feature-gated: `authentication`)
    - Module is feature-gated, but `User` and `AccessLevel` are re-exported at root level (always available)
-   - Only `CredentialProvider` requires authentication feature
    - Unit tests
 
-3. Implement configuration in `config.rs` (see TYPE_REFERENCE.md "Configuration")
+4. Implement authentication infrastructure in `auth/mod.rs` (see SECURITY.md):
+   - `CredentialProvider` trait (requires authentication feature):
+     * `type Error` - Associated error type
+     * `find_user(&self, username: &str) -> Result<Option<User<L>>, Self::Error>`
+     * `verify_password(&self, user: &User<L>, password: &str) -> bool`
+     * `list_users(&self) -> Result<Vec<&str>, Self::Error>`
+   - `PasswordHasher` trait:
+     * `hash(&self, password: &str, salt: &[u8]) -> [u8; 32]`
+     * `verify(&self, password: &str, salt: &[u8], hash: &[u8; 32]) -> bool`
+
+5. Implement password hashing in `auth/password.rs`:
+   - `Sha256Hasher` struct implementing `PasswordHasher` trait
+   - SHA-256 hashing using `sha2` crate
+   - Constant-time password verification using `subtle::ConstantTimeEq`
+   - Salt handling (16-byte salts prepended to password before hashing)
+   - Unit tests verifying constant-time comparison
+
+6. Create credential provider implementations in `auth/providers/`:
+   - `buildtime.rs` - Build-time environment variables (production use)
+   - `const_provider.rs` - Hardcoded credentials (examples/testing ONLY)
+   - Note: Flash storage provider can be added later as needed
+
+7. Implement configuration in `config.rs` (see TYPE_REFERENCE.md "Configuration")
    - `ShellConfig` trait with associated constants (MAX_INPUT, MAX_PATH_DEPTH, MAX_ARGS, MAX_PROMPT, MAX_RESPONSE, HISTORY_SIZE)
    - `DefaultConfig` struct (balanced for typical embedded systems: 128/8/16/64/256/10)
    - `MinimalConfig` struct (resource-constrained systems: 64/4/8/32/128/5)
    - All constants are compile-time evaluated (zero runtime cost)
    - Unit tests
 
-**Success Criteria**: Can abstract I/O, access control, and configuration with zero runtime cost
+**Success Criteria**: Can abstract I/O, access control, configuration, and errors with zero runtime cost
 
 ---
 
@@ -152,13 +209,66 @@ Phase 9:
      - `access_level: L`
    - Type checking methods: `is_command()`, `is_directory()`, `name()`, `access_level()`
 
-2. Unit tests for type construction and pattern matching
+2. Implement `CommandHandlers` trait in `shell/handlers.rs`:
+   - Generic over `C: ShellConfig` (for Response buffer sizing)
+   - `execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>`
+   - `execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>` (feature-gated: `async`)
+   - See TYPE_REFERENCE.md for complete trait definition
+
+3. **CRITICAL: Validate metadata/execution separation pattern early**:
+   - Create `MockHandlers` test fixture in `tests/fixtures/mod.rs` implementing `CommandHandlers<DefaultConfig>`
+   - Implement 2-3 test commands:
+     ```rust
+     struct MockHandlers;
+
+     impl CommandHandlers<DefaultConfig> for MockHandlers {
+         fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+             match name {
+                 "echo" => {
+                     let msg = args.join(" ");
+                     Ok(Response::success(&msg))
+                 }
+                 "fail" => Ok(Response::error("Test error")),
+                 "reboot" => Ok(Response::success("Rebooting...")),
+                 _ => Err(CliError::CommandNotFound),
+             }
+         }
+
+         #[cfg(feature = "async")]
+         async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+             match name {
+                 "async-wait" => {
+                     // Simulate async operation
+                     Ok(Response::success("Async complete"))
+                 }
+                 _ => Err(CliError::CommandNotFound),
+             }
+         }
+     }
+     ```
+   - Create corresponding const `CommandMeta` instances in TEST_TREE
+   - Write integration test that:
+     * Validates const metadata compiles
+     * Verifies handlers can be instantiated
+     * Confirms metadata and execution are properly separated
+     * Tests that async trait method compiles (even without awaiting yet)
+   - **Async validation** (when `async` feature enabled):
+     * Write test that calls `execute_async()` and verifies it compiles
+     * Use a simple async runtime or `futures::executor::block_on()` for testing
+     * Verify async methods return correct Response types
+     * Test that `CommandKind::Async` marker works as expected
+     * **Why now?** Async trait method issues won't surface until Phase 8 otherwise - discovering async compilation problems early saves significant refactoring
+   - **Why validate now?** This pattern is foundational. If there are issues with const initialization + generic traits, we need to discover them BEFORE building Shell in Phase 8.
+
+4. Unit tests for type construction and pattern matching
 
 **Success Criteria**:
 - Can define individual CommandMeta and Directory instances
 - Node enum enables zero-cost dispatch via pattern matching
 - Access level integration works with generic parameter
 - CommandMeta is const-initializable (no function pointers, metadata only)
+- CommandHandlers trait compiles with both sync and async methods
+- MockHandlers proves the metadata/execution separation pattern works
 
 ---
 
@@ -232,63 +342,55 @@ Phase 9:
 
 ---
 
-### Phase 5: Tab Completion
-**Goal**: Smart command/path completion (optional feature)
+### Phase 5: Request/Response Types
+**Goal**: Type-safe command processing types (MUST complete before Phase 6)
+
+**Why this phase comes first**: Phase 6 (Input Processing) needs to convert input buffers into `Request` types, so these types must exist first.
 
 **Tasks**:
-1. Implement in `tree/completion.rs`:
-   - Prefix matching for commands and directories
-   - Return multiple matches when ambiguous
-   - Auto-append "/" for directories
-   - Handle partial path completion (`sys/de<TAB>` → `system/debug`)
-   - Implement completion logic (~229 lines)
+1. Implement `HistoryDirection` enum in `shell/mod.rs`:
+   - `Previous = 0` - Up arrow key (navigate to older command)
+   - `Next = 1` - Down arrow key (navigate to newer command or restore original)
+   - Used by `Request::History` variant
+   - Size: 1 byte (repr(u8) for efficiency)
+   - Self-documenting alternative to bool
 
-2. Implement feature gating using stub function pattern (see DESIGN.md "Feature Gating & Optional Features"):
-   - Add `completion` feature flag to Cargo.toml
-   - Add `#[cfg(feature = "completion")]` conditional compilation within module contents
-   - Implement stub function pattern: `suggest_completions()` returns empty `Vec` when disabled
-   - Module always exists, contents are feature-gated
-   - Single `handle_tab()` implementation calls stub functions (no dual methods needed)
-   - Parser handles tab key identically in both modes (stub returns empty results)
+2. Implement `Request<C: ShellConfig>` enum in `shell/mod.rs`:
 
-3. Tests for completion scenarios:
-   - Single match completion
-   - Multiple match display
-   - No matches
-   - Directory vs command completion
-   - Test builds with feature enabled/disabled
-   - Verify no_std compliance with feature disabled
-   - Measure code size impact (should be ~2KB)
+   **IMPORTANT**: Request is generic over `C: ShellConfig` to use configured buffer sizes.
+   This enables per-deployment buffer customization without recompilation.
+   - `path` fields use `C::MAX_INPUT`
+   - `args` uses `C::MAX_ARGS`
+   - `buffer` fields use `C::MAX_INPUT`
 
-**Success Criteria**:
-- Tab completion works for partial names with proper directory handling
-- Feature can be disabled via `--no-default-features` flag
-- Graceful degradation when completion disabled
-- Code size savings measurable (~2KB)
-
----
-
-### Phase 6: Request/Response Types
-**Goal**: Type-safe command processing types (MUST complete before Phase 7)
-
-**Why this phase comes first**: Phase 7 (Input Processing) needs to convert input buffers into `Request` types, so these types must exist first.
-
-**Tasks**:
-1. Implement `Request<C: ShellConfig>` enum in `shell/mod.rs` (generic over config):
-   - `Login { username, password }` - Authentication attempt
-   - `InvalidLogin` - Failed login
-   - `Command { path, args, #[cfg] original }` - Execute command (uses `C::MAX_INPUT`, `C::MAX_ARGS`)
-     - `original` field is feature-gated (`#[cfg(feature = "history")]`) to save ~128 bytes RAM when disabled
-   - `TabComplete { path }` - Request completions (uses `C::MAX_INPUT`)
-   - `History { direction, buffer }` - Navigate history (uses `HistoryDirection` enum, `C::MAX_INPUT`)
+   **Variants**:
+   - `Login { username, password }` - Authentication attempt (feature-gated: `authentication`)
+     * `username: heapless::String<32>`
+     * `password: heapless::String<64>`
+   - `InvalidLogin` - Failed login (feature-gated: `authentication`)
+   - `Command { path, args, #[cfg] original }` - Execute command
+     * `path: heapless::String<C::MAX_INPUT>`
+     * `args: heapless::Vec<heapless::String<C::MAX_INPUT>, C::MAX_ARGS>`
+     * `original: heapless::String<C::MAX_INPUT>` (feature-gated: `history`)
+     * `original` field saves ~128 bytes RAM when history disabled
+   - `TabComplete { path }` - Request completions (feature-gated: `completion`)
+     * `path: heapless::String<C::MAX_INPUT>`
+   - `History { direction, buffer }` - Navigate history (feature-gated: `history`)
+     * `direction: HistoryDirection`
+     * `buffer: heapless::String<C::MAX_INPUT>`
    - See TYPE_REFERENCE.md for complete type definition and usage patterns
 
-2. Implement `CliState` enum in `shell/mod.rs`:
+3. Implement `CliState` enum in `shell/mod.rs`:
    - `Inactive` - CLI not active
    - `LoggedOut` - Awaiting authentication (feature-gated variant)
    - `LoggedIn` - Authenticated or auth-disabled mode
 
-3. Implement `Response<C: ShellConfig>` in `response.rs` (generic over config):
+4. Implement `Response<C: ShellConfig>` in `response.rs`:
+
+   **IMPORTANT**: Response is generic over `C: ShellConfig` for buffer sizing.
+   Message uses `C::MAX_RESPONSE` buffer size.
+
+   **Fields**:
    - Success/error variants
    - Formatting flags:
      - `inline_message` - Message is inline (don't echo newline after command input)
@@ -330,22 +432,33 @@ Phase 9:
          }
      }
      ```
-   - Shell integration: Check `exclude_from_history` before calling `history.add()` (see Phase 7)
+   - Shell integration: Check `exclude_from_history` before calling `history.add()` (see Phase 6)
 
-4. Tests for request/response handling
+5. Tests for request/response handling
 
 **Success Criteria**:
 - Can represent all CLI operations type-safely
 - Response type supports all formatting modes needed by global commands and custom commands
-- Input Parser (Phase 7) can convert buffers to Request types
+- Input Parser (Phase 6) can convert buffers to Request types
 
 ---
 
-### Phase 7: Input Processing
+### Phase 6: Input Processing
 **Goal**: Terminal I/O with escape sequences
 
 **Tasks**:
-1. Implement `InputParser` in `shell/parser.rs`:
+1. Implement `ParseEvent` enum in `shell/parser.rs`:
+   - `None` - No special action needed
+   - `CharAdded(char)` - Character added to buffer
+   - `Backspace` - Backspace pressed (remove last char)
+   - `Enter` - Enter pressed (input complete)
+   - `Tab` - Tab pressed (trigger completion)
+   - `UpArrow` - Up arrow (history previous)
+   - `DownArrow` - Down arrow (history next)
+   - `ClearAndRedraw` - Double-ESC (clear buffer and exit history)
+   - Returned by `InputParser::process_char()` to indicate what happened
+
+2. Implement `InputParser` in `shell/parser.rs`:
    - Character-by-character processing
    - Escape sequence state machine (up/down arrows, double-ESC)
    - Double-ESC clear buffer (always enabled, ~50-100 bytes, see PHILOSOPHY.md)
@@ -357,7 +470,7 @@ Phase 9:
    - Implement input parser (~397 lines)
    - Note: Left/right arrows, Home/End keys are future additions (see PHILOSOPHY.md "Recommended Additions")
 
-2. Implement `CommandHistory<const N: usize, const INPUT_SIZE: usize>` in `shell/history.rs` using stub type pattern (see DESIGN.md "Feature Gating & Optional Features"):
+3. Implement `CommandHistory<const N: usize, const INPUT_SIZE: usize>` in `shell/history.rs` using stub type pattern (see DESIGN.md "Feature Gating & Optional Features"):
    - Circular buffer with two const generics: N (history size), INPUT_SIZE (buffer size per entry)
    - O(1) add, previous, next operations
    - Position tracking for navigation
@@ -374,7 +487,7 @@ Phase 9:
      ```
    - This allows commands handling sensitive data (passwords, credentials) to prevent their input from being recorded
 
-3. Comprehensive tests:
+4. Comprehensive tests:
    - Escape sequence parsing (up/down arrows, double-ESC)
    - Double-ESC clears buffer and exits history navigation
    - ESC + [ starts escape sequence (not cleared)
@@ -388,6 +501,88 @@ Phase 9:
 - Handle arrows, backspace, tab, double-ESC
 - Double-ESC clears input buffer without clearing screen
 - O(1) history operations
+
+---
+
+### ⚡ Checkpoint: Type-Level Integration Validation
+
+**At this point, all core types exist.** Before proceeding to Phase 7 (Tab Completion) and Phase 8 (Shell), validate that the type system integrates correctly.
+
+**Why checkpoint here?**
+- All foundational types are implemented: CharIo, AccessLevel, User, Node, Path, Request, Response, InputParser, CommandHistory
+- Phase 7 adds an optional feature (tab completion)
+- Phase 8 brings everything together in Shell
+- Better to discover type integration issues NOW than during Shell implementation
+
+**Validation Tasks:**
+1. **Create integration test** in `tests/integration/type_validation.rs`:
+   - Instantiate all core types together in a single test
+   - Create a mock command tree with various access levels
+   - Parse a path and resolve it through the tree
+   - Create Request instances and convert to Response
+   - Verify all generic parameters (L, IO, H, C) work together
+   - Test both `DefaultConfig` and `MinimalConfig`
+
+2. **Verify compilation** across feature combinations:
+   ```bash
+   cargo test --all-features
+   cargo test --no-default-features
+   cargo test --features authentication
+   cargo test --features history
+   ```
+
+3. **Check type-level constraints**:
+   - Verify `CommandMeta` is const-initializable
+   - Confirm `CommandHandlers` trait object safety (if needed)
+   - Test lifetime relationships between tree and Shell components
+   - Validate generic parameter inference works naturally
+
+4. **Success Criteria**:
+   - All types instantiate without compilation errors
+   - Generic parameters infer correctly in typical usage
+   - No lifetime conflicts between tree and runtime state
+   - Feature combinations compile cleanly
+   - **If issues found**: Refactor types NOW before Shell implementation
+
+**Time Investment**: 1-2 hours. **Value**: Prevents 4-8 hours of refactoring during Phase 8.
+
+---
+
+### Phase 7: Tab Completion
+**Goal**: Smart command/path completion (optional feature)
+
+**Note**: Tab completion grouped here with other input/interaction features (parser in Phase 6, Shell in Phase 8) for logical cohesion.
+
+**Tasks**:
+1. Implement in `tree/completion.rs`:
+   - Prefix matching for commands and directories
+   - Return multiple matches when ambiguous
+   - Auto-append "/" for directories
+   - Handle partial path completion (`sys/de<TAB>` → `system/debug`)
+   - Implement completion logic (~229 lines)
+
+2. Implement feature gating using stub function pattern (see DESIGN.md "Feature Gating & Optional Features"):
+   - Add `completion` feature flag to Cargo.toml
+   - Add `#[cfg(feature = "completion")]` conditional compilation within module contents
+   - Implement stub function pattern: `suggest_completions()` returns empty `Vec` when disabled
+   - Module always exists, contents are feature-gated
+   - Single `handle_tab()` implementation calls stub functions (no dual methods needed)
+   - Parser handles tab key identically in both modes (stub returns empty results)
+
+3. Tests for completion scenarios:
+   - Single match completion
+   - Multiple match display
+   - No matches
+   - Directory vs command completion
+   - Test builds with feature enabled/disabled
+   - Verify no_std compliance with feature disabled
+   - Measure code size impact (should be ~2KB)
+
+**Success Criteria**:
+- Tab completion works for partial names with proper directory handling
+- Feature can be disabled via `--no-default-features` flag
+- Graceful degradation when completion disabled
+- Code size savings measurable (~2KB)
 
 ---
 
@@ -500,7 +695,11 @@ Phase 9:
 
    f. **Implement Shell orchestration** (~589 lines total)
 
-   Note: No `cd`, `ls`, `pwd`, or `tree` commands per syntax design (see DESIGN.md)
+   **Note on omitted commands**: No `cd`, `pwd`, or `tree` commands per path-based syntax design (see DESIGN.md).
+   Path-based navigation makes them redundant:
+   - Instead of `cd system`: just type `system`
+   - Instead of `pwd`: current path shown in prompt (`user@/current/path>`)
+   - Instead of `tree`: use `ls` to explore directory structure
 
 2. Integration tests with mock I/O:
    - Login flow (auth enabled)
@@ -511,6 +710,25 @@ Phase 9:
    - History navigation (both enabled and disabled via stubs)
    - Test unified architecture: auth-enabled vs auth-disabled modes
    - Test feature combinations: all features, no features, individual features
+
+3. Async feature testing (when `async` feature enabled):
+   - **Async command execution**:
+     * Create test handlers with both sync and async commands
+     * Verify `process_char_async()` correctly awaits async commands
+     * Test that async commands complete before returning
+     * Verify output is generated correctly after async command completes
+   - **Sync commands in async mode**:
+     * Verify sync commands still work when using `process_char_async()`
+     * Test mixed command trees (some sync, some async)
+   - **Error handling**:
+     * Verify `AsyncNotSupported` error when calling sync `process_char()` with async command
+     * Test error propagation from async commands (via `?` operator)
+   - **I/O buffering with async**:
+     * Verify CharIo buffer is flushed after async command completes
+     * Test buffer overflow handling during long async operations
+   - **Command metadata validation**:
+     * Verify `CommandKind::Async` properly routes to `execute_async()` handler
+     * Verify `CommandKind::Sync` routes to `execute_sync()` in async mode
 
 **Success Criteria**:
 - End-to-end CLI functionality works with all feature combinations
@@ -723,9 +941,10 @@ cargo expand --lib                       # Expand macros
 - ⬜ Phase 2: I/O & Access Control Foundation
 - ⬜ Phase 3: Tree Data Model
 - ⬜ Phase 4: Path Navigation
-- ⬜ Phase 5: Tab Completion
-- ⬜ Phase 6: Request/Response Types
-- ⬜ Phase 7: Input Processing
+- ⬜ Phase 5: Request/Response Types
+- ⬜ Phase 6: Input Processing
+- ⬜ ⚡ Checkpoint: Type-Level Integration Validation
+- ⬜ Phase 7: Tab Completion
 - ⬜ Phase 8: Shell Orchestration
 - ⬜ Phase 9: Examples
 - ⬜ Phase 10: Testing & Polish
