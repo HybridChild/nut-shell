@@ -1,6 +1,6 @@
 # nut-shell library - Implementation Plan
 
-**Status**: Implementation Phase 3 in progress  
+**Status**: Implementation Phase 3b in progress  
 **Estimated Timeline**: 2-3 weeks
 
 ## Overview
@@ -275,13 +275,23 @@ Phase 9:
 
 4. Unit tests for type construction and pattern matching
 
-**Success Criteria**:
-- Can define individual CommandMeta and Directory instances
-- Node enum enables zero-cost dispatch via pattern matching
-- Access level integration works with generic parameter
-- CommandMeta is const-initializable (no function pointers, metadata only)
-- CommandHandlers trait compiles with both sync and async methods
-- MockHandlers proves the metadata/execution separation pattern works
+**Success Criteria**: ✅ All met
+- ✅ Can define individual CommandMeta and Directory instances
+- ✅ Node enum enables zero-cost dispatch via pattern matching
+- ✅ Access level integration works with generic parameter
+- ✅ CommandMeta is const-initializable (no function pointers, metadata only)
+- ✅ CommandHandlers trait compiles with both sync and async methods
+- ✅ MockHandlers proves the metadata/execution separation pattern works
+- ✅ Async validation complete (tokio tests execute async commands successfully)
+- ✅ All tests passing (93 total with all features, 64 without features)
+- ✅ Embedded target (thumbv6m-none-eabi) verified with all feature combinations
+
+**Implementation Results**:
+- Created `tests/test_tree.rs` with 22 comprehensive integration tests
+- Added `MockHandlers` fixture implementing `CommandHandlers<DefaultConfig>` (tests/fixtures/mod.rs:275-308)
+- Added async test command `CMD_ASYNC_WAIT` to TEST_TREE (feature-gated)
+- Validated async trait methods compile and execute correctly using tokio
+- Confirmed pattern works before proceeding to Phase 8 (Shell)
 
 ---
 
@@ -963,11 +973,24 @@ cargo expand --lib                       # Expand macros
   - Comprehensive tests (44 tests with all features, 18 with no features, 37 with authentication only)
   - Verified compilation on native and embedded targets with all feature combinations
 
+- ✅ Phase 3a: Tree Core Types
+  - CommandKind enum (Sync/Async markers)
+  - CommandMeta struct (const metadata, no execution logic)
+  - Directory struct with child array references
+  - Node enum with type checking methods
+  - CommandHandlers trait (metadata/execution separation pattern)
+  - Response type (already implemented in Phase 2)
+  - MockHandlers test fixture validates pattern
+  - Async command support validated (CMD_ASYNC_WAIT in TEST_TREE)
+  - Comprehensive integration tests (22 tree-specific tests)
+  - All tests passing (93 total with all features, 64 without features)
+  - Embedded target verified (thumbv6m-none-eabi with all feature combinations)
+  - Metadata/execution separation pattern proven before Shell implementation
+
 ### In Progress
-- 🟡 Phase 3: Tree Data Model (ready to start)
+- 🟡 Phase 3b: Tree Const Initialization (ready to start)
 
 ### Upcoming
-- ⬜ Phase 3b: Tree Const Initialization
 - ⬜ Phase 4: Path Navigation
 - ⬜ Phase 5: Request/Response Types
 - ⬜ Phase 6: Input Processing

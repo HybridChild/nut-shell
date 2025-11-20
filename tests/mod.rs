@@ -59,8 +59,10 @@
 // Re-export fixtures for use in test files
 pub mod fixtures;
 
-// Future test modules will be added here as implementation progresses:
+// Test modules (implementation phases):
+mod test_tree; // Phase 3: Tree data model and metadata/execution separation
+
+// Future test modules:
 // mod test_io;
 // mod test_auth;
-// mod test_tree;
 // mod test_shell;

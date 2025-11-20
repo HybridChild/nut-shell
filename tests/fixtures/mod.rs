@@ -9,6 +9,10 @@
 #![allow(dead_code)]
 
 use nut_shell::auth::AccessLevel;
+use nut_shell::config::DefaultConfig;
+use nut_shell::error::CliError;
+use nut_shell::response::Response;
+use nut_shell::shell::handlers::CommandHandlers;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 use nut_shell::CharIo;
 use std::collections::VecDeque;
@@ -193,12 +197,36 @@ pub const CMD_STATUS: CommandMeta<MockAccessLevel> = CommandMeta {
     max_args: 0,
 };
 
+/// Test command: async-wait (async command for testing)
+#[cfg(feature = "async")]
+pub const CMD_ASYNC_WAIT: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "async-wait",
+    description: "Async test command",
+    access_level: MockAccessLevel::User,
+    kind: CommandKind::Async,
+    min_args: 0,
+    max_args: 1,
+};
+
 /// Test directory: system/
+#[cfg(not(feature = "async"))]
 pub const DIR_SYSTEM: Directory<MockAccessLevel> = Directory {
     name: "system",
     children: &[
         Node::Command(&CMD_STATUS),
         Node::Command(&CMD_REBOOT),
+    ],
+    access_level: MockAccessLevel::User,
+};
+
+/// Test directory: system/ (with async command)
+#[cfg(feature = "async")]
+pub const DIR_SYSTEM: Directory<MockAccessLevel> = Directory {
+    name: "system",
+    children: &[
+        Node::Command(&CMD_STATUS),
+        Node::Command(&CMD_REBOOT),
+        Node::Command(&CMD_ASYNC_WAIT),
     ],
     access_level: MockAccessLevel::User,
 };
@@ -234,6 +262,54 @@ pub const TEST_TREE: Directory<MockAccessLevel> = Directory {
     ],
     access_level: MockAccessLevel::Guest,
 };
+
+// ============================================================================
+// MockHandlers - Command Execution Implementation
+// ============================================================================
+
+/// Mock command handlers for testing the metadata/execution separation pattern.
+///
+/// Implements the execution side of the pattern, mapping command names to functions.
+/// This validates that CommandMeta (const metadata) and CommandHandlers (runtime execution)
+/// work together correctly.
+pub struct MockHandlers;
+
+impl CommandHandlers<DefaultConfig> for MockHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+        match name {
+            "help" => Ok(Response::success("Help text here")),
+            "echo" => {
+                if args.is_empty() {
+                    Ok(Response::success(""))
+                } else {
+                    let msg = args.join(" ");
+                    Ok(Response::success(&msg))
+                }
+            }
+            "reboot" => Ok(Response::success("Rebooting...")),
+            "status" => Ok(Response::success("System OK")),
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+        match name {
+            "async-wait" => {
+                // Simulate async operation
+                let duration = args.get(0).and_then(|s| s.parse::<u32>().ok()).unwrap_or(100);
+                let formatted = format!("Waited {}ms", duration);
+                let mut msg = heapless::String::<64>::new();
+                let _ = msg.push_str(&formatted);
+                if msg.is_empty() {
+                    let _ = msg.push_str("Async complete");
+                }
+                Ok(Response::success(msg.as_str()))
+            }
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
 
 // ============================================================================
 // Helper Functions
@@ -317,9 +393,19 @@ mod tests {
 
         if let Some(Node::Directory(dir)) = system {
             assert_eq!(dir.name, "system");
+
+            // Directory has 2 children without async, 3 with async
+            #[cfg(not(feature = "async"))]
             assert_eq!(dir.children.len(), 2);
+
+            #[cfg(feature = "async")]
+            assert_eq!(dir.children.len(), 3);
+
             assert!(dir.find_child("status").is_some());
             assert!(dir.find_child("reboot").is_some());
+
+            #[cfg(feature = "async")]
+            assert!(dir.find_child("async-wait").is_some());
         } else {
             panic!("Expected directory node");
         }

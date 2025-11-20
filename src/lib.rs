@@ -58,6 +58,9 @@
 #![warn(missing_debug_implementations)]
 
 // Core dependencies
+#[cfg(not(feature = "std"))]
+extern crate core;
+
 extern crate heapless;
 
 // Optional dependencies (feature-gated)
