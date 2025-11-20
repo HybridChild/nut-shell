@@ -184,4 +184,122 @@ mod tests {
         assert!(history.previous().is_none());
         assert!(history.next().is_none());
     }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_ring_buffer_behavior() {
+        let mut history = CommandHistory::<3, 128>::new();
+
+        // Fill buffer to capacity
+        history.add("cmd1");
+        history.add("cmd2");
+        history.add("cmd3");
+
+        // Add one more - should remove oldest (cmd1)
+        history.add("cmd4");
+
+        // Navigate to oldest (should be cmd2 now)
+        assert_eq!(history.previous().unwrap().as_str(), "cmd4");
+        assert_eq!(history.previous().unwrap().as_str(), "cmd3");
+        assert_eq!(history.previous().unwrap().as_str(), "cmd2");
+
+        // cmd1 should be gone
+        assert_eq!(history.previous().unwrap().as_str(), "cmd2"); // Stay at oldest
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_empty_commands_ignored() {
+        let mut history = CommandHistory::<5, 128>::new();
+
+        history.add("");
+        history.add("cmd1");
+        history.add("");
+        history.add("cmd2");
+
+        // Only cmd1 and cmd2 should be in history
+        assert_eq!(history.previous().unwrap().as_str(), "cmd2");
+        assert_eq!(history.previous().unwrap().as_str(), "cmd1");
+        assert_eq!(history.previous().unwrap().as_str(), "cmd1"); // At oldest
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_duplicate_commands_ignored() {
+        let mut history = CommandHistory::<5, 128>::new();
+
+        history.add("cmd1");
+        history.add("cmd1"); // Duplicate - should be ignored
+        history.add("cmd2");
+        history.add("cmd2"); // Duplicate - should be ignored
+        history.add("cmd1"); // Different from last - should be added
+
+        // Should have: cmd1, cmd2, cmd1
+        assert_eq!(history.previous().unwrap().as_str(), "cmd1");
+        assert_eq!(history.previous().unwrap().as_str(), "cmd2");
+        assert_eq!(history.previous().unwrap().as_str(), "cmd1");
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_navigation_without_adding() {
+        let mut history = CommandHistory::<5, 128>::new();
+
+        // Try to navigate when empty
+        assert!(history.previous().is_none());
+        assert!(history.next().is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_reset_position() {
+        let mut history = CommandHistory::<5, 128>::new();
+
+        history.add("cmd1");
+        history.add("cmd2");
+        history.add("cmd3");
+
+        // Navigate backwards
+        history.previous();
+        history.previous();
+
+        // Reset position
+        history.reset_position();
+
+        // Next previous should return most recent
+        assert_eq!(history.previous().unwrap().as_str(), "cmd3");
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_position_resets_on_add() {
+        let mut history = CommandHistory::<5, 128>::new();
+
+        history.add("cmd1");
+        history.add("cmd2");
+
+        // Navigate backwards
+        history.previous();
+
+        // Add new command - position should reset
+        history.add("cmd3");
+
+        // Next previous should return most recent
+        assert_eq!(history.previous().unwrap().as_str(), "cmd3");
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_default() {
+        let history = CommandHistory::<5, 128>::default();
+        let mut history2 = history;
+        assert!(history2.previous().is_none());
+    }
+
+    #[test]
+    #[cfg(not(feature = "history"))]
+    fn test_stub_reset_position() {
+        let mut history = CommandHistory::<5, 128>::new();
+        history.reset_position(); // Should not panic
+    }
 }
