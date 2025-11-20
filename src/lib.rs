@@ -75,17 +75,8 @@ extern crate subtle;
 pub mod io;
 pub mod config;
 
-// Authentication module (always present, contents feature-gated)
-// Re-exports User and AccessLevel types at root level (always available)
-#[cfg(feature = "authentication")]
+// Authentication module (always present, but with different contents based on features)
 pub mod auth;
-
-#[cfg(not(feature = "authentication"))]
-pub mod auth {
-    //! Stub authentication module when feature disabled.
-    //!
-    //! Provides minimal types needed for non-authenticated mode.
-}
 
 // Phase 2: Error handling
 pub mod error;
@@ -116,8 +107,7 @@ pub use error::CliError;
 pub use tree::{Node, Directory, CommandMeta, CommandKind};
 
 // Access control (always available, even without authentication feature)
-// These will be defined in auth module but re-exported here
-// pub use auth::{AccessLevel, User};
+pub use auth::{AccessLevel, User};
 
 // Response types (Phase 5)
 pub use response::Response;
@@ -126,13 +116,9 @@ pub use response::Response;
 pub use shell::{Shell, Request, CliState, HistoryDirection};
 pub use shell::handlers::CommandHandlers;
 
-// Optional feature re-exports
+// Optional feature re-exports (authentication-only types)
 #[cfg(feature = "authentication")]
-pub use auth::{AccessLevel, User, CredentialProvider, PasswordHasher};
-
-// Password hasher will be re-exported once implemented in Phase 2
-// #[cfg(feature = "authentication")]
-// pub use auth::password::Sha256Hasher;
+pub use auth::{CredentialProvider, PasswordHasher, Sha256Hasher, ConstCredentialProvider};
 
 // ============================================================================
 // Library Metadata

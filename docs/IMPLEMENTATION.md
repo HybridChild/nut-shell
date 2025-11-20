@@ -1,6 +1,6 @@
 # nut-shell library - Implementation Plan
 
-**Status**: Implementation Phase 2 in progress  
+**Status**: Implementation Phase 3 in progress  
 **Estimated Timeline**: 2-3 weeks
 
 ## Overview
@@ -108,81 +108,94 @@ Phase 9:
 
 ---
 
-### Phase 2: I/O & Access Control Foundation
+### Phase 2: I/O & Access Control Foundation ✅
 **Goal**: Core traits everything depends on
 
 **Tasks**:
-1. Implement `CharIo` trait in `io.rs` (see IO_DESIGN.md for complete design)
-   - Define trait with associated error type
-   - Character read/write methods:
+1. ✅ Implement `CharIo` trait in `io.rs` (see IO_DESIGN.md for complete design)
+   - ✅ Define trait with associated error type
+   - ✅ Character read/write methods:
      * `get_char(&mut self) -> Result<Option<char>, Self::Error>` - Non-blocking read
      * `put_char(&mut self, c: char) -> Result<(), Self::Error>` - Write to buffer
      * `write_str(&mut self, s: &str) -> Result<(), Self::Error>` - Default impl using put_char
-   - Document buffering requirements (CRITICAL - see IO_DESIGN.md):
+   - ✅ Document buffering requirements (CRITICAL - see IO_DESIGN.md):
      * All implementations MUST buffer output internally
      * Bare-metal: May flush immediately in put_char() (blocking acceptable)
      * Async: MUST buffer to memory only, flush externally after process_char()
      * Recommended buffer sizes: 256 bytes for async platforms, 0 (immediate) for bare-metal
      * put_char() and write_str() MUST NOT await or block indefinitely
-   - Create `StdioStream` implementation for testing (bare-metal pattern with immediate flush)
-   - Add basic tests
+   - ✅ Create `StdioStream` implementation for testing (bare-metal pattern with immediate flush)
+   - ✅ Add basic tests (6 tests covering write_str, put_char, unicode, special chars)
 
-2. Implement `CliError` enum in `lib.rs` or `error.rs` (foundational error type):
-   - `CommandNotFound` - Command not found in tree
-   - `InvalidPath` - Path doesn't exist OR user lacks access (intentionally ambiguous for security)
-   - `InvalidArguments { expected_min, expected_max, received }` - Wrong argument count
-   - `BufferFull` - Buffer capacity exceeded
-   - `PathTooDeep` - Path exceeds MAX_PATH_DEPTH
-   - `AuthenticationFailed` (feature-gated: `authentication`) - Wrong credentials
-   - `NotAuthenticated` (feature-gated: `authentication`) - Tried to execute command while logged out
-   - `IoError` - I/O error occurred
-   - `AsyncNotSupported` (feature-gated: `async`) - Async command called in sync mode
-   - `Timeout` - Operation timed out (used by command implementations)
-   - `Other(heapless::String<MAX_RESPONSE>)` - Generic error with message
-   - Implement `core::fmt::Display` for user-friendly error messages
-   - **SECURITY NOTE**: Never create separate "AccessDenied" error - always use `InvalidPath` to hide node existence
+2. ✅ Implement `CliError` enum in `error.rs` (foundational error type):
+   - ✅ `CommandNotFound` - Command not found in tree
+   - ✅ `InvalidPath` - Path doesn't exist OR user lacks access (intentionally ambiguous for security)
+   - ✅ `InvalidArguments { expected_min, expected_max, received }` - Wrong argument count
+   - ✅ `BufferFull` - Buffer capacity exceeded
+   - ✅ `PathTooDeep` - Path exceeds MAX_PATH_DEPTH
+   - ✅ `AuthenticationFailed` (feature-gated: `authentication`) - Wrong credentials
+   - ✅ `NotAuthenticated` (feature-gated: `authentication`) - Tried to execute command while logged out
+   - ✅ `IoError` - I/O error occurred
+   - ✅ `AsyncNotSupported` (feature-gated: `async`) - Async command called in sync mode
+   - ✅ `Timeout` - Operation timed out (used by command implementations)
+   - ✅ `Other(heapless::String<256>)` - Generic error with message
+   - ✅ Implement `core::fmt::Display` for user-friendly error messages
+   - ✅ Added `custom()` helper for creating Other variant
+   - ✅ **SECURITY**: Uses `InvalidPath` for both non-existent and access-denied cases
 
-3. Implement access control in `auth/mod.rs` (see DESIGN.md "Module Structure")
-   - `AccessLevel` trait with comparison operators
-   - Example implementations (e.g., enum with Admin/User/Guest)
-   - `User` struct with complete field definition:
+3. ✅ Implement access control in `auth/mod.rs` (see DESIGN.md "Module Structure")
+   - ✅ `AccessLevel` trait with comparison operators (Copy, Clone, PartialOrd, Ord)
+   - ✅ `from_str()` and `as_str()` methods for serialization
+   - ✅ `User` struct with complete field definition:
      * `username: heapless::String<32>` (always present)
      * `access_level: L` (always present)
      * `password_hash: [u8; 32]` (feature-gated: `authentication`)
      * `salt: [u8; 16]` (feature-gated: `authentication`)
-   - Module is feature-gated, but `User` and `AccessLevel` are re-exported at root level (always available)
-   - Unit tests
+   - ✅ Module always present, `User` and `AccessLevel` re-exported at root level (always available)
+   - ✅ Unit tests (3 tests: ordering, from_str, user creation)
 
-4. Implement authentication infrastructure in `auth/mod.rs` (see SECURITY.md):
-   - `CredentialProvider` trait (requires authentication feature):
+4. ✅ Implement authentication infrastructure in `auth/mod.rs` (see SECURITY.md):
+   - ✅ `CredentialProvider` trait (requires authentication feature):
      * `type Error` - Associated error type
      * `find_user(&self, username: &str) -> Result<Option<User<L>>, Self::Error>`
      * `verify_password(&self, user: &User<L>, password: &str) -> bool`
-     * `list_users(&self) -> Result<Vec<&str>, Self::Error>`
-   - `PasswordHasher` trait:
+     * `list_users(&self) -> Result<heapless::Vec<&str, 32>, Self::Error>`
+   - ✅ `PasswordHasher` trait:
      * `hash(&self, password: &str, salt: &[u8]) -> [u8; 32]`
      * `verify(&self, password: &str, salt: &[u8], hash: &[u8; 32]) -> bool`
 
-5. Implement password hashing in `auth/password.rs`:
-   - `Sha256Hasher` struct implementing `PasswordHasher` trait
-   - SHA-256 hashing using `sha2` crate
-   - Constant-time password verification using `subtle::ConstantTimeEq`
-   - Salt handling (16-byte salts prepended to password before hashing)
-   - Unit tests verifying constant-time comparison
+5. ✅ Implement password hashing in `auth/password.rs`:
+   - ✅ `Sha256Hasher` struct implementing `PasswordHasher` trait
+   - ✅ SHA-256 hashing using `sha2` crate
+   - ✅ Constant-time password verification using `subtle::ConstantTimeEq`
+   - ✅ Salt handling (16-byte salts prepended to password before hashing)
+   - ✅ Unit tests verifying constant-time comparison (12 tests total)
+   - ✅ Tests: hash size, determinism, different passwords/salts, verification, empty/unicode passwords
 
-6. Create credential provider implementations in `auth/providers/`:
-   - `buildtime.rs` - Build-time environment variables (production use)
-   - `const_provider.rs` - Hardcoded credentials (examples/testing ONLY)
+6. ✅ Create credential provider implementations in `auth/providers/`:
+   - ✅ `const_provider.rs` - Hardcoded credentials (examples/testing ONLY)
+     * Generic over AccessLevel, PasswordHasher, and user count
+     * Implements CredentialProvider trait
+     * 7 comprehensive tests
+   - ✅ `buildtime.rs` - Placeholder for build-time environment variables (production use)
    - Note: Flash storage provider can be added later as needed
 
-7. Implement configuration in `config.rs` (see TYPE_REFERENCE.md "Configuration")
-   - `ShellConfig` trait with associated constants (MAX_INPUT, MAX_PATH_DEPTH, MAX_ARGS, MAX_PROMPT, MAX_RESPONSE, HISTORY_SIZE)
-   - `DefaultConfig` struct (balanced for typical embedded systems: 128/8/16/64/256/10)
-   - `MinimalConfig` struct (resource-constrained systems: 64/4/8/32/128/5)
-   - All constants are compile-time evaluated (zero runtime cost)
-   - Unit tests
+7. ✅ Implement configuration in `config.rs` (see TYPE_REFERENCE.md "Configuration")
+   - ✅ `ShellConfig` trait with associated constants (MAX_INPUT, MAX_PATH_DEPTH, MAX_ARGS, MAX_PROMPT, MAX_RESPONSE, HISTORY_SIZE)
+   - ✅ `DefaultConfig` struct (balanced for typical embedded systems: 128/8/16/64/256/10)
+   - ✅ `MinimalConfig` struct (resource-constrained systems: 64/4/8/32/128/5)
+   - ✅ All constants are compile-time evaluated (zero runtime cost)
+   - ✅ Unit tests (2 tests verifying constant values)
 
-**Success Criteria**: Can abstract I/O, access control, configuration, and errors with zero runtime cost
+**Success Criteria**: ✅ All met
+- ✅ Can abstract I/O, access control, configuration, and errors with zero runtime cost
+- ✅ All types compile on both native and embedded targets (thumbv6m-none-eabi)
+- ✅ Feature combinations work correctly:
+  * All features: 44 tests passing
+  * No features: 18 tests passing
+  * Authentication only: 37 tests passing
+- ✅ Embedded compilation verified for all feature combinations
+- ✅ Security requirements met (constant-time comparison, ambiguous error messages)
 
 ---
 
@@ -938,12 +951,23 @@ cargo expand --lib                       # Expand macros
   - Feature flag testing documented
   - Verified builds on native and embedded targets (thumbv6m-none-eabi)
   - All tests passing (24 total)
+- ✅ Phase 2: I/O & Access Control Foundation
+  - CharIo trait with StdioStream implementation for testing
+  - CliError enum with all variants and Display trait
+  - AccessLevel trait and User struct (always available)
+  - ShellConfig trait with DefaultConfig and MinimalConfig
+  - CredentialProvider and PasswordHasher traits
+  - Sha256Hasher with constant-time verification
+  - ConstCredentialProvider for testing/examples
+  - BuildtimeCredentialProvider placeholder
+  - Comprehensive tests (44 tests with all features, 18 with no features, 37 with authentication only)
+  - Verified compilation on native and embedded targets with all feature combinations
 
 ### In Progress
-- 🟡 Phase 2: I/O & Access Control Foundation (ready to start)
+- 🟡 Phase 3: Tree Data Model (ready to start)
 
 ### Upcoming
-- ⬜ Phase 3: Tree Data Model
+- ⬜ Phase 3b: Tree Const Initialization
 - ⬜ Phase 4: Path Navigation
 - ⬜ Phase 5: Request/Response Types
 - ⬜ Phase 6: Input Processing

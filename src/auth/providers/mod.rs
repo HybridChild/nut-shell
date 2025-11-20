@@ -1,10 +1,13 @@
 //! Credential provider implementations.
 //!
 //! Provides various credential storage backends for authentication.
+//!
+//! ## Available Providers
+//!
+//! - `ConstCredentialProvider` - Hardcoded credentials (testing/examples only)
+//! - `buildtime` - Build-time environment variables (planned for production)
 
-// Placeholder - will be implemented in Phase 2
+pub mod buildtime;
+pub mod const_provider;
 
-#[cfg(test)]
-mod tests {
-    // Tests will be added in Phase 2
-}
+pub use const_provider::ConstCredentialProvider;

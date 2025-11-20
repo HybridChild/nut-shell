@@ -16,6 +16,13 @@ pub mod password;
 #[cfg(feature = "authentication")]
 pub mod providers;
 
+// Re-exports
+#[cfg(feature = "authentication")]
+pub use password::Sha256Hasher;
+
+#[cfg(feature = "authentication")]
+pub use providers::ConstCredentialProvider;
+
 /// Access level trait for hierarchical permissions.
 ///
 /// Implement this trait to define your application's access hierarchy.
