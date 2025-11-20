@@ -61,7 +61,10 @@ impl StdioStream {
         }
     }
 
-    /// Get a reference to the output buffer.
+    /// Returns a clone of the Arc pointing to the output buffer.
+    ///
+    /// This is a cheap operation (increments reference count) that allows
+    /// multiple owners to share access to the same output buffer.
     pub fn output(&self) -> std::sync::Arc<std::sync::Mutex<Vec<char>>> {
         self.output.clone()
     }
