@@ -101,4 +101,16 @@ mod tests {
         let result = handlers.execute_sync("unknown", &[]);
         assert_eq!(result, Err(CliError::CommandNotFound));
     }
+
+    #[cfg(feature = "async")]
+    #[tokio::test]
+    async fn test_async_handler() {
+        let handlers = TestHandlers;
+        let result = handlers.execute_async("async-test", &[]).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().message.as_str(), "Async OK");
+
+        let result = handlers.execute_async("unknown", &[]).await;
+        assert_eq!(result, Err(CliError::CommandNotFound));
+    }
 }
