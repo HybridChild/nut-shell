@@ -825,22 +825,52 @@ Phase 9:
 **Goal**: Demonstrate usage
 
 **Tasks**:
-1. Create `examples/basic.rs`:
-   - Native stdio CLI
-   - Example command tree (system commands, config, etc.)
-   - Simple commands (echo, reboot, version, etc.)
-   - Interactive session
-   - Proper error handling
+1. ✅ Create `examples/basic.rs`:
+   - ✅ Native stdio CLI
+   - ✅ Example command tree (system commands, config, etc.)
+   - ✅ Simple commands (echo, reboot, version, etc.)
+   - ✅ Interactive session
+   - ✅ Proper error handling
+   - ✅ Feature-conditional compilation (works with/without authentication)
+   - ✅ Comprehensive documentation comments
 
-2. Create `examples/rp2040_uart.rs` (optional):
+2. ⬜ Create `examples/rp2040_uart.rs` (optional, deferred):
    - RP2040-specific UART I/O implementation
    - Minimal command tree for embedded
    - Hardware initialization
    - Verify on actual Pico hardware
 
-3. Add documentation comments showing example usage
+3. ✅ Add documentation comments showing example usage
 
-**Success Criteria**: Can run interactive CLI session with examples
+**Success Criteria**: ✅ Can run interactive CLI session with examples
+
+**Implementation Results**:
+- Created `examples/basic.rs` (~400 lines):
+  - Complete working CLI demonstrating all major features
+  - Custom AccessLevel implementation (Guest/User/Admin)
+  - Command tree with nested directories:
+    - `/system/` - reboot, status, version
+    - `/config/` - get, set
+    - Root commands - echo, uptime
+  - CommandHandlers implementation with 8 commands
+  - CredentialProvider with 3 test users (when authentication enabled)
+  - StdioCharIo implementation for native platform
+  - Feature-conditional compilation:
+    - Works with `--all-features` (authentication + completion + history)
+    - Works with `--no-default-features` (minimal build)
+    - Works with partial feature sets
+  - Interactive main loop with character-by-character input processing
+- Verified compilation:
+  - ✅ All features: Compiles successfully
+  - ✅ No features: Compiles successfully
+  - ✅ Partial features (completion+history): Compiles successfully
+- Example demonstrates:
+  - How to define custom AccessLevel types
+  - How to create const command trees
+  - How to implement CommandHandlers trait
+  - How to set up authentication (conditional)
+  - How to implement CharIo for native platform
+  - How to create and run Shell in interactive mode
 
 ---
 
@@ -1211,10 +1241,16 @@ cargo expand --lib                       # Expand macros
   - **All Phase 8 success criteria met** - Core Shell implementation complete
 
 ### In Progress
-- (None - ready for Phase 9)
+- (None)
+
+### Completed (Phase 9: Examples - Partial)
+- ✅ Phase 9.1: Basic Example (`examples/basic.rs`)
+  - Complete native stdio CLI with all features demonstrated
+  - Feature-conditional compilation verified
+  - Comprehensive documentation included
 
 ### Upcoming
-- ⬜ Phase 9: Examples
+- ⬜ Phase 9.2: RP2040 UART Example (optional, deferred)
 - ⬜ Phase 10: Testing & Polish
 
 ## Notes
