@@ -348,6 +348,183 @@ fn test_generic_config_integration() {
 }
 
 // ============================================================================
+// Phase 3b: Const Initialization Validation Tests
+// ============================================================================
+
+#[test]
+fn test_deep_nesting_const_initialization() {
+    // Validates that 3-level nesting works with const initialization
+    use fixtures::DIR_SYSTEM;
+
+    // System directory has nested subdirectories
+    let network = DIR_SYSTEM.find_child("network");
+    assert!(network.is_some(), "Network subdirectory should exist");
+
+    let hardware = DIR_SYSTEM.find_child("hardware");
+    assert!(hardware.is_some(), "Hardware subdirectory should exist");
+
+    // Each subdirectory has commands
+    if let Some(Node::Directory(net)) = network {
+        assert!(net.children.len() >= 3, "Network should have at least 3 commands");
+        assert!(net.find_child("status").is_some());
+        assert!(net.find_child("config").is_some());
+        assert!(net.find_child("ping").is_some());
+    }
+
+    if let Some(Node::Directory(hw)) = hardware {
+        assert!(hw.children.len() >= 2, "Hardware should have at least 2 commands");
+        assert!(hw.find_child("led").is_some());
+        assert!(hw.find_child("temperature").is_some());
+    }
+}
+
+#[test]
+fn test_varied_access_levels_in_tree() {
+    // Validates that mixed access levels work in const tree
+    use fixtures::{CMD_HELP, CMD_REBOOT, CMD_NET_CONFIG, MockAccessLevel};
+
+    // Different access levels across the tree
+    assert_eq!(CMD_HELP.access_level, MockAccessLevel::Guest);
+    assert_eq!(CMD_REBOOT.access_level, MockAccessLevel::Admin);
+    assert_eq!(CMD_NET_CONFIG.access_level, MockAccessLevel::Admin);
+}
+
+#[test]
+fn test_varied_argument_counts() {
+    // Validates commands with different argument patterns
+    use fixtures::{CMD_HELP, CMD_ECHO, CMD_NET_CONFIG, CMD_NET_PING, CMD_HW_LED};
+
+    // No args
+    assert_eq!(CMD_HELP.min_args, 0);
+    assert_eq!(CMD_HELP.max_args, 0);
+
+    // Variable args
+    assert_eq!(CMD_ECHO.min_args, 0);
+    assert_eq!(CMD_ECHO.max_args, 16);
+
+    // Required args with range
+    assert_eq!(CMD_NET_CONFIG.min_args, 2);
+    assert_eq!(CMD_NET_CONFIG.max_args, 4);
+
+    // Optional args
+    assert_eq!(CMD_NET_PING.min_args, 1);
+    assert_eq!(CMD_NET_PING.max_args, 2);
+
+    // Exact arg count
+    assert_eq!(CMD_HW_LED.min_args, 1);
+    assert_eq!(CMD_HW_LED.max_args, 1);
+}
+
+#[test]
+fn test_const_tree_size() {
+    // Validates tree structure counts for ROM size estimation
+    use fixtures::{TEST_TREE, DIR_SYSTEM, DIR_DEBUG};
+
+    // Count total nodes in tree
+    let mut command_count = 0;
+    let mut directory_count = 0;
+
+    // Root level
+    for child in TEST_TREE.children {
+        match child {
+            Node::Command(_) => command_count += 1,
+            Node::Directory(_) => directory_count += 1,
+        }
+    }
+
+    // System level
+    for child in DIR_SYSTEM.children {
+        match child {
+            Node::Command(_) => command_count += 1,
+            Node::Directory(dir) => {
+                directory_count += 1;
+                // Count subdirectory contents
+                for subchild in dir.children {
+                    match subchild {
+                        Node::Command(_) => command_count += 1,
+                        Node::Directory(_) => directory_count += 1,
+                    }
+                }
+            }
+        }
+    }
+
+    // Debug level
+    for child in DIR_DEBUG.children {
+        match child {
+            Node::Command(_) => command_count += 1,
+            Node::Directory(_) => directory_count += 1,
+        }
+    }
+
+    // Verify expected structure
+    // Commands: help(2) + system(2) + network(3) + hardware(2) + debug(2) = 11
+    // With async: +1 (async-wait) = 12
+    // Directories: system(1) + debug(1) + network(1) + hardware(1) = 4 (root doesn't count)
+    #[cfg(not(feature = "async"))]
+    {
+        assert_eq!(command_count, 11, "Should have exactly 11 commands without async");
+        assert_eq!(directory_count, 4, "Should have exactly 4 directories");
+    }
+
+    #[cfg(feature = "async")]
+    {
+        assert_eq!(command_count, 12, "Should have exactly 12 commands with async");
+        assert_eq!(directory_count, 4, "Should have exactly 4 directories");
+    }
+}
+
+#[test]
+fn test_const_metadata_properties() {
+    // Validates that CommandMeta is truly const-initializable
+    use fixtures::{CMD_NET_STATUS, CMD_DEBUG_REG};
+
+    // These should be compile-time constants (const fn)
+    const _TEST_NAME: &'static str = CMD_NET_STATUS.name;
+    const _TEST_MIN: usize = CMD_DEBUG_REG.min_args;
+    const _TEST_MAX: usize = CMD_DEBUG_REG.max_args;
+
+    // If this compiles, const initialization works
+    assert_eq!(_TEST_NAME, "status");
+    assert_eq!(_TEST_MIN, 1);
+    assert_eq!(_TEST_MAX, 1);
+}
+
+#[test]
+fn test_tree_can_navigate_full_paths() {
+    // Validates that full path navigation works through const tree
+    use fixtures::TEST_TREE;
+
+    // Navigate: root -> system -> network -> status
+    let system = TEST_TREE.find_child("system");
+    assert!(system.is_some());
+
+    if let Some(Node::Directory(sys_dir)) = system {
+        let network = sys_dir.find_child("network");
+        assert!(network.is_some());
+
+        if let Some(Node::Directory(net_dir)) = network {
+            let status = net_dir.find_child("status");
+            assert!(status.is_some());
+
+            if let Some(Node::Command(cmd)) = status {
+                assert_eq!(cmd.name, "status");
+                assert_eq!(cmd.description, "Show network status");
+            }
+        }
+    }
+
+    // Navigate: root -> system -> hardware -> temperature
+    if let Some(Node::Directory(sys_dir)) = TEST_TREE.find_child("system") {
+        if let Some(Node::Directory(hw_dir)) = sys_dir.find_child("hardware") {
+            if let Some(Node::Command(cmd)) = hw_dir.find_child("temperature") {
+                assert_eq!(cmd.name, "temperature");
+            }
+        }
+    }
+}
+
+// ============================================================================
 // Pattern Validation Summary
 // ============================================================================
 

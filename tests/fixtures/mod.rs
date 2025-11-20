@@ -215,6 +215,8 @@ pub const DIR_SYSTEM: Directory<MockAccessLevel> = Directory {
     children: &[
         Node::Command(&CMD_STATUS),
         Node::Command(&CMD_REBOOT),
+        Node::Directory(&DIR_NETWORK),
+        Node::Directory(&DIR_HARDWARE),
     ],
     access_level: MockAccessLevel::User,
 };
@@ -227,31 +229,157 @@ pub const DIR_SYSTEM: Directory<MockAccessLevel> = Directory {
         Node::Command(&CMD_STATUS),
         Node::Command(&CMD_REBOOT),
         Node::Command(&CMD_ASYNC_WAIT),
+        Node::Directory(&DIR_NETWORK),
+        Node::Directory(&DIR_HARDWARE),
     ],
     access_level: MockAccessLevel::User,
+};
+
+// ============================================================================
+// Network Commands (system/network/)
+// ============================================================================
+
+/// Test command: network status
+pub const CMD_NET_STATUS: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "status",
+    description: "Show network status",
+    access_level: MockAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+/// Test command: network config
+pub const CMD_NET_CONFIG: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "config",
+    description: "Configure network settings",
+    access_level: MockAccessLevel::Admin,
+    kind: CommandKind::Sync,
+    min_args: 2,
+    max_args: 4,
+};
+
+/// Test command: network ping
+pub const CMD_NET_PING: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "ping",
+    description: "Ping remote host",
+    access_level: MockAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 1,
+    max_args: 2,
+};
+
+/// Network subdirectory
+pub const DIR_NETWORK: Directory<MockAccessLevel> = Directory {
+    name: "network",
+    children: &[
+        Node::Command(&CMD_NET_STATUS),
+        Node::Command(&CMD_NET_CONFIG),
+        Node::Command(&CMD_NET_PING),
+    ],
+    access_level: MockAccessLevel::User,
+};
+
+// ============================================================================
+// Hardware Commands (system/hardware/)
+// ============================================================================
+
+/// Test command: LED control
+pub const CMD_HW_LED: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "led",
+    description: "Control LED state",
+    access_level: MockAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 1,
+    max_args: 1,
+};
+
+/// Test command: temperature sensor
+pub const CMD_HW_TEMP: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "temperature",
+    description: "Read temperature sensor",
+    access_level: MockAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+/// Hardware subdirectory
+pub const DIR_HARDWARE: Directory<MockAccessLevel> = Directory {
+    name: "hardware",
+    children: &[
+        Node::Command(&CMD_HW_LED),
+        Node::Command(&CMD_HW_TEMP),
+    ],
+    access_level: MockAccessLevel::User,
+};
+
+// ============================================================================
+// Debug Commands
+// ============================================================================
+
+/// Test command: memory dump
+pub const CMD_DEBUG_MEM: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "memory",
+    description: "Dump memory contents",
+    access_level: MockAccessLevel::Admin,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 2,
+};
+
+/// Test command: register read
+pub const CMD_DEBUG_REG: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "registers",
+    description: "Read hardware registers",
+    access_level: MockAccessLevel::Admin,
+    kind: CommandKind::Sync,
+    min_args: 1,
+    max_args: 1,
 };
 
 /// Test directory: debug/ (admin only)
 pub const DIR_DEBUG: Directory<MockAccessLevel> = Directory {
     name: "debug",
     children: &[
-        // Empty for now, can add commands in specific tests
+        Node::Command(&CMD_DEBUG_MEM),
+        Node::Command(&CMD_DEBUG_REG),
     ],
     access_level: MockAccessLevel::Admin,
 };
 
 /// Root directory for testing.
 ///
+/// Demonstrates const initialization with 3-level nesting and varied command patterns.
+///
 /// Structure:
 /// ```text
 /// /
-/// ├── help (Guest)
-/// ├── echo (Guest)
+/// ├── help (Guest, 0 args)
+/// ├── echo (Guest, 0-16 args)
 /// ├── system/ (User)
-/// │   ├── status (User)
-/// │   └── reboot (Admin)
+/// │   ├── status (User, 0 args)
+/// │   ├── reboot (Admin, 0 args)
+/// │   ├── async-wait (User, 0-1 args) [async feature only]
+/// │   ├── network/ (User)
+/// │   │   ├── status (User, 0 args)
+/// │   │   ├── config (Admin, 2-4 args)
+/// │   │   └── ping (User, 1-2 args)
+/// │   └── hardware/ (User)
+/// │       ├── led (User, 1 arg)
+/// │       └── temperature (User, 0 args)
 /// └── debug/ (Admin)
+///     ├── memory (Admin, 0-2 args)
+///     └── registers (Admin, 1 arg)
 /// ```
+///
+/// **Validation Points**:
+/// - 3 levels of nesting (root → system → network/hardware)
+/// - Mixed access levels (Guest, User, Admin)
+/// - Varied argument counts (0 to 16 max)
+/// - Feature-gated commands (async-wait)
+/// - Both empty and populated directories at each level
+/// - All const-initializable (lives in ROM)
 pub const TEST_TREE: Directory<MockAccessLevel> = Directory {
     name: "/",
     children: &[
@@ -277,6 +405,7 @@ pub struct MockHandlers;
 impl CommandHandlers<DefaultConfig> for MockHandlers {
     fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match name {
+            // Root commands
             "help" => Ok(Response::success("Help text here")),
             "echo" => {
                 if args.is_empty() {
@@ -286,8 +415,43 @@ impl CommandHandlers<DefaultConfig> for MockHandlers {
                     Ok(Response::success(&msg))
                 }
             }
+
+            // System commands
             "reboot" => Ok(Response::success("Rebooting...")),
             "status" => Ok(Response::success("System OK")),
+
+            // Network commands (system/network/)
+            "config" => {
+                let params = args.join(" ");
+                Ok(Response::success(&format!("Network configured: {}", params)))
+            }
+            "ping" => {
+                let host = args.get(0).unwrap_or(&"localhost");
+                let count = args.get(1).unwrap_or(&"4");
+                Ok(Response::success(&format!("Pinging {} ({} times)", host, count)))
+            }
+
+            // Hardware commands (system/hardware/)
+            "led" => {
+                let state = args.get(0).unwrap_or(&"off");
+                Ok(Response::success(&format!("LED: {}", state)))
+            }
+            "temperature" => Ok(Response::success("Temperature: 23.5°C")),
+
+            // Debug commands
+            "memory" => {
+                if args.is_empty() {
+                    Ok(Response::success("Memory dump (full)"))
+                } else {
+                    let addr = args.join(" ");
+                    Ok(Response::success(&format!("Memory at {}", addr)))
+                }
+            }
+            "registers" => {
+                let reg = args.get(0).unwrap_or(&"0x00");
+                Ok(Response::success(&format!("Register {}: 0x1234", reg)))
+            }
+
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -380,34 +544,75 @@ mod tests {
 
     #[test]
     fn test_tree_structure() {
-        // Root has 4 children
+        // Root has 3 children (help, echo, system, debug)
         assert_eq!(TEST_TREE.children.len(), 4);
 
-        // Can find commands
+        // Can find root commands
         assert!(TEST_TREE.find_child("help").is_some());
         assert!(TEST_TREE.find_child("echo").is_some());
 
-        // Can find directories
+        // Can find root directories
+        assert!(TEST_TREE.find_child("system").is_some());
+        assert!(TEST_TREE.find_child("debug").is_some());
+
+        // Validate system/ directory (2 commands + 2 subdirs = 4, or +1 with async)
         let system = TEST_TREE.find_child("system");
         assert!(system.is_some());
 
         if let Some(Node::Directory(dir)) = system {
             assert_eq!(dir.name, "system");
 
-            // Directory has 2 children without async, 3 with async
+            // System has 4 children without async (status, reboot, network, hardware)
+            // and 5 with async (+ async-wait)
             #[cfg(not(feature = "async"))]
-            assert_eq!(dir.children.len(), 2);
+            assert_eq!(dir.children.len(), 4);
 
             #[cfg(feature = "async")]
-            assert_eq!(dir.children.len(), 3);
+            assert_eq!(dir.children.len(), 5);
 
+            // Check commands
             assert!(dir.find_child("status").is_some());
             assert!(dir.find_child("reboot").is_some());
 
             #[cfg(feature = "async")]
             assert!(dir.find_child("async-wait").is_some());
+
+            // Check subdirectories
+            assert!(dir.find_child("network").is_some());
+            assert!(dir.find_child("hardware").is_some());
+
+            // Validate network/ subdirectory (3 commands)
+            if let Some(Node::Directory(network)) = dir.find_child("network") {
+                assert_eq!(network.name, "network");
+                assert_eq!(network.children.len(), 3);
+                assert!(network.find_child("status").is_some());
+                assert!(network.find_child("config").is_some());
+                assert!(network.find_child("ping").is_some());
+            } else {
+                panic!("Expected network directory");
+            }
+
+            // Validate hardware/ subdirectory (2 commands)
+            if let Some(Node::Directory(hardware)) = dir.find_child("hardware") {
+                assert_eq!(hardware.name, "hardware");
+                assert_eq!(hardware.children.len(), 2);
+                assert!(hardware.find_child("led").is_some());
+                assert!(hardware.find_child("temperature").is_some());
+            } else {
+                panic!("Expected hardware directory");
+            }
         } else {
-            panic!("Expected directory node");
+            panic!("Expected system directory node");
+        }
+
+        // Validate debug/ directory (2 commands)
+        if let Some(Node::Directory(debug)) = TEST_TREE.find_child("debug") {
+            assert_eq!(debug.name, "debug");
+            assert_eq!(debug.children.len(), 2);
+            assert!(debug.find_child("memory").is_some());
+            assert!(debug.find_child("registers").is_some());
+        } else {
+            panic!("Expected debug directory node");
         }
     }
 
