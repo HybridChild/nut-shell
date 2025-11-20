@@ -1,0 +1,57 @@
+[package]
+name = "nut-shell"
+version = "0.1.0"
+edition = "2021"
+authors = ["Esben Dueholm Nørgaard"]
+license = "MIT OR Apache-2.0"
+description = "A lightweight command-line interface library for embedded systems"
+repository = "https://github.com/HybridChild/nut-shell"
+keywords = ["embedded", "no-std", "cli", "shell", "command-line"]
+categories = ["embedded", "no-std", "command-line-interface"]
+
+[dependencies]
+heapless = { version = "0.9.2", default-features = false }
+
+# Optional dependencies for specific features
+sha2 = { version = "0.10", default-features = false, optional = true }
+subtle = { version = "2.5", default-features = false, optional = true }
+
+[dev-dependencies]
+# For testing only (std available)
+
+[features]
+default = ["authentication", "completion", "history"]
+
+# Authentication feature - adds login/logout, password hashing, access control
+authentication = ["dep:sha2", "dep:subtle"]
+
+# Tab completion feature - enables command/path completion
+completion = []
+
+# Command history feature - enables up/down arrow navigation
+history = []
+
+# Async command support - enables async command execution
+async = []
+
+# For testing - enable std features in dependencies when running tests
+std = []
+
+[profile.release]
+opt-level = "z"       # Optimize for size
+lto = true            # Link-time optimization
+codegen-units = 1     # Better optimization, slower compile
+strip = true          # Strip symbols
+
+[profile.dev]
+opt-level = 1         # Some optimization for faster dev builds
+
+# Examples will be added in later phases
+# [[example]]
+# name = "basic"
+# required-features = []
+
+# Future example for embedded hardware
+# [[example]]
+# name = "rp2040_uart"
+# required-features = []

@@ -1,0 +1,160 @@
+//! # nut-shell
+//!
+//! A lightweight command-line interface library for embedded systems.
+//!
+//! **nut-shell** provides a flexible, zero-allocation CLI framework designed for `no_std`
+//! environments. It features:
+//!
+//! - **Static allocation**: Everything lives in ROM, zero heap usage
+//! - **Const initialization**: Command trees defined at compile time
+//! - **Optional features**: Authentication, tab completion, command history can be toggled
+//! - **Flexible I/O**: Platform-agnostic character I/O trait
+//! - **Access control**: Hierarchical permissions with generic access levels
+//!
+//! ## Quick Start
+//!
+//! ```rust,ignore
+//! use nut_shell::{Shell, Directory, Node, CommandMeta, CommandHandlers, Response, DefaultConfig};
+//!
+//! // 1. Define command tree (const, lives in ROM)
+//! const ROOT: Directory<MyAccessLevel> = Directory {
+//!     name: "/",
+//!     children: &[/* commands */],
+//!     access_level: MyAccessLevel::Guest,
+//! };
+//!
+//! // 2. Implement command handlers
+//! struct MyHandlers;
+//! impl CommandHandlers<DefaultConfig> for MyHandlers {
+//!     fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+//!         // Command implementation
+//!     }
+//! }
+//!
+//! // 3. Create shell and process input
+//! let mut shell = Shell::new(&ROOT, MyHandlers, io);
+//! shell.activate()?;
+//!
+//! loop {
+//!     if let Some(c) = io.get_char()? {
+//!         shell.process_char(c)?;
+//!     }
+//! }
+//! ```
+//!
+//! ## Features
+//!
+//! - `authentication` - User login/logout, password hashing, credential providers
+//! - `completion` - Tab completion for commands and paths
+//! - `history` - Command history with up/down arrow navigation
+//! - `async` - Async command execution support
+//!
+//! ## no_std Support
+//!
+//! This library is `no_std` by default. Enable the `std` feature for testing only.
+
+#![cfg_attr(not(feature = "std"), no_std)]
+#![warn(missing_docs)]
+#![warn(missing_debug_implementations)]
+
+// Core dependencies
+extern crate heapless;
+
+// Optional dependencies (feature-gated)
+#[cfg(feature = "authentication")]
+extern crate sha2;
+
+#[cfg(feature = "authentication")]
+extern crate subtle;
+
+// ============================================================================
+// Module Declarations
+// ============================================================================
+
+// Phase 2: I/O & Access Control Foundation
+pub mod io;
+pub mod config;
+
+// Authentication module (always present, contents feature-gated)
+// Re-exports User and AccessLevel types at root level (always available)
+#[cfg(feature = "authentication")]
+pub mod auth;
+
+#[cfg(not(feature = "authentication"))]
+pub mod auth {
+    //! Stub authentication module when feature disabled.
+    //!
+    //! Provides minimal types needed for non-authenticated mode.
+}
+
+// Phase 2: Error handling
+pub mod error;
+
+// Phase 3: Tree data model
+pub mod tree;
+
+// Phase 5: Response types
+pub mod response;
+
+// Phase 6+: Shell orchestration
+pub mod shell;
+
+// ============================================================================
+// Re-exports - Public API
+// ============================================================================
+
+// Core I/O
+pub use io::CharIo;
+
+// Configuration
+pub use config::{ShellConfig, DefaultConfig, MinimalConfig};
+
+// Error types
+pub use error::CliError;
+
+// Tree types (Phase 3)
+pub use tree::{Node, Directory, CommandMeta, CommandKind};
+
+// Access control (always available, even without authentication feature)
+// These will be defined in auth module but re-exported here
+// pub use auth::{AccessLevel, User};
+
+// Response types (Phase 5)
+pub use response::Response;
+
+// Shell types (Phase 6+)
+pub use shell::{Shell, Request, CliState, HistoryDirection};
+pub use shell::handlers::CommandHandlers;
+
+// Optional feature re-exports
+#[cfg(feature = "authentication")]
+pub use auth::{AccessLevel, User, CredentialProvider, PasswordHasher};
+
+// Password hasher will be re-exported once implemented in Phase 2
+// #[cfg(feature = "authentication")]
+// pub use auth::password::Sha256Hasher;
+
+// ============================================================================
+// Library Metadata
+// ============================================================================
+
+/// Library version
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Library name
+pub const NAME: &str = env!("CARGO_PKG_NAME");
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_version() {
+        assert!(!VERSION.is_empty());
+        assert_eq!(NAME, "nut-shell");
+    }
+}
