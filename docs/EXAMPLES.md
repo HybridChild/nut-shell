@@ -569,7 +569,8 @@ fn main() {
 ```rust
 // Define async command function
 async fn http_get_async(args: &[&str]) -> Result<Response, CliError> {
-    let url = args.get(0).ok_or(CliError::InvalidArguments)?;
+    // Shell validates argument count, so args[0] is guaranteed to exist if min_args >= 1
+    let url = args[0];
 
     // Use embassy_time for timeout
     let result = embassy_time::with_timeout(

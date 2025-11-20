@@ -130,7 +130,8 @@ Phase 9:
 2. ✅ Implement `CliError` enum in `error.rs` (foundational error type):
    - ✅ `CommandNotFound` - Command not found in tree
    - ✅ `InvalidPath` - Path doesn't exist OR user lacks access (intentionally ambiguous for security)
-   - ✅ `InvalidArguments { expected_min, expected_max, received }` - Wrong argument count
+   - ✅ `InvalidArgumentCount { expected_min, expected_max, received }` - Wrong number of arguments
+   - ✅ `InvalidArgumentFormat { arg_index, expected }` - Wrong argument type/format
    - ✅ `BufferFull` - Buffer capacity exceeded
    - ✅ `PathTooDeep` - Path exceeds MAX_PATH_DEPTH
    - ✅ `AuthenticationFailed` (feature-gated: `authentication`) - Wrong credentials

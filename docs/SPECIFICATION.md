@@ -329,12 +329,12 @@ user@/> _                                                        # Cleared, exit
 
 ### Response Structure
 
-Commands return `Response` with message and formatting flags.
+Commands return `Result<Response, CliError>` with message and formatting flags.
 
-**Status codes:**
-- `Success` - Command completed successfully
-- `Error` - Command failed (generic error)
-- `InvalidArguments` - Wrong argument count or format
+**Error types (CliError variants):**
+- `CommandFailed` - Command execution failed (generic error with message)
+- `InvalidArgumentCount` - Wrong number of arguments
+- `InvalidArgumentFormat` - Wrong argument type/format (e.g., expected integer, got string)
 - `InvalidPath` - Path does not exist, is malformed, or user lacks permission (security: inaccessible nodes appear non-existent)
 
 **Formatting flags:**

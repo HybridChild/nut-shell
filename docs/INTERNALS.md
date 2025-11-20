@@ -478,7 +478,7 @@ Shell::process_request(&mut self, request: Request)
             // Validate argument count
             let arg_count = args.len();
             if arg_count < command.min_args || arg_count > command.max_args {
-                return Err(CliError::InvalidArguments {
+                return Err(CliError::InvalidArgumentCount {
                     expected_min: command.min_args,
                     expected_max: command.max_args,
                     received: arg_count,
@@ -540,7 +540,7 @@ Shell::process_request_async(&mut self, request: Request)
             // Validate argument count (same as sync)
             let arg_count = args.len();
             if arg_count < command.min_args || arg_count > command.max_args {
-                return Err(CliError::InvalidArguments {
+                return Err(CliError::InvalidArgumentCount {
                     expected_min: command.min_args,
                     expected_max: command.max_args,
                     received: arg_count,
@@ -1268,18 +1268,20 @@ impl CharIo for UartIo {
 
 ```
 CliError variants:
-├─ BufferFull        → Input exceeds fixed buffer capacity
-├─ InvalidPath       → Path doesn't exist OR access denied (security, hides node existence)
-├─ InvalidArguments  → Wrong argument count or format
-├─ PathTooDeep       → Exceeded MAX_PATH_DEPTH
-└─ Custom(...)       → Command-specific errors
+├─ BufferFull             → Input exceeds fixed buffer capacity
+├─ InvalidPath            → Path doesn't exist OR access denied (security, hides node existence)
+├─ InvalidArgumentCount   → Wrong number of arguments
+├─ InvalidArgumentFormat  → Wrong argument type/format (e.g., expected integer, got string)
+├─ PathTooDeep            → Exceeded MAX_PATH_DEPTH
+└─ Custom(...)            → Command-specific errors
 
 Error propagation:
 1. Low-level errors (I/O) bubble up as IO::Error
 2. CLI logic errors return CliError
 3. Commands return Response with status code
-4. Parse errors return InvalidPath or InvalidArguments
-5. Access denial masqueraded as InvalidPath (security)
+4. Parse errors return InvalidPath or InvalidArgumentCount
+5. Command implementations validate argument format and return InvalidArgumentFormat
+6. Access denial masqueraded as InvalidPath (security)
 ```
 
 ## Feature Gate Impact

@@ -1068,10 +1068,16 @@ pub enum CliError {
     InvalidPath,
 
     /// Wrong number of arguments
-    InvalidArguments {
+    InvalidArgumentCount {
         expected_min: usize,
         expected_max: usize,
         received: usize,
+    },
+
+    /// Invalid argument format/type (e.g., expected integer, got string)
+    InvalidArgumentFormat {
+        arg_index: usize,
+        expected: heapless::String<32>,
     },
 
     /// Buffer capacity exceeded
@@ -1113,12 +1119,15 @@ impl core::fmt::Display for CliError {
         match self {
             CliError::CommandNotFound => write!(f, "Command not found"),
             CliError::InvalidPath => write!(f, "Invalid path"),
-            CliError::InvalidArguments { expected_min, expected_max, received } => {
+            CliError::InvalidArgumentCount { expected_min, expected_max, received } => {
                 if expected_min == expected_max {
                     write!(f, "Expected {} arguments, got {}", expected_min, received)
                 } else {
                     write!(f, "Expected {}-{} arguments, got {}", expected_min, expected_max, received)
                 }
+            }
+            CliError::InvalidArgumentFormat { arg_index, expected } => {
+                write!(f, "Argument {}: expected {}", arg_index + 1, expected)
             }
             CliError::BufferFull => write!(f, "Buffer full"),
             CliError::PathTooDeep => write!(f, "Path too deep"),
