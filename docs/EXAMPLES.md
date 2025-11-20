@@ -581,8 +581,16 @@ async fn http_get_async(args: &[&str]) -> Result<Response, CliError> {
 
     match result {
         Ok(Ok(data)) => Ok(Response::success(&data)),
-        Ok(Err(e)) => Ok(Response::error(&format!("HTTP error: {:?}", e))),
-        Err(_) => Ok(Response::error("Request timeout")),
+        Ok(Err(e)) => {
+            let mut msg = heapless::String::new();
+            write!(msg, "HTTP error: {:?}", e).ok();
+            Err(CliError::CommandFailed(msg))
+        }
+        Err(_) => {
+            let mut msg = heapless::String::new();
+            msg.push_str("Request timeout").unwrap();
+            Err(CliError::CommandFailed(msg))
+        }
     }
 }
 

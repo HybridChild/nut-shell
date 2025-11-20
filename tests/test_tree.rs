@@ -96,14 +96,12 @@ fn test_sync_command_execution() {
     let result = handlers.execute_sync("help", &[]);
     assert!(result.is_ok());
     let response = result.unwrap();
-    assert!(response.is_success);
     assert_eq!(response.message.as_str(), "Help text here");
 
     // Test echo command with args
     let result = handlers.execute_sync("echo", &["hello", "world"]);
     assert!(result.is_ok());
     let response = result.unwrap();
-    assert!(response.is_success);
     assert_eq!(response.message.as_str(), "hello world");
 
     // Test echo with no args
@@ -211,14 +209,12 @@ async fn test_async_command_execution() {
     let result = handlers.execute_async("async-wait", &[]).await;
     assert!(result.is_ok());
     let response = result.unwrap();
-    assert!(response.is_success);
     assert!(response.message.as_str().contains("100ms") || response.message.as_str() == "Async complete");
 
     // Test async-wait with custom duration
     let result = handlers.execute_async("async-wait", &["250"]).await;
     assert!(result.is_ok());
     let response = result.unwrap();
-    assert!(response.is_success);
     assert!(response.message.as_str().contains("250ms") || response.message.as_str() == "Async complete");
 
     // Test unknown async command
@@ -343,8 +339,7 @@ fn test_generic_config_integration() {
     assert!(result.is_ok());
 
     // Verify Response type is correct
-    let response = result.unwrap();
-    assert!(response.is_success);
+    let _response = result.unwrap();
 }
 
 // ============================================================================

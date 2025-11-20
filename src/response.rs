@@ -1,7 +1,8 @@
 //! Response types for command execution.
 //!
-//! The `Response` type represents the result of command execution with formatting flags
-//! and message content. Generic over `ShellConfig` for buffer sizing.
+//! The `Response` type represents successful command execution with formatting flags
+//! and message content. Command failures are represented via `CliError::CommandFailed`.
+//! Generic over `ShellConfig` for buffer sizing.
 //!
 //! See [TYPE_REFERENCE.md](../docs/TYPE_REFERENCE.md) and [INTERNALS.md](../docs/INTERNALS.md)
 //! Level 7 for complete response formatting details.
@@ -12,14 +13,12 @@ use core::marker::PhantomData;
 /// Command execution response.
 ///
 /// Generic over `C: ShellConfig` to use configured buffer size for messages.
-/// Contains result status, message, and formatting flags.
+/// Contains message and formatting flags. Represents successful command execution.
+/// Command failures should return `Err(CliError::CommandFailed(msg))`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Response<C: ShellConfig> {
     /// Response message (uses C::MAX_RESPONSE buffer size)
     pub message: heapless::String<256>, // TODO: Use C::MAX_RESPONSE when const generics stabilize
-
-    /// Success or error status
-    pub is_success: bool,
 
     /// Message is inline (don't echo newline after command input)
     pub inline_message: bool,
@@ -54,28 +53,6 @@ impl<C: ShellConfig> Response<C> {
 
         Self {
             message: msg,
-            is_success: true,
-            inline_message: false,
-            prefix_newline: false,
-            indent_message: false,
-            postfix_newline: true,
-            show_prompt: true,
-            #[cfg(feature = "history")]
-            exclude_from_history: false,
-            _phantom: PhantomData,
-        }
-    }
-
-    /// Create error response with default formatting.
-    ///
-    /// Default: include in history, show prompt, add postfix newline.
-    pub fn error(message: &str) -> Self {
-        let mut msg = heapless::String::new();
-        let _ = msg.push_str(message);
-
-        Self {
-            message: msg,
-            is_success: false,
             inline_message: false,
             prefix_newline: false,
             indent_message: false,
@@ -121,17 +98,7 @@ mod tests {
     #[test]
     fn test_success_response() {
         let response = Response::<DefaultConfig>::success("OK");
-        assert!(response.is_success);
         assert_eq!(response.message.as_str(), "OK");
-        assert!(response.show_prompt);
-        assert!(response.postfix_newline);
-    }
-
-    #[test]
-    fn test_error_response() {
-        let response = Response::<DefaultConfig>::error("Error");
-        assert!(!response.is_success);
-        assert_eq!(response.message.as_str(), "Error");
         assert!(response.show_prompt);
         assert!(response.postfix_newline);
     }

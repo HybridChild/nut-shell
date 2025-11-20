@@ -54,6 +54,9 @@ pub enum CliError {
     /// Operation timed out
     Timeout,
 
+    /// Command executed but reported failure
+    CommandFailed(heapless::String<256>),
+
     /// Generic error with message
     Other(heapless::String<256>),
 }
@@ -80,6 +83,7 @@ impl fmt::Display for CliError {
             #[cfg(feature = "async")]
             CliError::AsyncNotSupported => write!(f, "Async not supported"),
             CliError::Timeout => write!(f, "Timeout"),
+            CliError::CommandFailed(msg) => write!(f, "{}", msg),
             CliError::Other(msg) => write!(f, "{}", msg),
         }
     }

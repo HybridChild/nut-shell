@@ -657,9 +657,6 @@ pub struct Response<C: ShellConfig> {
     /// Response message content
     pub message: heapless::String<C::MAX_RESPONSE>,
 
-    /// Success or error status
-    pub is_success: bool,
-
     /// Formatting flags (set by command or Shell)
     pub inline_message: bool,   // Message is inline (don't echo \r\n after command input)
     pub prefix_newline: bool,   // Add \r\n before message
@@ -679,22 +676,6 @@ impl<C: ShellConfig> Response<C> {
     pub fn success(message: &str) -> Self {
         Self {
             message: heapless::String::from(message).unwrap_or_default(),
-            is_success: true,
-            inline_message: false,  // Default: echo newline after command
-            prefix_newline: true,
-            indent_message: false,
-            postfix_newline: true,
-            show_prompt: true,
-            #[cfg(feature = "history")]
-            exclude_from_history: false,
-        }
-    }
-
-    /// Create error response (default formatting, included in history)
-    pub fn error(message: &str) -> Self {
-        Self {
-            message: heapless::String::from(message).unwrap_or_default(),
-            is_success: false,
             inline_message: false,  // Default: echo newline after command
             prefix_newline: true,
             indent_message: false,
@@ -723,9 +704,10 @@ impl<C: ShellConfig> Response<C> {
 ```
 
 **Default formatting guidelines**:
-- Global commands (`?`, `ls`, `logout`, `clear`): Use default formatting
-- Custom commands: Use `Response::success()` or `Response::error()`
-- Sensitive commands: Use `.without_history()` or `success_no_history()`
+- Global commands (`?`, `ls`, `logout`, `clear`): Return `Ok(Response::success(...))`
+- Custom commands: Return `Ok(Response::success(...))` on success
+- Command failures: Return `Err(CliError::CommandFailed(msg))` or other appropriate `CliError` variant
+- Sensitive commands: Use `.without_history()` or `success_no_history()` to exclude from command history
 
 ---
 
@@ -1118,6 +1100,10 @@ pub enum CliError {
     /// Used by command implementations with timeout logic
     Timeout,
 
+    /// Command executed but reported failure
+    /// Use this to return error messages from commands
+    CommandFailed(heapless::String<MAX_RESPONSE>),
+
     /// Generic error with message
     Other(heapless::String<MAX_RESPONSE>),
 }
@@ -1144,6 +1130,7 @@ impl core::fmt::Display for CliError {
             #[cfg(feature = "async")]
             CliError::AsyncNotSupported => write!(f, "Async command not supported in sync mode"),
             CliError::Timeout => write!(f, "Operation timed out"),
+            CliError::CommandFailed(msg) => write!(f, "{}", msg),
             CliError::Other(msg) => write!(f, "{}", msg),
         }
     }

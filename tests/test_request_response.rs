@@ -7,6 +7,7 @@
 //! - HistoryDirection and CliState enums
 
 use nut_shell::config::DefaultConfig;
+use nut_shell::error::CliError;
 use nut_shell::response::Response;
 use nut_shell::shell::{CliState, HistoryDirection, Request};
 
@@ -72,20 +73,7 @@ fn test_cli_state_copy() {
 #[test]
 fn test_response_success_default() {
     let response = Response::<DefaultConfig>::success("Command executed");
-    assert!(response.is_success);
     assert_eq!(response.message.as_str(), "Command executed");
-    assert!(!response.inline_message);
-    assert!(!response.prefix_newline);
-    assert!(!response.indent_message);
-    assert!(response.postfix_newline);
-    assert!(response.show_prompt);
-}
-
-#[test]
-fn test_response_error_default() {
-    let response = Response::<DefaultConfig>::error("Command failed");
-    assert!(!response.is_success);
-    assert_eq!(response.message.as_str(), "Command failed");
     assert!(!response.inline_message);
     assert!(!response.prefix_newline);
     assert!(!response.indent_message);
@@ -96,7 +84,6 @@ fn test_response_error_default() {
 #[test]
 fn test_response_empty_message() {
     let response = Response::<DefaultConfig>::success("");
-    assert!(response.is_success);
     assert_eq!(response.message.as_str(), "");
 }
 
@@ -104,7 +91,6 @@ fn test_response_empty_message() {
 fn test_response_long_message() {
     let long_msg = "A".repeat(250);
     let response = Response::<DefaultConfig>::success(&long_msg);
-    assert!(response.is_success);
     // Message should be truncated or fit within buffer
     assert!(response.message.len() <= 256);
 }
@@ -120,7 +106,6 @@ fn test_response_exclude_from_history_default() {
 #[cfg(feature = "history")]
 fn test_response_success_no_history() {
     let response = Response::<DefaultConfig>::success_no_history("Sensitive data");
-    assert!(response.is_success);
     assert!(response.exclude_from_history);
     assert_eq!(response.message.as_str(), "Sensitive data");
 }
@@ -130,16 +115,6 @@ fn test_response_success_no_history() {
 fn test_response_without_history_builder() {
     let response = Response::<DefaultConfig>::success("Password set")
         .without_history();
-    assert!(response.is_success);
-    assert!(response.exclude_from_history);
-}
-
-#[test]
-#[cfg(feature = "history")]
-fn test_response_error_without_history() {
-    let response = Response::<DefaultConfig>::error("Auth failed")
-        .without_history();
-    assert!(!response.is_success);
     assert!(response.exclude_from_history);
 }
 
@@ -390,19 +365,26 @@ fn test_request_response_workflow_success() {
     };
 
     // Extract command info
-    let response = match request {
+    let result: Result<Response<DefaultConfig>, CliError> = match request {
         Request::Command { path, .. } => {
             if path.as_str() == "status" {
-                Response::<DefaultConfig>::success("System OK")
+                Ok(Response::<DefaultConfig>::success("System OK"))
             } else {
-                Response::<DefaultConfig>::error("Unknown command")
+                let mut msg = heapless::String::new();
+                msg.push_str("Unknown command").unwrap();
+                Err(CliError::CommandFailed(msg))
             }
         }
         #[allow(unreachable_patterns)]
-        _ => Response::<DefaultConfig>::error("Invalid request"),
+        _ => {
+            let mut msg = heapless::String::new();
+            msg.push_str("Invalid request").unwrap();
+            Err(CliError::CommandFailed(msg))
+        }
     };
 
-    assert!(response.is_success);
+    assert!(result.is_ok());
+    let response = result.unwrap();
     assert_eq!(response.message.as_str(), "System OK");
 }
 
@@ -425,16 +407,23 @@ fn test_request_response_workflow_error() {
         _phantom: core::marker::PhantomData,
     };
 
-    let response = match request {
+    let result: Result<Response<DefaultConfig>, CliError> = match request {
         Request::Command { .. } => {
-            Response::<DefaultConfig>::error("Command not found")
+            let mut msg = heapless::String::new();
+            msg.push_str("Command not found").unwrap();
+            Err(CliError::CommandFailed(msg))
         }
         #[allow(unreachable_patterns)]
-        _ => Response::<DefaultConfig>::error("Invalid request"),
+        _ => {
+            let mut msg = heapless::String::new();
+            msg.push_str("Invalid request").unwrap();
+            Err(CliError::CommandFailed(msg))
+        }
     };
 
-    assert!(!response.is_success);
-    assert_eq!(response.message.as_str(), "Command not found");
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(format!("{}", err), "Command not found");
 }
 
 #[test]

@@ -274,17 +274,17 @@ Shell::handle_command_input() -> Result<(), IO::Error>
     let input = self.input_buffer.as_str();
     let (path_str, args) = split_whitespace(input);
 
-    // 3. Check for global commands FIRST
-    let response = match path_str {
-        "?" => self.handle_help(),
-        "ls" => self.handle_context_help(),
+    // 3. Check for global commands FIRST, then process command
+    let result: Result<Response, CliError> = match path_str {
+        "?" => Ok(self.handle_help()),
+        "ls" => Ok(self.handle_context_help()),
 
         #[cfg(feature = "authentication")]
-        "logout" => self.handle_logout(),
+        "logout" => Ok(self.handle_logout()),
 
         "clear" => {
             self.io.write_str("\x1b[2J\x1b[H")?;  // ANSI clear
-            Response::success("")
+            Ok(Response::success(""))
         }
 
         _ => {
@@ -292,31 +292,41 @@ Shell::handle_command_input() -> Result<(), IO::Error>
             let request = self.parse_path_and_args(path_str, args)?;
 
             // 5. Process request (navigation or execution)
-            self.process_request(request)?
+            self.process_request(request)
         }
     };
 
     // 6. Add successful commands to history (stub no-ops if disabled)
-    // Note: In actual implementation, use Request::Command::original field
-    // which is feature-gated to save RAM when history disabled
+    // Commands that fail (Err) are not added to history
     #[cfg(feature = "history")]
-    if response.is_success() && !path_str.is_empty() {
+    if result.is_ok() && !path_str.is_empty() {
         self.history.add(&self.input_buffer);
     }
 
-    // 7. Clear buffer and reset history navigation
+    // 7. Convert errors to responses for display
+    let response = match result {
+        Ok(response) => response,
+        Err(err) => {
+            // Convert CliError to displayable response
+            // Note: This creates a response with the error message
+            // In actual implementation, this would format the error appropriately
+            Response::success(&format!("Error: {}", err))
+        }
+    };
+
+    // 8. Clear buffer and reset history navigation
     self.input_buffer.clear();
     self.history.reset();
 
-    // 8. Echo newline ONLY if message is not inline
+    // 9. Echo newline ONLY if message is not inline
     if !response.inline_message {
         self.io.write_str("\r\n")?;
     }
 
-    // 9. Display response
+    // 10. Display response
     self.display_response(&response)?;
 
-    // 10. Show prompt (unless response disabled it)
+    // 11. Show prompt (unless response disabled it)
     if response.show_prompt {
         self.show_prompt()?;
     }
@@ -468,10 +478,11 @@ Shell::process_request(&mut self, request: Request)
             // Validate argument count
             let arg_count = args.len();
             if arg_count < command.min_args || arg_count > command.max_args {
-                return Ok(Response::error(&format!(
-                    "Invalid argument count. Expected {}-{}, got {}",
-                    command.min_args, command.max_args, arg_count
-                )));
+                return Err(CliError::InvalidArguments {
+                    expected_min: command.min_args,
+                    expected_max: command.max_args,
+                    received: arg_count,
+                });
             }
 
             // Dispatch to handler based on command kind
@@ -529,10 +540,11 @@ Shell::process_request_async(&mut self, request: Request)
             // Validate argument count (same as sync)
             let arg_count = args.len();
             if arg_count < command.min_args || arg_count > command.max_args {
-                return Ok(Response::error(&format!(
-                    "Invalid argument count. Expected {}-{}, got {}",
-                    command.min_args, command.max_args, arg_count
-                )));
+                return Err(CliError::InvalidArguments {
+                    expected_min: command.min_args,
+                    expected_max: command.max_args,
+                    received: arg_count,
+                });
             }
 
             // Dispatch to handler based on command kind

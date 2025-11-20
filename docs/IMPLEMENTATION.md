@@ -241,7 +241,11 @@ Phase 9:
                      let msg = args.join(" ");
                      Ok(Response::success(&msg))
                  }
-                 "fail" => Ok(Response::error("Test error")),
+                 "fail" => {
+                     let mut msg = heapless::String::new();
+                     msg.push_str("Test error").unwrap();
+                     Err(CliError::CommandFailed(msg))
+                 }
                  "reboot" => Ok(Response::success("Rebooting...")),
                  _ => Err(CliError::CommandNotFound),
              }
@@ -478,16 +482,15 @@ Phase 9:
      - `postfix_newline` - Add newline after message
      - `show_prompt` - Display prompt after response
      - `exclude_from_history` - Prevent input from being saved to history (feature-gated: `history`)
-   - Helper constructors: `Response::success()`, `Response::error()`, `Response::success_no_history()` (feature-gated)
+   - Helper constructors: `Response::success()`, `Response::success_no_history()` (feature-gated)
    - Builder method: `without_history()` - Chain to exclude from history (feature-gated)
-   - Message content and status code
+   - Command failures returned via `Err(CliError::CommandFailed(msg))` instead of Response
+   - Message content uses `C::MAX_RESPONSE` buffer size
    - See INTERNALS.md Level 7 for complete response formatting
-   - Message uses `C::MAX_RESPONSE` buffer size
    - Implementation example:
      ```rust
      pub struct Response<C: ShellConfig> {
          pub message: heapless::String<C::MAX_RESPONSE>,
-         pub is_success: bool,
          pub inline_message: bool,
          pub prefix_newline: bool,
          pub indent_message: bool,
