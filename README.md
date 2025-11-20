@@ -2,7 +2,7 @@
 
 > _A complete CLI framework for embedded systems, in a nutshell._
 
-A lightweight, embedded-first command-line interface library for `no_std` Rust environments with native sync/async support.
+A lightweight, embedded-first command-line interface library for `no_std` Rust environments with optional async support.
 
 [![Status](https://img.shields.io/badge/status-in%20development-yellow)](docs/IMPLEMENTATION.md)
 [![Platform](https://img.shields.io/badge/platform-no_std-blue)](#platform-support)
@@ -12,7 +12,7 @@ A lightweight, embedded-first command-line interface library for `no_std` Rust e
 
 ## Overview
 
-**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers like the Raspberry Pi Pico (RP2040), it offers an interactive command-line interface over serial connections (UART/USB) with **first-class async/await support** for long-running operations (Embassy, RTIC compatible), alongside optional features for authentication, tab completion, and command history.
+**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers like the Raspberry Pi Pico (RP2040), it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support for long-running operations (Embassy, RTIC compatible), authentication, tab completion, and command history.
 
 **Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat. See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for our feature decision framework.
 
@@ -30,7 +30,7 @@ See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the current roadmap and
 
 ### Core Functionality (Always Present)
 - **Path-based navigation** - Unix-style hierarchical commands (`system/reboot`, `network/status`)
-- **Command execution** - Both synchronous and asynchronous command support
+- **Command execution** - Synchronous command support with structured argument parsing
 - **Input parsing** - Terminal I/O with line editing (backspace, arrows, double-ESC clear)
 - **Const initialization** - Zero runtime overhead, ROM placement
 - **Global commands** - `ls`, `?`, `clear` (and `logout` when authentication enabled)
