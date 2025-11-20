@@ -7,25 +7,20 @@
 //!
 //! ```rust,ignore
 //! use nut_shell::tree::path::Path;
+//! use nut_shell::config::DefaultConfig;
 //!
-//! // Absolute path
-//! let path = Path::parse("/system/reboot")?;
+//! // Absolute path (using DefaultConfig depth of 8)
+//! let path = Path::<{DefaultConfig::MAX_PATH_DEPTH}>::parse("/system/reboot")?;
 //! assert!(path.is_absolute());
-//! assert_eq!(path.segments().collect::<Vec<_>>(), vec!["system", "reboot"]);
+//! assert_eq!(path.segments(), &["system", "reboot"]);
 //!
 //! // Relative path with parent navigation
-//! let path = Path::parse("../network/status")?;
+//! let path = Path::<{DefaultConfig::MAX_PATH_DEPTH}>::parse("../network/status")?;
 //! assert!(!path.is_absolute());
-//! assert_eq!(path.segments().collect::<Vec<_>>(), vec!["..", "network", "status"]);
+//! assert_eq!(path.segments(), &["..", "network", "status"]);
 //! ```
 
 use crate::error::CliError;
-
-/// Maximum path depth (directory nesting)
-///
-/// This matches the default MAX_PATH_DEPTH from ShellConfig.
-/// Limited to 8 levels to conserve stack space on embedded systems.
-pub const MAX_PATH_DEPTH: usize = 8;
 
 /// Unix-style path parser and representation.
 ///
@@ -41,10 +36,14 @@ pub const MAX_PATH_DEPTH: usize = 8;
 ///
 /// # Memory
 ///
-/// Uses MAX_PATH_DEPTH (8) to limit nesting depth.
+/// Uses `MAX_DEPTH` const generic to limit nesting depth.
 /// All parsing is zero-allocation, working with string slices.
+///
+/// # Generic Parameters
+///
+/// - `MAX_DEPTH`: Maximum path depth (from ShellConfig::MAX_PATH_DEPTH)
 #[derive(Debug, PartialEq)]
-pub struct Path<'a> {
+pub struct Path<'a, const MAX_DEPTH: usize> {
     /// Original path string
     _original: &'a str,
 
@@ -53,10 +52,10 @@ pub struct Path<'a> {
 
     /// Path segments (directories/commands)
     /// Includes `.` and `..` for processing during resolution
-    segments: heapless::Vec<&'a str, MAX_PATH_DEPTH>,
+    segments: heapless::Vec<&'a str, MAX_DEPTH>,
 }
 
-impl<'a> Path<'a> {
+impl<'a, const MAX_DEPTH: usize> Path<'a, MAX_DEPTH> {
     /// Parse path string into Path structure.
     ///
     /// # Supported Syntax
@@ -70,15 +69,15 @@ impl<'a> Path<'a> {
     ///
     /// - `Ok(Path)` - Successfully parsed
     /// - `Err(CliError::InvalidPath)` - Empty path or invalid syntax
-    /// - `Err(CliError::PathTooDeep)` - Exceeds MAX_PATH_DEPTH
+    /// - `Err(CliError::PathTooDeep)` - Exceeds MAX_DEPTH
     ///
     /// # Examples
     ///
     /// ```rust,ignore
-    /// let path = Path::parse("/system/reboot")?;
+    /// let path = Path::<8>::parse("/system/reboot")?;  // DefaultConfig depth
     /// assert!(path.is_absolute());
     ///
-    /// let path = Path::parse("../network")?;
+    /// let path = Path::<4>::parse("../network")?;  // MinimalConfig depth
     /// assert!(!path.is_absolute());
     /// ```
     pub fn parse(input: &'a str) -> Result<Self, CliError> {
@@ -176,8 +175,10 @@ impl<'a> Path<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{DefaultConfig, MinimalConfig, ShellConfig};
 
-    type TestPath<'a> = Path<'a>;
+    // Use DefaultConfig's MAX_PATH_DEPTH = 8 for most tests
+    type TestPath<'a> = Path<'a, { DefaultConfig::MAX_PATH_DEPTH }>;
 
     #[test]
     fn test_empty_path_is_invalid() {
@@ -307,5 +308,31 @@ mod tests {
         let path = TestPath::parse("./status").unwrap();
         assert!(!path.is_absolute());
         assert_eq!(path.segments(), &[".", "status"]);
+    }
+
+    #[test]
+    fn test_minimal_config_respects_depth() {
+        type MinimalPath<'a> = Path<'a, { MinimalConfig::MAX_PATH_DEPTH }>;
+
+        // MinimalConfig has MAX_PATH_DEPTH = 4
+        // Exactly 4 segments should succeed
+        let path = MinimalPath::parse("a/b/c/d").unwrap();
+        assert_eq!(path.segment_count(), 4);
+
+        // 5 segments should fail
+        let result = MinimalPath::parse("a/b/c/d/e");
+        assert_eq!(result, Err(CliError::PathTooDeep));
+    }
+
+    #[test]
+    fn test_default_config_allows_deeper_paths() {
+        // DefaultConfig has MAX_PATH_DEPTH = 8
+        let path = TestPath::parse("a/b/c/d/e/f/g/h").unwrap();
+        assert_eq!(path.segment_count(), 8);
+
+        // But MinimalConfig (depth=4) doesn't allow this
+        type MinimalPath<'a> = Path<'a, { MinimalConfig::MAX_PATH_DEPTH }>;
+        let result = MinimalPath::parse("a/b/c/d/e/f/g/h");
+        assert_eq!(result, Err(CliError::PathTooDeep));
     }
 }
