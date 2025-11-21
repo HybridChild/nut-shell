@@ -541,11 +541,10 @@ If you can't answer these convincingly, the feature doesn't belong in nut-shell.
 
 This philosophy is implemented across:
 - **[DESIGN.md](DESIGN.md)** - Design decisions and patterns implementing these principles
-- **[INTERNALS.md](INTERNALS.md)** - Runtime internals showing principles in action
-- **[SPECIFICATION.md](SPECIFICATION.md)** - Exact behavioral requirements for implemented features
 - **[SECURITY.md](SECURITY.md)** - Security-by-design principles in authentication system
-- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Phased implementation following these constraints
-- **[../CLAUDE.md](../CLAUDE.md)** - Practical patterns for working within these constraints
+- **[EXAMPLES.md](EXAMPLES.md)** - Practical usage examples following these constraints
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Build workflows and testing strategies
+- **[../CLAUDE.md](../CLAUDE.md)** - Patterns for working within these constraints
 
 ---
 

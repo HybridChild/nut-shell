@@ -6,10 +6,9 @@ This document describes the security architecture for authentication and access 
 
 **Related Documentation:**
 - **[DESIGN.md](DESIGN.md)** - Command architecture, unified auth pattern, and feature gating details
-- **[INTERNALS.md](INTERNALS.md)** - Complete authentication flow and state machine implementation
-- **[SPECIFICATION.md](SPECIFICATION.md)** - Behavioral specification for authentication (prompts, messages, login flow)
 - **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy and feature criteria
-- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Authentication implementation roadmap
+- **[EXAMPLES.md](EXAMPLES.md)** - Authentication usage examples and patterns
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Build and testing workflows
 
 ---
 
@@ -368,7 +367,6 @@ impl<'tree, L: AccessLevel, IO: CharIo> Shell<'tree, L, IO> {
 - Inaccessible nodes return same error as non-existent nodes
 - No information leakage about node existence
 - Parent directory access doesn't imply child access (each node checked independently)
-- See INTERNALS.md for complete resolve_path() implementation with access control
 
 ### Node Access Levels
 
@@ -403,8 +401,6 @@ Authentication can be disabled via Cargo features for unsecured development envi
 
 **Architecture:** The implementation uses a unified architecture approach with a single code path for both auth-enabled and auth-disabled modes. See [DESIGN.md](DESIGN.md) Section 5.2 "Unified Architecture Pattern" for complete details on the state machine, field organization, and implementation benefits.
 
-**Access Control Flow:** See [INTERNALS.md](INTERNALS.md) Level 4 "Path Parsing & Tree Navigation" for the complete access control enforcement implementation during tree traversal.
-
 **Security-Specific Considerations:**
 
 1. **InvalidPath Error Hiding**: When access is denied, the system returns `CliError::InvalidPath` (same as non-existent paths) to prevent revealing the existence of restricted commands to unauthorized users.
@@ -420,7 +416,7 @@ Authentication can be disabled via Cargo features for unsecured development envi
    cargo build --no-default-features
    ```
 
-See [DESIGN.md](DESIGN.md) for feature gating patterns and [SPECIFICATION.md](SPECIFICATION.md) for behavioral specifications in both modes.
+See [DESIGN.md](DESIGN.md) for feature gating patterns and architectural details for both modes.
 
 ---
 
@@ -437,13 +433,11 @@ See [DESIGN.md](DESIGN.md) for feature gating patterns and [SPECIFICATION.md](SP
 - Echo characters normally until colon detected
 - Mask all characters after colon with asterisks
 - Backspace must properly handle masked characters
-- See SPECIFICATION.md for complete terminal behavior
 
 ### Access Control Enforcement
 - Check access level at every path segment during tree traversal
 - Return `CliError::InvalidPath` for both nonexistent and inaccessible nodes
 - Verify access before dispatching to CommandHandlers
-- See INTERNALS.md Level 4 for complete implementation details
 
 ---
 
@@ -713,8 +707,7 @@ If your threat model requires stronger protections:
 ## See Also
 
 - **[DESIGN.md](DESIGN.md)** - Unified architecture pattern, feature gating, and authentication design decisions
-- **[INTERNALS.md](INTERNALS.md)** - Complete authentication flow, state machine, and access control enforcement
-- **[SPECIFICATION.md](SPECIFICATION.md)** - Behavioral specification (login flow, prompts, password masking)
 - **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy and feature decision framework
-- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Authentication implementation roadmap and testing strategy
-- **[../CLAUDE.md](../CLAUDE.md)** - Working patterns and practical implementation guidance
+- **[EXAMPLES.md](EXAMPLES.md)** - Authentication usage examples and patterns
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Build commands and testing workflows
+- **[../CLAUDE.md](../CLAUDE.md)** - AI-assisted development guidance

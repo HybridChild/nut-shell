@@ -4,204 +4,188 @@ Complete documentation for the nut-shell embedded CLI library.
 
 ## Quick Navigation
 
-| Document | Purpose | When to Read |
-|----------|---------|--------------|
-| **[SPECIFICATION.md](SPECIFICATION.md)** | Exact behavioral requirements | Implementing features, understanding what the system does |
-| **[DESIGN.md](DESIGN.md)** | Design decisions and rationale | Understanding why design choices were made, feature gating |
-| **[INTERNALS.md](INTERNALS.md)** | Runtime behavior and data flow | Understanding how the system works internally |
-| **[IMPLEMENTATION.md](IMPLEMENTATION.md)** | Implementation roadmap | Finding what to build next, build commands |
-| **[TYPE_REFERENCE.md](TYPE_REFERENCE.md)** | Complete type definitions | Looking up exact struct fields, method signatures, constants |
-| **[SECURITY.md](SECURITY.md)** | Authentication and security | Implementing auth, credential storage, access control |
-| **[PHILOSOPHY.md](PHILOSOPHY.md)** | Design philosophy | Evaluating feature requests, understanding project scope |
-| **[IO_DESIGN.md](IO_DESIGN.md)** | CharIo trait and buffering model | Implementing I/O adapters for sync/async environments |
+| Document | Purpose | Audience |
+|----------|---------|----------|
+| **[EXAMPLES.md](EXAMPLES.md)** | Usage examples and configuration patterns | Library users |
+| **[DESIGN.md](DESIGN.md)** | Architecture decisions and design rationale | Contributors, advanced users |
+| **[SECURITY.md](SECURITY.md)** | Authentication and access control patterns | Users implementing auth |
+| **[PHILOSOPHY.md](PHILOSOPHY.md)** | Design philosophy and feature criteria | Contributors |
+| **[IO_DESIGN.md](IO_DESIGN.md)** | CharIo trait and platform adapters | Platform implementers |
+| **[DEVELOPMENT.md](DEVELOPMENT.md)** | Build commands and testing workflows | Contributors |
+
+---
+
+## Documentation by Audience
+
+### For Library Users
+
+**Getting Started:**
+1. **[EXAMPLES.md](EXAMPLES.md)** - Start here for practical usage examples
+   - Quick start guide
+   - Configuration examples
+   - Platform-specific implementations
+   - Common patterns and troubleshooting
+
+2. **[IO_DESIGN.md](IO_DESIGN.md)** - Implement CharIo for your platform
+   - Buffering model explained
+   - Sync and async patterns
+   - Platform adapter examples
+
+3. **[SECURITY.md](SECURITY.md)** - Add authentication (if needed)
+   - Credential provider implementations
+   - Access control patterns
+   - Security considerations
+
+**Additional Resources:**
+- **API Documentation**: Run `cargo doc --open` for complete API reference
+- **Examples**: Check `examples/` directory for working code
+
+### For Contributors
+
+**Understanding the Codebase:**
+1. **[PHILOSOPHY.md](PHILOSOPHY.md)** - Understand project goals
+   - Core principles
+   - Feature decision framework
+   - What we include vs exclude
+
+2. **[DESIGN.md](DESIGN.md)** - Learn the architecture
+   - Command architecture patterns
+   - Feature gating patterns
+   - Design decisions and rationale
+
+3. **[DEVELOPMENT.md](DEVELOPMENT.md)** - Build and test
+   - Build commands
+   - Testing workflows
+   - CI simulation
+   - Troubleshooting
+
+**Implementing Features:**
+- See **[DESIGN.md](DESIGN.md)** for architectural patterns
+- See **[PHILOSOPHY.md](PHILOSOPHY.md)** for feature criteria
+- See **[DEVELOPMENT.md](DEVELOPMENT.md)** for testing strategies
+
+---
 
 ## Documentation Overview
 
-### [SPECIFICATION.md](SPECIFICATION.md) - WHAT the System Does
-**24KB • Behavioral Specification**
+### [EXAMPLES.md](EXAMPLES.md) - Usage Guide
+**28KB • Practical Examples**
 
-Authoritative reference for exact system behavior:
-- Terminal I/O (character echo, control sequences, escape sequences)
-- Authentication flow (login, password masking, session management)
-- Tab completion behavior (single/multiple matches, directory handling)
-- Command history (navigation, storage rules)
-- Response formatting (indentation, newlines, prompt control)
-- Global commands (`ls`, `?`, `logout`, `clear`)
-- Path resolution (absolute/relative, `.` and `..`)
-- Access control enforcement
-- Example command trees
+Comprehensive usage examples and tutorials:
+- Quick start (minimal example)
+- Buffer sizing guide
+- Platform examples (native stdio, RP2040 UART, Embassy async)
+- Configuration examples (custom configs, feature combinations)
+- Common patterns (command trees, handlers, authentication)
+- Troubleshooting
 
-**Read this when:** You need to know exactly how a feature should behave.
+**Read this when:** You're integrating nut-shell into your project.
 
 ---
 
-### [DESIGN.md](DESIGN.md) - WHY It's Designed This Way
-**32KB • Design Decisions & Rationale**
+### [DESIGN.md](DESIGN.md) - Architecture
+**29KB • Design Decisions**
 
-Design decisions and architectural patterns:
-- Command syntax rationale (path-based, positional arguments)
-- Key design decisions (8 decisions with alternatives considered)
-- Feature gating patterns (async, authentication, completion, history)
-- Unified architecture approach (single code path for auth-enabled/disabled)
-- Stub function pattern (minimizing `#[cfg]` branching)
-- Module structure (14 modules, organization rationale)
-- Implementation benefits (zero-cost abstractions, ROM placement, O(1) operations)
+Architectural decisions and patterns:
+- Command syntax rationale (path-based navigation)
+- Metadata/execution separation pattern (sync + async commands)
+- Feature gating patterns (unified architecture, stub functions)
+- Access control system
+- Module structure
+- Design trade-offs and alternatives considered
 
-**Read this when:** You want to understand the reasoning behind design choices or need feature gating examples.
-
----
-
-### [INTERNALS.md](INTERNALS.md) - HOW the System Works
-**40KB • Runtime Internals**
-
-Complete data flow from character input to terminal output:
-- High-level system overview (7-layer architecture)
-- Level 1-7 detailed pseudocode implementations:
-  - Character input processing
-  - InputParser state machine
-  - Command input processing
-  - Path parsing & tree navigation
-  - Request processing
-  - Interactive features (tab completion, history)
-  - Response formatting & output
-- Complete flow diagrams (authentication enabled/disabled)
-- State transition diagrams
-- Access control enforcement points
-- Memory layout (Flash/RAM)
-- Performance characteristics (time complexity table)
-- Thread safety considerations
-- Error handling strategy
-
-**Read this when:** You need to understand the runtime behavior or implement a complex feature.
+**Read this when:** You want to understand why design choices were made or need to implement features following established patterns.
 
 ---
 
-### [IMPLEMENTATION.md](IMPLEMENTATION.md) - Implementation Roadmap
-**24KB • Task Tracking & Build Commands**
+### [SECURITY.md](SECURITY.md) - Authentication & Access Control
+**25KB • Security Architecture**
 
-Phased implementation plan and build workflows:
-- 10 implementation phases (Foundation → Polish)
-- Task breakdown per phase
-- Success criteria for each phase
-- Test-driven development workflow
-- Complete build command reference:
-  - Quick iteration commands
-  - Feature validation
-  - Embedded target verification
-  - Pre-commit validation
-  - CI simulation
-  - Troubleshooting
-- Current status tracking
+Security design and implementation guidance:
+- Security considerations and limitations
+- Password hashing (SHA-256 with salts)
+- Credential storage options (build-time, flash, custom)
+- Access control system (path-based validation)
+- Authentication feature gating
+- Implementation patterns
+- Testing and validation strategies
+- Threat model and assumptions
 
-**Read this when:** You need to know what to build next or how to build/test the project.
-
----
-
-### [TYPE_REFERENCE.md](TYPE_REFERENCE.md) - Complete Type Definitions
-**32KB • Type Reference**
-
-Complete type specifications and method signatures:
-- Constants (buffer sizes, capacity limits, recommended values)
-- Core traits (`CharIo`, `AccessLevel`, `CommandHandlers`)
-- Tree types (`Node`, `CommandMeta`, `CommandKind`, `Directory`)
-- Request/Response types (all variants, formatting flags)
-- Shell types (`CliState`, `User`, `Shell` struct with all generics)
-- Parser types (`InputParser`, `CommandHistory`, `ParseEvent`)
-- Error types (`CliError` with all variants)
-- Method signatures (Shell core methods, path navigation, authentication)
-- Complete usage examples (end-to-end Shell creation)
-
-**Read this when:** You need exact field names, method signatures, or recommended constant values during implementation.
-
----
-
-### [SECURITY.md](SECURITY.md) - Security Design
-**28KB • Authentication & Access Control**
-
-Security architecture and best practices:
-- Security vulnerabilities analysis (plaintext passwords, hardcoded credentials, etc.)
-- Rust implementation security design (SHA-256 hashing, salting, constant-time comparison)
-- Password hashing rationale (why SHA-256 vs bcrypt/Argon2)
-- Credential storage options:
-  - Build-time environment variables (default)
-  - Flash storage (production recommended)
-  - Const provider (testing only)
-  - Custom trait-based providers
-- Access control system (generic AccessLevel trait, path-based validation)
-- Authentication feature gating (unified architecture approach)
-- Implementation patterns (login flow, password masking, credential hashing)
-- Testing & validation (unit tests, integration tests, security tests)
-- Threat model and security assumptions
-
-**Read this when:** Implementing authentication, choosing credential storage, or evaluating security requirements.
+**Read this when:** Implementing authentication or evaluating security requirements.
 
 ---
 
 ### [PHILOSOPHY.md](PHILOSOPHY.md) - Design Philosophy
-**20KB • Feature Decision Framework**
+**18KB • Feature Framework**
 
-Project philosophy and feature criteria:
+Project philosophy and decision framework:
 - Core principle: Essential CLI primitives only
-- What we include:
-  - Core functionality (always present)
-  - Interactive UX features (default enabled, can disable)
-  - Global commands
-- What we exclude (with rationale):
-  - Shell scripting features
-  - Command aliases
-  - Output paging
-  - Command logging
-  - History persistence
-  - Advanced line editing
-  - Session management
-  - Visual feedback
-  - Multi-line input
-- Decision framework (5 key questions):
-  - Cost analysis
-  - Embedded relevance
-  - Alternative solutions
-  - User demand
-  - Consistency with philosophy
+- What we include (core functionality, interactive features)
+- What we exclude (with rationale)
+- Decision framework (5 key questions for new features)
 - Design principles (8 core principles)
-- Feature status reference (implemented/future/excluded)
-- Evolution guidelines (when to add/reject/defer)
-- Success metrics
+- Evolution guidelines
 
-**Read this when:** Evaluating a feature request or understanding project scope.
+**Read this when:** Evaluating feature requests or understanding project scope.
+
+---
+
+### [IO_DESIGN.md](IO_DESIGN.md) - I/O Abstraction
+**16KB • CharIo Guide**
+
+I/O abstraction design and implementation:
+- Design problem (bare-metal vs async runtimes)
+- Explicit buffering model
+- CharIo trait design
+- Sync and async patterns
+- Platform implementation examples
+- Buffering strategy rationale
+
+**Read this when:** Implementing CharIo for a new platform or debugging I/O issues.
+
+---
+
+### [DEVELOPMENT.md](DEVELOPMENT.md) - Development Guide
+**10KB • Build & Test**
+
+Build commands and development workflows:
+- Quick reference (check, test, clippy, fmt)
+- Feature validation (test all combinations)
+- Embedded target verification
+- Pre-commit validation
+- CI simulation
+- Troubleshooting
+- Project structure
+
+**Read this when:** Building, testing, or contributing to the project.
 
 ---
 
 ## Common Questions
 
-### "What does feature X do?"
-→ See **[SPECIFICATION.md](SPECIFICATION.md)**
-
-### "Why was it implemented this way?"
-→ See **[DESIGN.md](DESIGN.md)**
-
-### "How does the login flow work internally?"
-→ See **[INTERNALS.md](INTERNALS.md)** (Level 1 & 3)
-
-### "Should we add feature Y?"
-→ See **[PHILOSOPHY.md](PHILOSOPHY.md)** (Decision Framework)
-
-### "How do I implement authentication?"
-→ See **[SECURITY.md](SECURITY.md)** (Implementation Patterns) and **[IMPLEMENTATION.md](IMPLEMENTATION.md)** (Phase 2)
-
-### "What's the build command for X?"
-→ See **[IMPLEMENTATION.md](IMPLEMENTATION.md)** (Build & Validation Commands)
-
-### "How do I feature-gate a module?"
-→ See **[DESIGN.md](DESIGN.md)** (Feature Gating & Optional Features)
+### "How do I use nut-shell in my project?"
+→ See **[EXAMPLES.md](EXAMPLES.md)** - Start with Quick Start
 
 ### "How do I implement CharIo for my platform?"
-→ See **[IO_DESIGN.md](IO_DESIGN.md)** (Buffering Model & Sync/Async Patterns)
+→ See **[IO_DESIGN.md](IO_DESIGN.md)** - Buffering Model & Patterns
 
-### "What are the exact fields of struct X?"
-→ See **[TYPE_REFERENCE.md](TYPE_REFERENCE.md)** (Complete Type Definitions)
+### "How do I add authentication?"
+→ See **[SECURITY.md](SECURITY.md)** - Credential Storage & Implementation Patterns
 
-### "What's the recommended value for constant Y?"
-→ See **[TYPE_REFERENCE.md](TYPE_REFERENCE.md)** (Constants section)
+### "Why was it designed this way?"
+→ See **[DESIGN.md](DESIGN.md)** - Architecture decisions with rationale
+
+### "Should we add feature X?"
+→ See **[PHILOSOPHY.md](PHILOSOPHY.md)** - Feature Decision Framework
+
+### "How do I feature-gate a module?"
+→ See **[DESIGN.md](DESIGN.md)** - Feature Gating Patterns
+
+### "What's the build command for X?"
+→ See **[DEVELOPMENT.md](DEVELOPMENT.md)** - Complete Build Command Reference
+
+### "Where's the API documentation?"
+→ Run `cargo doc --open` for complete API docs generated from source code
 
 ---
 
@@ -216,51 +200,26 @@ Project philosophy and feature criteria:
 ┌─────────────────┐
 │    DESIGN.md    │  ← Why it's designed this way
 └────────┬────────┘
-         │ defines
-         ▼
-┌─────────────────┐
-│SPECIFICATION.md │  ← What it should do
-└────────┬────────┘
-         │ specifies
-         ▼
-┌─────────────────┐
-│  INTERNALS.md   │  ← How it works at runtime
-└────────┬────────┘
          │ implements
          ▼
 ┌─────────────────┐
-│IMPLEMENTATION.md│  ← How to build it
+│   Source Code   │  ← The implementation (see cargo doc)
 └────────┬────────┘
-         │ builds             ┌──────────────────┐
-         │                    │TYPE_REFERENCE.md │  ← Exact type definitions
-         │                    └──────────────────┘
-         │                               ▲
-         │                               │ references
-         │───────────────────────────────┘
-         ▼
-┌─────────────────┐
-│   SECURITY.md   │  ← How authentication/access control works
-└─────────────────┘
+         │ documented by
+         ├────────────────────────┐
+         │                        │
+         ▼                        ▼
+┌─────────────────┐      ┌───────────────┐
+│  EXAMPLES.md    │      │ SECURITY.md   │
+│  IO_DESIGN.md   │      │               │
+│  DEVELOPMENT.md │      │               │
+└─────────────────┘      └───────────────┘
+    User guides          Security guide
 ```
 
 ---
 
-## Document Size Reference
-
-| Document | Size | Lines | Primary Focus |
-|----------|------|-------|---------------|
-| INTERNALS.md | 40KB | ~1106 | Runtime behavior, data flow |
-| DESIGN.md | 32KB | ~793 | Design rationale, feature gating |
-| TYPE_REFERENCE.md | 28KB | ~1090 | Complete type definitions, method signatures |
-| SECURITY.md | 25KB | ~633 | Authentication, security |
-| SPECIFICATION.md | 24KB | ~657 | Behavioral requirements |
-| IMPLEMENTATION.md | 24KB | ~657 | Implementation roadmap |
-| PHILOSOPHY.md | 20KB | ~554 | Design philosophy |
-| IO_DESIGN.md | 12KB | ~301 | CharIo trait, buffering model |
-
----
-
-## For AI Assistants
+## For AI Assistants (Claude Code)
 
 See **[../CLAUDE.md](../CLAUDE.md)** for:
 - Quick reference for common tasks
@@ -268,4 +227,18 @@ See **[../CLAUDE.md](../CLAUDE.md)** for:
 - Critical constraints (no_std, static allocation)
 - Common pitfalls & solutions
 - Testing patterns
-- Build command quick reference
+- Build command reference
+
+---
+
+## Getting Help
+
+1. **Check examples**: Look in `examples/` for working implementations
+2. **API documentation**: Run `cargo doc --open` for detailed API docs
+3. **This documentation**: Use the Quick Navigation table above
+4. **Issues**: Report issues at https://github.com/anthropics/nut-shell/issues (update with actual repo URL)
+
+---
+
+**Project Status:** Production-ready library ✅
+**Last Updated:** 2025 (update after implementation complete)

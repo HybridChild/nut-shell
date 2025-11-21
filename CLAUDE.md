@@ -12,14 +12,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 _A complete CLI framework for embedded systems, in a nutshell._
 
-**Current Status:** Architecture complete, implementation in progress (see IMPLEMENTATION.md for roadmap).
+**Current Status:** Production-ready library ✅ (all implementation phases complete)
 
-**Important Note on Design Evolution:**
-The architectural decisions and patterns documented here represent our current best thinking, not immutable requirements. During implementation, if you identify a better design approach or discover issues with the current plan:
-- **Feel free to suggest improvements** - your insights during implementation are valuable
-- **Ask before executing architectural changes** - discuss alternatives before modifying core design decisions
-- **Small improvements are fine** - refining implementation details within the existing architecture doesn't need approval
-- **Documentation is a snapshot** - treat specs as guidance that can evolve, not rigid constraints
+**Important Note on Contributing:**
+The library is now complete and production-ready. When contributing:
+- **Follow established patterns** - See DESIGN.md for architectural patterns
+- **Discuss significant changes** - Open an issue for architectural modifications
+- **Test thoroughly** - Run all feature combinations (see docs/DEVELOPMENT.md)
+- **Update documentation** - Keep docs synchronized with code changes
 
 ---
 
@@ -29,14 +29,13 @@ The architectural decisions and patterns documented here represent our current b
 
 | Need | Document | What You'll Find |
 |------|----------|------------------|
-| Exact behavior (I/O, auth, commands) | **[docs/SPECIFICATION.md](docs/SPECIFICATION.md)** | Terminal sequences, password masking, command syntax, startup behavior |
+| Usage examples and configuration | **[docs/EXAMPLES.md](docs/EXAMPLES.md)** | Quick start, platform examples, common patterns, troubleshooting |
 | Why it's designed this way | **[docs/DESIGN.md](docs/DESIGN.md)** | Design rationale, unified architecture pattern, feature gating |
-| How system works at runtime | **[docs/INTERNALS.md](docs/INTERNALS.md)** | Complete data flow, state machines, pseudocode implementations |
-| Implementation order and tasks | **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** | 10-phase roadmap, task breakdown, what to build next |
-| Exact type definitions and signatures | **[docs/TYPE_REFERENCE.md](docs/TYPE_REFERENCE.md)** | Complete struct fields, method signatures, constants, error types |
 | Security patterns and credential storage | **[docs/SECURITY.md](docs/SECURITY.md)** | Password hashing, access control, authentication flow |
 | Design philosophy and feature criteria | **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** | What we include/exclude, decision framework |
 | CharIo implementation and buffering | **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** | Sync/async I/O patterns, buffering model, platform adapters |
+| Build commands and testing | **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Complete build workflows, CI simulation, troubleshooting |
+| API reference | **Run `cargo doc --open`** | Complete API documentation generated from source code |
 
 ---
 
@@ -802,34 +801,34 @@ cargo size --target thumbv6m-none-eabi --release --no-default-features --feature
 cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-features
 ```
 
-**For comprehensive build workflows, CI configuration, and troubleshooting:** See IMPLEMENTATION.md
+**For comprehensive build workflows, CI configuration, and troubleshooting:** See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ---
 
-## Implementation Workflow
+## Contributing Workflow
 
-**Current Phase:** See IMPLEMENTATION.md for detailed task breakdown
+**Library Status:** Production-ready (all implementation phases complete)
 
-**General Approach:**
-1. **Consult SPECIFICATION.md** for exact behavior to implement
-2. **Check IMPLEMENTATION.md** for current phase and tasks
-3. **Write tests first** based on behavioral specification
-4. **Implement minimal functionality** to pass tests
-5. **Test on native target** (`cargo test`)
+**General Approach for Contributions:**
+1. **Understand existing architecture** - Review [docs/DESIGN.md](docs/DESIGN.md) for patterns
+2. **Check feature criteria** - See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) before adding features
+3. **Write tests first** - Follow TDD approach
+4. **Implement changes** following established patterns
+5. **Test on native target** (`cargo test --all-features`)
 6. **Verify embedded target** (`cargo check --target thumbv6m-none-eabi`)
-7. **Verify feature combinations** (test with/without features)
-8. **Document public APIs** with doc comments
+7. **Test feature combinations** (see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md))
+8. **Update documentation** - Keep API docs and guides synchronized
+9. **Run pre-commit checks** - Format, lint, test, embedded verification
 
-**When stuck:**
-- **[docs/SPECIFICATION.md](docs/SPECIFICATION.md)** for "what should this do?"
+**When working with the codebase:**
+- **[docs/EXAMPLES.md](docs/EXAMPLES.md)** for "how do I use this?"
 - **[docs/DESIGN.md](docs/DESIGN.md)** for "why is it designed this way?"
-- **[docs/INTERNALS.md](docs/INTERNALS.md)** for "how does this work at runtime?"
-- **[docs/TYPE_REFERENCE.md](docs/TYPE_REFERENCE.md)** for "what fields does this type have?" or "what's the signature?"
+- **Run `cargo doc --open`** for "what's the API signature?"
 - **[docs/SECURITY.md](docs/SECURITY.md)** for authentication/access control specifics
 - **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** for "should we add this feature?"
 - **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** for "how do I implement CharIo?"
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** for build commands and testing workflows
 - **This file (CLAUDE.md)** for constraints and patterns
-- **If the documented approach seems problematic**: Ask! Design can evolve based on implementation insights
 
 ---
 
@@ -878,11 +877,10 @@ Always lowercase, no hyphens when referring to Cargo features:
 
 ## Documentation Quick Links
 
+- **[docs/EXAMPLES.md](docs/EXAMPLES.md)** - Usage examples, configuration guide, troubleshooting
 - **[docs/DESIGN.md](docs/DESIGN.md)** - Design decisions, rationale, feature gating
-- **[docs/INTERNALS.md](docs/INTERNALS.md)** - Runtime behavior, data flow, state machines
-- **[docs/SPECIFICATION.md](docs/SPECIFICATION.md)** - Complete behavioral specification
-- **[docs/TYPE_REFERENCE.md](docs/TYPE_REFERENCE.md)** - Complete type definitions, method signatures, constants
 - **[docs/SECURITY.md](docs/SECURITY.md)** - Authentication, access control security
 - **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** - Design philosophy, feature framework
-- **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** - Implementation roadmap, build commands
 - **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** - CharIo trait, buffering model, async patterns
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Build commands, testing workflows, CI
+- **Run `cargo doc --open`** - Complete API reference from source code

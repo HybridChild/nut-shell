@@ -5,7 +5,7 @@ This document records the architectural decisions for **nut-shell**. It explains
 **When to use this document:**
 - Understanding why a design decision was made
 - Evaluating trade-offs between architectural alternatives
-- Learning about feature gating patterns and implementation
+- Learning about feature gating patterns
 - Understanding the unified architecture approach for optional features
 
 ## Table of Contents
@@ -29,7 +29,7 @@ The CLI uses a path-based syntax that mirrors filesystem navigation, optimized f
 
 ### Core Syntax Rules
 
-**Note:** Examples show prompts with authentication enabled (`user@path>`). Without authentication, the username prefix may be omitted or use a default value (implementation-defined). See SPECIFICATION.md for complete prompt format details.
+**Note:** Examples show prompts with authentication enabled (`user@path>`). Without authentication, the username prefix may be omitted or use a default value (implementation-defined).
 
 **Navigation** (both absolute and relative):
 ```
@@ -765,9 +765,9 @@ src/
 
 ## See Also
 
-- **[SPECIFICATION.md](SPECIFICATION.md)**: Complete behavioral specification with usage examples
-- **[INTERNALS.md](INTERNALS.md)**: Complete runtime internals from input to output
+- **[EXAMPLES.md](EXAMPLES.md)**: Usage examples and configuration patterns
 - **[SECURITY.md](SECURITY.md)**: Authentication, access control, and security design
-- **[IMPLEMENTATION.md](IMPLEMENTATION.md)**: Implementation tracking and phased development plan
 - **[PHILOSOPHY.md](PHILOSOPHY.md)**: Design philosophy and feature decision framework
-- **[../CLAUDE.md](../CLAUDE.md)**: Working patterns and practical implementation guidance
+- **[IO_DESIGN.md](IO_DESIGN.md)**: CharIo trait and platform adapter guide
+- **[DEVELOPMENT.md](DEVELOPMENT.md)**: Build commands and development workflows
+- **[../CLAUDE.md](../CLAUDE.md)**: AI-assisted development guidance

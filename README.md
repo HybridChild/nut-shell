@@ -4,7 +4,7 @@
 
 A lightweight, embedded-first command-line interface library for `no_std` Rust environments with optional async support.
 
-[![Status](https://img.shields.io/badge/status-in%20development-yellow)](docs/IMPLEMENTATION.md)
+[![Status](https://img.shields.io/badge/status-production--ready-brightgreen)](#project-status)
 [![Platform](https://img.shields.io/badge/platform-no_std-blue)](#platform-support)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)](#license)
 
@@ -20,9 +20,9 @@ A lightweight, embedded-first command-line interface library for `no_std` Rust e
 
 ## Project Status
 
-🚧 **Currently in development** - Architecture complete, implementation in progress.
+✅ **Production-ready** - All implementation phases complete, fully tested and documented.
 
-See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for the current roadmap and build instructions.
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for build instructions and [docs/EXAMPLES.md](docs/EXAMPLES.md) for usage guidance.
 
 ---
 
@@ -255,10 +255,10 @@ See [docs/IO_DESIGN.md](docs/IO_DESIGN.md) for implementation details.
 | Command history (N=10) | ~1.3KB | `HISTORY_SIZE` const generic |
 | Command history (N=4) | ~0.5KB | RAM-constrained config |
 
-**Minimal configuration:** ~0.2KB RAM (no history, minimal buffers)  
+**Minimal configuration:** ~0.2KB RAM (no history, minimal buffers)
 **Default configuration:** ~1.5KB RAM (history enabled)
 
-See [docs/INTERNALS.md](docs/INTERNALS.md) for memory layout details and [docs/EXAMPLES.md](docs/EXAMPLES.md) for buffer sizing guidance.
+See [docs/EXAMPLES.md](docs/EXAMPLES.md) for buffer sizing guidance and configuration examples.
 
 ---
 
@@ -328,19 +328,18 @@ See [docs/EXAMPLES.md](docs/EXAMPLES.md) for complete configuration examples, Ch
 
 ## Documentation
 
-### For Users
+### For Library Users
 - **[README.md](README.md)** (this file) - Quick start and overview
 - **[docs/EXAMPLES.md](docs/EXAMPLES.md)** - Complete examples, configuration guide, and troubleshooting
-- **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** - Design philosophy and feature criteria
+- **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** - CharIo trait and platform adapter implementation guide
+- **[docs/SECURITY.md](docs/SECURITY.md)** - Authentication patterns and security considerations
+- **Run `cargo doc --open`** - Complete API reference
 
-### For Implementers (AI/Contributors)
-- **[CLAUDE.md](CLAUDE.md)** - Quick reference for common implementation tasks
-- **[docs/SPECIFICATION.md](docs/SPECIFICATION.md)** - Complete behavioral requirements
-- **[docs/DESIGN.md](docs/DESIGN.md)** - Design decisions and rationale
-- **[docs/INTERNALS.md](docs/INTERNALS.md)** - Runtime behavior and data flow
-- **[docs/SECURITY.md](docs/SECURITY.md)** - Authentication and security architecture
-- **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** - CharIo trait and buffering model
-- **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** - Implementation roadmap and build commands
+### For Contributors
+- **[CLAUDE.md](CLAUDE.md)** - AI-assisted development guidance
+- **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** - Design philosophy and feature criteria
+- **[docs/DESIGN.md](docs/DESIGN.md)** - Architecture decisions and design patterns
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Build commands, testing workflows, and CI
 
 See [docs/README.md](docs/README.md) for complete documentation navigation.
 
@@ -371,7 +370,7 @@ cargo build --target thumbv6m-none-eabi --release            # Release build
 cargo size --target thumbv6m-none-eabi --release -- -A       # Measure size
 ```
 
-See [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) for comprehensive build workflows.
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for comprehensive build workflows and CI simulation.
 
 ---
 
@@ -381,7 +380,7 @@ Contributions are welcome! Before implementing new features, please review:
 
 1. **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** - Understand what we include/exclude
 2. **[docs/DESIGN.md](docs/DESIGN.md)** - Review design patterns and rationale
-3. **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** - Check current roadmap
+3. **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Follow build and testing workflows
 
 **Feature requests:** Must align with embedded-first philosophy. Ask:
 - Is this typical for embedded CLIs?

@@ -4,9 +4,8 @@ This document explains the I/O abstraction design that enables nut-shell to work
 
 **Related Documentation:**
 - **[DESIGN.md](DESIGN.md)**: Metadata/execution separation pattern (Section 1) - enables async command support
-- **[SPECIFICATION.md](SPECIFICATION.md)**: Terminal I/O behavior specification
-- **[INTERNALS.md](INTERNALS.md)**: Complete data flow including I/O processing
-- **[IMPLEMENTATION.md](IMPLEMENTATION.md)**: CharIo implementation tasks (Phase 1)
+- **[EXAMPLES.md](EXAMPLES.md)**: CharIo implementation examples for various platforms
+- **[DEVELOPMENT.md](DEVELOPMENT.md)**: Build and testing workflows
 
 ## Design Problem
 
@@ -138,12 +137,15 @@ pub trait CharIo {
 
 ### 1. Respects Shell Ownership Model
 
-From INTERNALS.md, `Shell` owns/references the `CharIo`:
+`Shell` owns/references the `CharIo`:
 
 ```rust
-impl<'tree, L, IO> Shell<'tree, L, IO>
+impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
 where
+    L: AccessLevel,
     IO: CharIo,
+    H: CommandHandlers<C>,
+    C: ShellConfig,
 {
     pub fn process_char(&mut self, c: char) -> Result<(), IO::Error> {
         // CLI calls self.io.put_char() internally
@@ -280,10 +282,11 @@ See [DESIGN.md](DESIGN.md) section 1 for complete architecture details and imple
 ### Buffer Sizing Constraints
 
 **Input buffer (Shell):**
-- Default: 128 bytes (heapless::String<128>)
-- Configurable via const generic: `Shell<'tree, L, IO, H, MAX_INPUT, ...>`
+- Default: 128 bytes (`DefaultConfig::MAX_INPUT`)
+- Configurable via `ShellConfig` trait (e.g., `MinimalConfig` uses 64 bytes)
 - Overflow: Characters silently ignored, no error displayed
 - Range: 64-256 bytes typical
+- See [EXAMPLES.md](EXAMPLES.md#configuration-examples) for configuration details
 
 **Output buffer (async CharIo implementations only):**
 - Recommended: 256 bytes (heapless::Vec<u8, 256>)

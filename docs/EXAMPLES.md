@@ -2,10 +2,10 @@
 
 This document provides practical examples, configuration guidance, and tutorials for using nut-shell in your embedded projects.
 
-**For implementation details and architecture, see:**
-- **[SPECIFICATION.md](SPECIFICATION.md)** - Complete behavioral specification
+**For architecture and additional resources, see:**
 - **[DESIGN.md](DESIGN.md)** - Architecture decisions and patterns
 - **[IO_DESIGN.md](IO_DESIGN.md)** - CharIo trait design and reference implementations
+- **[SECURITY.md](SECURITY.md)** - Authentication and access control patterns
 
 ---
 
@@ -25,7 +25,10 @@ This document provides practical examples, configuration guidance, and tutorials
 ### Minimal Example (Native)
 
 ```rust
-use nut_shell::{Shell, CharIo, CommandHandlers, Response, CliError};
+use nut_shell::{
+    Shell, CharIo, CommandHandlers, Response, CliError,
+    AccessLevel, CommandMeta, CommandKind, Directory, Node, DefaultConfig
+};
 
 // Define your access levels
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -54,8 +57,8 @@ impl AccessLevel for MyAccessLevel {
 // Define command handlers
 struct MyHandlers;
 
-impl CommandHandlers for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl CommandHandlers<DefaultConfig> for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match name {
             "hello" => Ok(Response::success("Hello, World!")),
             "echo" => Ok(Response::success(args.get(0).unwrap_or(&""))),
@@ -85,7 +88,7 @@ const ROOT: Directory<MyAccessLevel> = Directory {
 fn main() {
     let io = StdioIo::new();  // Your CharIo implementation
     let handlers = MyHandlers;
-    let mut shell = Shell::new(&ROOT, handlers, io);
+    let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handlers, io);
 
     shell.activate().unwrap();
 
@@ -104,7 +107,7 @@ fn main() {
 
 ### How to Choose Buffer Sizes
 
-Buffer sizes are configured via const generics when creating Shell. Getting them right balances RAM usage with functionality.
+Buffer sizes are configured via the `ShellConfig` trait (see [Configuration Examples](#configuration-examples)). Getting them right balances RAM usage with functionality.
 
 #### Input Buffer (MAX_INPUT)
 
@@ -233,114 +236,166 @@ Add safety margin: 6 × 2 = 12
 
 ## Configuration Examples
 
-### Minimal Configuration (RP2040 Bootloader)
+Configuration is done via the `ShellConfig` trait, which defines buffer sizes and user-visible messages at compile time.
 
-For severely RAM-constrained environments:
+### Using Pre-Defined Configurations
+
+#### Standard Configuration (Recommended)
+
+Use `DefaultConfig` for most embedded applications:
 
 ```rust
-type MiniShell = Shell<
-    'static,
-    MyAccessLevel,
-    UartIo,
-    MyHandlers,
-    64,   // MAX_INPUT: Short commands only
-    4,    // MAX_PATH_DEPTH: Shallow tree
-    8,    // MAX_ARGS: Simple commands
-    4,    // HISTORY_SIZE: Minimal history
->;
+use nut_shell::{Shell, DefaultConfig};
 
-// Total RAM: ~64 + 16 + 0 + 520 = ~600 bytes
+let mut shell: Shell<_, MyAccessLevel, UartIo, MyHandlers, DefaultConfig> =
+    Shell::new(&TREE, handlers, io);
+
+// Or with type inference:
+let mut shell = Shell::<_, _, _, _, DefaultConfig>::new(&TREE, handlers, io);
 ```
+
+**Buffer sizes:**
+- MAX_INPUT: 128 bytes
+- MAX_PATH_DEPTH: 8 levels
+- MAX_ARGS: 16 arguments
+- MAX_PROMPT: 64 bytes
+- MAX_RESPONSE: 256 bytes
+- HISTORY_SIZE: 10 commands
+
+**Total RAM:** ~1.5 KB (with history enabled)
+
+**Use for:**
+- Production embedded devices (RP2040, STM32, nRF52, ESP32)
+- Interactive debugging interfaces
+- General-purpose embedded CLIs
+
+#### Minimal Configuration
+
+Use `MinimalConfig` for RAM-constrained systems:
+
+```rust
+use nut_shell::{Shell, MinimalConfig};
+
+let mut shell: Shell<_, MyAccessLevel, UartIo, MyHandlers, MinimalConfig> =
+    Shell::new(&TREE, handlers, io);
+```
+
+**Buffer sizes:**
+- MAX_INPUT: 64 bytes
+- MAX_PATH_DEPTH: 4 levels
+- MAX_ARGS: 8 arguments
+- MAX_PROMPT: 32 bytes
+- MAX_RESPONSE: 128 bytes
+- HISTORY_SIZE: 5 commands
+
+**Total RAM:** ~0.5 KB (with history enabled)
 
 **Use for:**
 - Bootloaders
 - Recovery mode interfaces
 - Systems with <2KB RAM available
 
-### Standard Configuration (Recommended)
+### Custom Configurations
 
-Balanced for most embedded applications:
-
-```rust
-type StandardShell = Shell<
-    'static,
-    MyAccessLevel,
-    UartIo,
-    MyHandlers,
-    128,  // MAX_INPUT (default)
-    8,    // MAX_PATH_DEPTH (default)
-    16,   // MAX_ARGS (default)
-    10,   // HISTORY_SIZE (default)
->;
-
-// Total RAM: ~128 + 32 + 0 + 1300 = ~1.5 KB
-```
-
-**Use for:**
-- Production embedded devices
-- RP2040 (Raspberry Pi Pico)
-- STM32, Nordic nRF52, ESP32
-
-### High-Capacity Configuration
-
-For systems with more RAM available:
+Create custom configurations by implementing `ShellConfig`:
 
 ```rust
-type HighCapacityShell = Shell<
-    'static,
-    MyAccessLevel,
-    UsbIo,
-    MyHandlers,
-    256,  // MAX_INPUT: Long commands
-    12,   // MAX_PATH_DEPTH: Deep trees
-    32,   // MAX_ARGS: Complex commands
-    20,   // HISTORY_SIZE: Extended history
->;
+use nut_shell::{Shell, ShellConfig};
 
-// Total RAM: ~256 + 48 + 0 + 2600 = ~2.9 KB
+// Define custom config
+struct MyCustomConfig;
+
+impl ShellConfig for MyCustomConfig {
+    // Buffer sizes
+    const MAX_INPUT: usize = 96;
+    const MAX_PATH_DEPTH: usize = 6;
+    const MAX_ARGS: usize = 12;
+    const MAX_PROMPT: usize = 48;
+    const MAX_RESPONSE: usize = 192;
+    const HISTORY_SIZE: usize = 8;
+
+    // Custom messages (all stored in ROM)
+    const MSG_WELCOME_AUTH: &'static str = "🔐 MyDevice v1.0 - Login Required\r\n";
+    const MSG_WELCOME_NO_AUTH: &'static str = "🚀 MyDevice v1.0 Ready\r\n";
+    const MSG_LOGIN_PROMPT: &'static str = "Login (user:pass): ";
+    const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted\r\n";
+    const MSG_LOGIN_FAILED: &'static str = "✗ Access denied\r\n";
+    const MSG_LOGOUT: &'static str = "Session terminated\r\n";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Format: username:password\r\n";
+}
+
+// Use custom config
+let mut shell: Shell<_, MyAccessLevel, UartIo, MyHandlers, MyCustomConfig> =
+    Shell::new(&TREE, handlers, io);
 ```
 
-**Use for:**
-- Systems with >16KB RAM
-- Complex command hierarchies
-- Development/debugging interfaces
+**Benefits of custom configs:**
+- Fine-tune buffer sizes for your specific needs
+- Customize all user-visible messages (branding, localization)
+- Zero runtime overhead (all values are const)
+
+### Configuration Comparison
+
+| Configuration | MAX_INPUT | PATH_DEPTH | ARGS | HISTORY | RAM Usage |
+|---------------|-----------|------------|------|---------|-----------|
+| MinimalConfig | 64 | 4 | 8 | 5 | ~0.5 KB |
+| DefaultConfig | 128 | 8 | 16 | 10 | ~1.5 KB |
+| Custom (high) | 256 | 12 | 32 | 20 | ~3.0 KB |
 
 ### Feature Combinations
 
-Choose features based on your requirements:
+Choose Cargo features based on your requirements:
 
 ```toml
-# Full-featured (default)
-[features]
-default = ["authentication", "completion", "history"]
+[dependencies]
+nut-shell = { version = "0.1", features = ["authentication", "completion", "history"] }
 
-# Minimal (security only)
-[features]
-default = ["authentication"]
+# Or minimal build
+nut-shell = { version = "0.1", default-features = false }
 
-# Interactive (no security)
-[features]
-default = ["completion", "history"]
-
-# Bare minimum (testing/development)
-[features]
-default = []
+# Or specific features
+nut-shell = { version = "0.1", default-features = false, features = ["authentication"] }
 ```
+
+**Available features:**
+- `authentication` - User login and access control (default: enabled)
+- `completion` - Tab completion for commands/paths (default: enabled)
+- `history` - Command history with arrow keys (default: enabled)
+- `async` - Async command execution support (default: disabled)
 
 **Build examples:**
 ```bash
-# All features
-cargo build --all-features
+# All features (default)
+cargo build
 
-# Minimal secure
+# Minimal (no optional features)
+cargo build --no-default-features
+
+# Secure only (authentication only)
 cargo build --no-default-features --features authentication
 
-# Interactive unsecured
+# Interactive only (no security)
 cargo build --no-default-features --features completion,history
 
-# Absolute minimum
-cargo build --no-default-features
+# With async support
+cargo build --features async
 ```
+
+### Estimating RAM Usage
+
+Calculate your RAM requirements:
+
+```
+Input buffer:      MAX_INPUT bytes
+Path stack:        MAX_PATH_DEPTH * 4 bytes (usize indices)
+History (enabled): HISTORY_SIZE * MAX_INPUT bytes
+History (disabled): 0 bytes
+
+Example (DefaultConfig with history):
+  128 + (8 * 4) + (10 * 128) = 128 + 32 + 1280 = ~1.5 KB
+```
+
+**Note:** Shell struct overhead is minimal (~50-100 bytes for other fields)
 
 ---
 
@@ -402,7 +457,7 @@ fn main() -> ! {
     // Create shell
     let io = UartIo { uart };
     let handlers = MyHandlers;
-    let mut shell = Shell::new(&ROOT, handlers, io);
+    let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handlers, io);
 
     shell.activate().ok();
 
@@ -548,7 +603,7 @@ impl CharIo for StdioIo {
 fn main() {
     let io = StdioIo;
     let handlers = MyHandlers;
-    let mut shell = Shell::new(&ROOT, handlers, io);
+    let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handlers, io);
 
     shell.activate().unwrap();
 
@@ -567,8 +622,10 @@ fn main() {
 ### Pattern: Async Commands
 
 ```rust
-// Define async command function
-async fn http_get_async(args: &[&str]) -> Result<Response, CliError> {
+use nut_shell::{DefaultConfig, Response};
+
+// Define async command function (generic over config)
+async fn http_get_async<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
     // Shell validates argument count, so args[0] is guaranteed to exist if min_args >= 1
     let url = args[0];
 
@@ -606,17 +663,23 @@ const HTTP_GET: CommandMeta<MyAccessLevel> = CommandMeta {
 };
 
 // Dispatch in handler
-impl CommandHandlers for MyHandlers {
+impl CommandHandlers<DefaultConfig> for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+        // ... sync commands
+        Err(CliError::CommandNotFound)
+    }
+
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match name {
-            "http-get" => http_get_async(args).await,
+            "http-get" => http_get_async::<DefaultConfig>(args).await,
             _ => Err(CliError::CommandNotFound),
         }
     }
 }
 
 // Use process_char_async in main loop
+let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handlers, io);
 loop {
     if let Some(c) = io.get_char()? {
         shell.process_char_async(c).await?;  // Async processing
@@ -627,13 +690,15 @@ loop {
 ### Pattern: Stateful Handlers
 
 ```rust
+use nut_shell::{DefaultConfig, CommandHandlers, Response};
+
 struct MyHandlers<'a> {
     system_state: &'a SystemState,
     config: &'a Config,
 }
 
-impl CommandHandlers for MyHandlers<'_> {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl<'a> CommandHandlers<DefaultConfig> for MyHandlers<'a> {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match name {
             "status" => {
                 let info = self.system_state.get_status();
@@ -652,7 +717,7 @@ impl CommandHandlers for MyHandlers<'_> {
 let system_state = SystemState::new();
 let config = Config::load();
 let handlers = MyHandlers { system_state: &system_state, config: &config };
-let shell = Shell::new(&ROOT, handlers, io);
+let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handlers, io);
 ```
 
 ### Pattern: Custom Access Levels
@@ -718,9 +783,22 @@ impl CredentialProvider<MyAccessLevel> for BuildTimeProvider {
 
 **Symptom:** Long commands get truncated
 
-**Solution:** Increase MAX_INPUT const generic
+**Solution:** Create a custom config with larger MAX_INPUT
 ```rust
-type MyShell = Shell<'static, L, IO, H, 256, ...>;  // Increase from 128
+struct LargeInputConfig;
+
+impl ShellConfig for LargeInputConfig {
+    const MAX_INPUT: usize = 256;  // Increased from 128
+    const MAX_PATH_DEPTH: usize = 8;
+    const MAX_ARGS: usize = 16;
+    const MAX_PROMPT: usize = 64;
+    const MAX_RESPONSE: usize = 256;
+    const HISTORY_SIZE: usize = 10;
+
+    // ... (include all required message constants)
+}
+
+let mut shell: Shell<_, _, _, _, LargeInputConfig> = Shell::new(&TREE, handlers, io);
 ```
 
 ### Problem: Output Buffer Overflow (Async)
@@ -739,18 +817,45 @@ struct MyIo {
 **Symptom:** Stack overflow, allocation failures
 
 **Solutions:**
-1. Reduce HISTORY_SIZE: `Shell<..., 4>` instead of default 10
-2. Disable history entirely: `--no-default-features --features authentication,completion`
-3. Reduce MAX_INPUT: 64 bytes instead of 128
-4. Reduce MAX_PATH_DEPTH: 4 instead of 8
+1. Use `MinimalConfig` instead of `DefaultConfig`
+   ```rust
+   let mut shell: Shell<_, _, _, _, MinimalConfig> = Shell::new(&TREE, handlers, io);
+   ```
+2. Create custom config with reduced buffer sizes
+   ```rust
+   struct TinyConfig;
+   impl ShellConfig for TinyConfig {
+       const MAX_INPUT: usize = 64;        // Reduced from 128
+       const MAX_PATH_DEPTH: usize = 4;    // Reduced from 8
+       const MAX_ARGS: usize = 8;          // Reduced from 16
+       const MAX_PROMPT: usize = 32;       // Reduced from 64
+       const MAX_RESPONSE: usize = 128;    // Reduced from 256
+       const HISTORY_SIZE: usize = 4;      // Reduced from 10
+       // ... (include all required message constants)
+   }
+   ```
+3. Disable history entirely: `cargo build --no-default-features --features authentication,completion`
 
 ### Problem: PathTooDeep Errors
 
 **Symptom:** Deep paths return errors
 
-**Solution:** Increase MAX_PATH_DEPTH
+**Solution:** Create custom config with increased MAX_PATH_DEPTH
 ```rust
-type MyShell = Shell<'static, L, IO, H, 128, 12, ...>;  // Increase from 8
+struct DeepPathConfig;
+
+impl ShellConfig for DeepPathConfig {
+    const MAX_INPUT: usize = 128;
+    const MAX_PATH_DEPTH: usize = 12;  // Increased from 8
+    const MAX_ARGS: usize = 16;
+    const MAX_PROMPT: usize = 64;
+    const MAX_RESPONSE: usize = 256;
+    const HISTORY_SIZE: usize = 10;
+
+    // ... (include all required message constants)
+}
+
+let mut shell: Shell<_, _, _, _, DeepPathConfig> = Shell::new(&TREE, handlers, io);
 ```
 
 ### Problem: Characters Dropped on UART
@@ -881,7 +986,7 @@ where
 ```rust
 let uart = setup_uart(); // Platform-specific initialization
 let io = UartIo { uart };
-let mut shell = Shell::new(&ROOT, handlers, io);
+let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handlers, io);
 
 loop {
     if let Ok(Some(c)) = io.get_char() {
@@ -929,7 +1034,7 @@ impl<'d, D> EmbassyUsbIo<'d, D> {
 #[embassy_executor::task]
 async fn shell_task(usb: CdcAcmClass<'static, Driver<'static>>) {
     let mut io = EmbassyUsbIo { class: usb, output_buffer: Vec::new() };
-    let mut shell = Shell::new(&ROOT, handlers, io);
+    let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handlers, io);
 
     let mut buffer = [0u8; 64];
     loop {
