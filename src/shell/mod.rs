@@ -952,6 +952,30 @@ where
     pub fn __test_io_mut(&mut self) -> &mut IO {
         &mut self.io
     }
+
+    /// Get reference to input buffer (test-only).
+    ///
+    /// Available in both unit tests and integration tests.
+    #[doc(hidden)]
+    pub fn __test_get_input_buffer(&self) -> &str {
+        self.input_buffer.as_str()
+    }
+
+    /// Set authenticated user (test-only, requires authentication feature).
+    ///
+    /// Allows tests to manually set authentication state.
+    #[doc(hidden)]
+    #[cfg(feature = "authentication")]
+    pub fn __test_set_authenticated_user(&mut self, user: Option<User<L>>) -> Result<(), CliError> {
+        let is_some = user.is_some();
+        self.current_user = user;
+        if is_some {
+            self.state = CliState::LoggedIn;
+        } else {
+            self.state = CliState::LoggedOut;
+        }
+        Ok(())
+    }
 }
 
 // ============================================================================

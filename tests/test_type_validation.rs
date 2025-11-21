@@ -362,7 +362,7 @@ fn test_lifetime_relationships() {
     assert_eq!(name, "/");
 
     // Verify command metadata is also 'static
-    fn get_command_name(node: &'static Node<MockAccessLevel>) -> Option<&'static str> {
+    fn _get_command_name(node: &'static Node<MockAccessLevel>) -> Option<&'static str> {
         match node {
             Node::Command(cmd) => Some(cmd.name),
             Node::Directory(_) => None,
