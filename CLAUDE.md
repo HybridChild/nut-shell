@@ -368,6 +368,45 @@ impl CharIo for MyIo {
 }
 ```
 
+### Customizing Messages
+
+All user-visible messages (welcome, login prompts, error messages) are configurable via the `ShellConfig` trait. Messages are stored in ROM with zero runtime cost.
+
+```rust
+struct MyAppConfig;
+
+impl ShellConfig for MyAppConfig {
+    // Buffer sizes (required)
+    const MAX_INPUT: usize = 128;
+    const MAX_PATH_DEPTH: usize = 8;
+    const MAX_ARGS: usize = 16;
+    const MAX_PROMPT: usize = 64;
+    const MAX_RESPONSE: usize = 256;
+    const HISTORY_SIZE: usize = 10;
+
+    // Customize messages for your application
+    const MSG_WELCOME_AUTH: &'static str = "🔐 MyDevice v1.0 - Login Required\r\n";
+    const MSG_WELCOME_NO_AUTH: &'static str = "🚀 MyDevice v1.0 Ready\r\n";
+    const MSG_LOGIN_PROMPT: &'static str = "Login (user:pass): ";
+    const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted\r\n";
+    const MSG_LOGIN_FAILED: &'static str = "✗ Access denied\r\n";
+    const MSG_LOGOUT: &'static str = "Session terminated\r\n";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Format: username:password\r\n";
+}
+
+// Use your custom config when creating the Shell
+let mut shell: Shell<_, _, _, _, MyAppConfig> = Shell::new(&TREE, handlers, io);
+```
+
+**Customization use cases:**
+- Brand your CLI with custom welcome messages
+- Localize messages for different languages
+- Add emojis or ANSI colors for better UX
+- Adjust tone (formal vs casual, technical vs user-friendly)
+- Match your device's personality
+
+**Note:** All messages stored in flash memory, no RAM overhead.
+
 ### Implementing Double-ESC Clear
 
 Double-ESC clears the input buffer and exits history navigation. This is NOT feature-gated (always enabled).

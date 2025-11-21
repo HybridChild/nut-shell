@@ -59,6 +59,30 @@ pub trait ShellConfig {
     /// Command history size
     /// Used for: CommandHistory buffer (when history feature enabled)
     const HISTORY_SIZE: usize;
+
+    // Message constants for user-visible strings
+    // All stored in ROM, zero runtime cost
+
+    /// Welcome message when authentication is enabled
+    const MSG_WELCOME_AUTH: &'static str;
+
+    /// Welcome message when authentication is disabled
+    const MSG_WELCOME_NO_AUTH: &'static str;
+
+    /// Login prompt (expects username:password format)
+    const MSG_LOGIN_PROMPT: &'static str;
+
+    /// Login success message
+    const MSG_LOGIN_SUCCESS: &'static str;
+
+    /// Login failed message
+    const MSG_LOGIN_FAILED: &'static str;
+
+    /// Logout message
+    const MSG_LOGOUT: &'static str;
+
+    /// Invalid login format message
+    const MSG_INVALID_LOGIN_FORMAT: &'static str;
 }
 ```
 
@@ -77,6 +101,14 @@ impl ShellConfig for DefaultConfig {
     const MAX_PROMPT: usize = 64;      // ~64 bytes
     const MAX_RESPONSE: usize = 256;   // ~256 bytes
     const HISTORY_SIZE: usize = 10;    // 10 commands
+
+    const MSG_WELCOME_AUTH: &'static str = "Welcome! Please log in.\r\n";
+    const MSG_WELCOME_NO_AUTH: &'static str = "Welcome to nut-shell!\r\n";
+    const MSG_LOGIN_PROMPT: &'static str = "Login (username:password): ";
+    const MSG_LOGIN_SUCCESS: &'static str = "Login successful!\r\n";
+    const MSG_LOGIN_FAILED: &'static str = "Login failed. Try again.\r\n";
+    const MSG_LOGOUT: &'static str = "Logged out.\r\n";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use username:password\r\n";
 }
 ```
 
@@ -93,6 +125,15 @@ impl ShellConfig for MinimalConfig {
     const MAX_PROMPT: usize = 32;      // ~32 bytes
     const MAX_RESPONSE: usize = 128;   // ~128 bytes
     const HISTORY_SIZE: usize = 5;     // 5 commands
+
+    // Messages same as DefaultConfig
+    const MSG_WELCOME_AUTH: &'static str = "Welcome! Please log in.\r\n";
+    const MSG_WELCOME_NO_AUTH: &'static str = "Welcome to nut-shell!\r\n";
+    const MSG_LOGIN_PROMPT: &'static str = "Login (username:password): ";
+    const MSG_LOGIN_SUCCESS: &'static str = "Login successful!\r\n";
+    const MSG_LOGIN_FAILED: &'static str = "Login failed. Try again.\r\n";
+    const MSG_LOGOUT: &'static str = "Logged out.\r\n";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use username:password\r\n";
 }
 ```
 
@@ -111,8 +152,24 @@ impl ShellConfig for MyAppConfig {
     const MAX_PROMPT: usize = 80;      // Wide terminal
     const MAX_RESPONSE: usize = 512;   // Verbose output
     const HISTORY_SIZE: usize = 20;    // Lots of history
+
+    // Customize messages for your application
+    const MSG_WELCOME_AUTH: &'static str = "🔐 MyApp v1.0 - Authentication Required\r\n";
+    const MSG_WELCOME_NO_AUTH: &'static str = "🚀 MyApp v1.0 Ready\r\n";
+    const MSG_LOGIN_PROMPT: &'static str = "👤 Login (user:pass): ";
+    const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted\r\n";
+    const MSG_LOGIN_FAILED: &'static str = "✗ Access denied. Try again.\r\n";
+    const MSG_LOGOUT: &'static str = "Session terminated\r\n";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Error: Use format username:password\r\n";
 }
 ```
+
+**Message customization benefits:**
+- Zero runtime cost (all messages stored in ROM)
+- Brand your CLI with custom welcome messages
+- Localize messages for different languages
+- Add emojis or special characters for better UX
+- Adjust tone (formal vs casual, technical vs user-friendly)
 
 **Memory calculation example** (DefaultConfig):
 ```

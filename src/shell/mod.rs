@@ -273,14 +273,14 @@ where
         #[cfg(feature = "authentication")]
         {
             self.state = CliState::LoggedOut;
-            self.io.write_str("Welcome! Please log in.\r\n")?;
-            self.io.write_str("Username: ")?;
+            self.io.write_str(C::MSG_WELCOME_AUTH)?;
+            self.io.write_str(C::MSG_LOGIN_PROMPT)?;
         }
 
         #[cfg(not(feature = "authentication"))]
         {
             self.state = CliState::LoggedIn;
-            self.io.write_str("Welcome to nut-shell!\r\n")?;
+            self.io.write_str(C::MSG_WELCOME_NO_AUTH)?;
             self.generate_and_write_prompt()?;
         }
 
@@ -468,22 +468,23 @@ where
                         // Login successful
                         self.current_user = Some(user);
                         self.state = CliState::LoggedIn;
-                        self.io.write_str("Login successful!\r\n")?;
+                        self.io.write_str(C::MSG_LOGIN_SUCCESS)?;
                         self.generate_and_write_prompt()?;
                     }
                     _ => {
                         // Login failed (user not found or wrong password)
-                        self.io.write_str("Login failed. Try again.\r\n")?;
-                        self.io.write_str("Username: ")?;
+                        self.io.write_str(C::MSG_LOGIN_FAILED)?;
+                        self.io.write_str(C::MSG_LOGIN_PROMPT)?;
                     }
                 }
             } else {
-                self.io.write_str("Invalid format. Use: username:password\r\n")?;
-                self.io.write_str("Username: ")?;
+                self.io.write_str(C::MSG_INVALID_LOGIN_FORMAT)?;
+                self.io.write_str(C::MSG_LOGIN_PROMPT)?;
             }
         } else {
-            // Just username entered, this is fine for now
-            self.io.write_str("Password: ")?;
+            // No colon - invalid format, show error
+            self.io.write_str(C::MSG_INVALID_LOGIN_FORMAT)?;
+            self.io.write_str(C::MSG_LOGIN_PROMPT)?;
         }
 
         Ok(())
@@ -519,8 +520,8 @@ where
                 self.current_user = None;
                 self.state = CliState::LoggedOut;
                 self.current_path.clear();
-                self.io.write_str("Logged out.\r\n")?;
-                self.io.write_str("Username: ")?;
+                self.io.write_str(C::MSG_LOGOUT)?;
+                self.io.write_str(C::MSG_LOGIN_PROMPT)?;
                 return Ok(());
             }
             _ => {}

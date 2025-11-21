@@ -27,6 +27,30 @@ pub trait ShellConfig {
 
     /// Command history size (default: 10)
     const HISTORY_SIZE: usize;
+
+    // Message constants for user-visible strings
+    // All stored in ROM, zero runtime cost
+
+    /// Welcome message when authentication is enabled (default: "Welcome! Please log in.\r\n")
+    const MSG_WELCOME_AUTH: &'static str;
+
+    /// Welcome message when authentication is disabled (default: "Welcome to nut-shell!\r\n")
+    const MSG_WELCOME_NO_AUTH: &'static str;
+
+    /// Login prompt (default: "Login (username:password): ")
+    const MSG_LOGIN_PROMPT: &'static str;
+
+    /// Login success message (default: "Login successful!\r\n")
+    const MSG_LOGIN_SUCCESS: &'static str;
+
+    /// Login failed message (default: "Login failed. Try again.\r\n")
+    const MSG_LOGIN_FAILED: &'static str;
+
+    /// Logout message (default: "Logged out.\r\n")
+    const MSG_LOGOUT: &'static str;
+
+    /// Invalid login format message (default: "Invalid format. Use username:password\r\n")
+    const MSG_INVALID_LOGIN_FORMAT: &'static str;
 }
 
 /// Default configuration for typical embedded systems.
@@ -48,6 +72,14 @@ impl ShellConfig for DefaultConfig {
     const MAX_PROMPT: usize = 64;
     const MAX_RESPONSE: usize = 256;
     const HISTORY_SIZE: usize = 10;
+
+    const MSG_WELCOME_AUTH: &'static str = "Welcome! Please log in.\r\n";
+    const MSG_WELCOME_NO_AUTH: &'static str = "Welcome to nut-shell!\r\n";
+    const MSG_LOGIN_PROMPT: &'static str = "Login (username:password): ";
+    const MSG_LOGIN_SUCCESS: &'static str = "Login successful!\r\n";
+    const MSG_LOGIN_FAILED: &'static str = "Login failed. Try again.\r\n";
+    const MSG_LOGOUT: &'static str = "Logged out.\r\n";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use username:password\r\n";
 }
 
 /// Minimal configuration for resource-constrained systems.
@@ -69,6 +101,14 @@ impl ShellConfig for MinimalConfig {
     const MAX_PROMPT: usize = 32;
     const MAX_RESPONSE: usize = 128;
     const HISTORY_SIZE: usize = 5;
+
+    const MSG_WELCOME_AUTH: &'static str = "Welcome! Please log in.\r\n";
+    const MSG_WELCOME_NO_AUTH: &'static str = "Welcome to nut-shell!\r\n";
+    const MSG_LOGIN_PROMPT: &'static str = "Login (username:password): ";
+    const MSG_LOGIN_SUCCESS: &'static str = "Login successful!\r\n";
+    const MSG_LOGIN_FAILED: &'static str = "Login failed. Try again.\r\n";
+    const MSG_LOGOUT: &'static str = "Logged out.\r\n";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use username:password\r\n";
 }
 
 #[cfg(test)]
@@ -93,5 +133,92 @@ mod tests {
         assert_eq!(MinimalConfig::MAX_PROMPT, 32);
         assert_eq!(MinimalConfig::MAX_RESPONSE, 128);
         assert_eq!(MinimalConfig::HISTORY_SIZE, 5);
+    }
+
+    #[test]
+    fn test_default_config_messages() {
+        assert_eq!(
+            DefaultConfig::MSG_WELCOME_AUTH,
+            "Welcome! Please log in.\r\n"
+        );
+        assert_eq!(
+            DefaultConfig::MSG_WELCOME_NO_AUTH,
+            "Welcome to nut-shell!\r\n"
+        );
+        assert_eq!(DefaultConfig::MSG_LOGIN_PROMPT, "Login (username:password): ");
+        assert_eq!(DefaultConfig::MSG_LOGIN_SUCCESS, "Login successful!\r\n");
+        assert_eq!(DefaultConfig::MSG_LOGIN_FAILED, "Login failed. Try again.\r\n");
+        assert_eq!(DefaultConfig::MSG_LOGOUT, "Logged out.\r\n");
+        assert_eq!(
+            DefaultConfig::MSG_INVALID_LOGIN_FORMAT,
+            "Invalid format. Use username:password\r\n"
+        );
+    }
+
+    #[test]
+    fn test_minimal_config_messages() {
+        // MinimalConfig uses same messages as DefaultConfig
+        assert_eq!(
+            MinimalConfig::MSG_WELCOME_AUTH,
+            "Welcome! Please log in.\r\n"
+        );
+        assert_eq!(
+            MinimalConfig::MSG_WELCOME_NO_AUTH,
+            "Welcome to nut-shell!\r\n"
+        );
+        assert_eq!(MinimalConfig::MSG_LOGIN_PROMPT, "Login (username:password): ");
+        assert_eq!(MinimalConfig::MSG_LOGIN_SUCCESS, "Login successful!\r\n");
+        assert_eq!(MinimalConfig::MSG_LOGIN_FAILED, "Login failed. Try again.\r\n");
+        assert_eq!(MinimalConfig::MSG_LOGOUT, "Logged out.\r\n");
+        assert_eq!(
+            MinimalConfig::MSG_INVALID_LOGIN_FORMAT,
+            "Invalid format. Use username:password\r\n"
+        );
+    }
+
+    #[test]
+    fn test_custom_config_messages() {
+        // Test that users can customize messages
+        struct CustomConfig;
+
+        impl ShellConfig for CustomConfig {
+            const MAX_INPUT: usize = 128;
+            const MAX_PATH_DEPTH: usize = 8;
+            const MAX_ARGS: usize = 16;
+            const MAX_PROMPT: usize = 64;
+            const MAX_RESPONSE: usize = 256;
+            const HISTORY_SIZE: usize = 10;
+
+            const MSG_WELCOME_AUTH: &'static str = "🔐 Custom System - Auth Required\r\n";
+            const MSG_WELCOME_NO_AUTH: &'static str = "🚀 Custom System Ready\r\n";
+            const MSG_LOGIN_PROMPT: &'static str = "Enter credentials (user:pass): ";
+            const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted\r\n";
+            const MSG_LOGIN_FAILED: &'static str = "✗ Access denied\r\n";
+            const MSG_LOGOUT: &'static str = "Session ended\r\n";
+            const MSG_INVALID_LOGIN_FORMAT: &'static str = "Format error\r\n";
+        }
+
+        // Verify custom messages
+        assert_eq!(
+            CustomConfig::MSG_WELCOME_AUTH,
+            "🔐 Custom System - Auth Required\r\n"
+        );
+        assert_eq!(CustomConfig::MSG_WELCOME_NO_AUTH, "🚀 Custom System Ready\r\n");
+        assert_eq!(CustomConfig::MSG_LOGIN_PROMPT, "Enter credentials (user:pass): ");
+        assert_eq!(CustomConfig::MSG_LOGIN_SUCCESS, "✓ Access granted\r\n");
+        assert_eq!(CustomConfig::MSG_LOGIN_FAILED, "✗ Access denied\r\n");
+        assert_eq!(CustomConfig::MSG_LOGOUT, "Session ended\r\n");
+        assert_eq!(CustomConfig::MSG_INVALID_LOGIN_FORMAT, "Format error\r\n");
+    }
+
+    #[test]
+    fn test_messages_are_const() {
+        // Verify that messages are compile-time constants (can be used in const context)
+        const _WELCOME: &str = DefaultConfig::MSG_WELCOME_AUTH;
+        const _LOGIN: &str = DefaultConfig::MSG_LOGIN_PROMPT;
+        const _SUCCESS: &str = DefaultConfig::MSG_LOGIN_SUCCESS;
+        const _FAILED: &str = DefaultConfig::MSG_LOGIN_FAILED;
+        const _LOGOUT: &str = DefaultConfig::MSG_LOGOUT;
+        const _FORMAT: &str = DefaultConfig::MSG_INVALID_LOGIN_FORMAT;
     }
 }
