@@ -302,8 +302,9 @@ where
             ParseEvent::None => Ok(()), // Still accumulating sequence
 
             ParseEvent::Character(ch) => {
-                // Echo character
-                self.io.put_char(ch)?;
+                // Determine what to echo based on password masking
+                let echo_char = self.get_echo_char(ch);
+                self.io.put_char(echo_char)?;
                 Ok(())
             }
 
@@ -364,6 +365,48 @@ where
             self.process_char(c)?;
         }
         Ok(())
+    }
+
+    /// Determine what character to echo based on password masking rules.
+    ///
+    /// When in LoggedOut state (login prompt), characters after the `:` delimiter
+    /// are masked with `*` for password privacy.
+    ///
+    /// # Masking Rules
+    ///
+    /// - Characters before first `:` are echoed normally (username)
+    /// - The first `:` character is echoed normally (delimiter)
+    /// - All characters after `:` are echoed as `*` (password)
+    ///
+    /// # Arguments
+    ///
+    /// * `ch` - The character that was just added to the input buffer
+    ///
+    /// # Returns
+    ///
+    /// The character to echo to the terminal (`*` for masked, or original char)
+    fn get_echo_char(&self, ch: char) -> char {
+        #[cfg(feature = "authentication")]
+        {
+            // Password masking only applies during login (LoggedOut state)
+            if self.state == CliState::LoggedOut {
+                // Count colons in buffer (parser has already added current char)
+                let colon_count = self.input_buffer.matches(':').count();
+
+                // Logic: Mask if buffer had at least one colon before this character
+                // - colon_count == 0: No delimiter yet, echo normally
+                // - colon_count == 1 && ch == ':': First colon (just added), echo normally
+                // - Otherwise: We're in password territory, mask it
+                if colon_count == 0 || (colon_count == 1 && ch == ':') {
+                    return ch; // Username or delimiter
+                } else {
+                    return '*'; // Password
+                }
+            }
+        }
+
+        // Default: echo character as-is
+        ch
     }
 
     /// Generate prompt string.
@@ -888,6 +931,26 @@ where
         // In practice, the I/O error type would need to support this conversion
         // For now, we'll use a default error value
         unsafe { core::mem::zeroed() }
+    }
+
+    // ========================================
+    // Test-only accessors
+    // ========================================
+
+    /// Get reference to I/O interface (test-only).
+    ///
+    /// Available in both unit tests and integration tests.
+    #[doc(hidden)]
+    pub fn __test_io(&self) -> &IO {
+        &self.io
+    }
+
+    /// Get mutable reference to I/O interface (test-only).
+    ///
+    /// Available in both unit tests and integration tests.
+    #[doc(hidden)]
+    pub fn __test_io_mut(&mut self) -> &mut IO {
+        &mut self.io
     }
 }
 

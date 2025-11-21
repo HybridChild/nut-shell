@@ -64,7 +64,10 @@ mod test_tree; // Phase 3: Tree data model and metadata/execution separation
 mod test_request_response; // Phase 5: Request/Response types
 mod test_type_validation; // Checkpoint: Type-Level Integration Validation
 
+// Shell tests
+#[cfg(feature = "authentication")]
+mod test_shell_auth; // Shell authentication and password masking tests
+
 // Future test modules:
 // mod test_io;
-// mod test_auth;
 // mod test_shell;
