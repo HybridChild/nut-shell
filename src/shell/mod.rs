@@ -489,7 +489,7 @@ where
             #[cfg(feature = "authentication")]
             CliState::LoggedOut => self.handle_login_input(&input),
 
-            CliState::LoggedIn => self.handle_command_input(&input),
+            CliState::LoggedIn => self.handle_input_line(&input),
         }
     }
 
@@ -533,15 +533,20 @@ where
         Ok(())
     }
 
-    /// Handle command input.
-    fn handle_command_input(&mut self, input: &str) -> Result<(), IO::Error> {
-        // Skip empty commands
+    /// Handle user input line when in LoggedIn state.
+    ///
+    /// Processes three types of input:
+    /// 1. Global commands (?, ls, clear, logout)
+    /// 2. Tree navigation (paths resolving to directories)
+    /// 3. Tree commands (paths resolving to Node::Command)
+    fn handle_input_line(&mut self, input: &str) -> Result<(), IO::Error> {
+        // Skip empty input
         if input.trim().is_empty() {
             self.generate_and_write_prompt()?;
             return Ok(());
         }
 
-        // Check for global commands first
+        // Check for global commands first (non-tree operations)
         match input.trim() {
             "?" => {
                 self.show_help()?;
@@ -570,8 +575,8 @@ where
             _ => {}
         }
 
-        // Execute command
-        match self.execute_command(input) {
+        // Handle tree operations (navigation or command execution)
+        match self.execute_tree_path(input) {
             Ok(response) => {
                 // Write response
                 self.io.write_str(response.message.as_str())?;
@@ -613,9 +618,16 @@ where
         Ok(())
     }
 
-    /// Execute a command string.
-    fn execute_command(&mut self, input: &str) -> Result<Response<C>, CliError> {
-        // Parse command path and arguments
+    /// Execute a tree path (navigation or command execution).
+    ///
+    /// Resolves the path and either:
+    /// - Navigates to a directory (if path resolves to Node::Directory)
+    /// - Executes a tree command (if path resolves to Node::Command)
+    ///
+    /// Note: "command" here refers specifically to Node::Command,
+    /// not generic user input.
+    fn execute_tree_path(&mut self, input: &str) -> Result<Response<C>, CliError> {
+        // Parse path and arguments
         let parts: heapless::Vec<&str, 17> = input.split_whitespace().collect();
         if parts.is_empty() {
             return Err(CliError::CommandNotFound);
@@ -624,10 +636,10 @@ where
         let path_str = parts[0];
         let args = &parts[1..];
 
-        // Resolve path
+        // Resolve path to node
         let (target_node, new_path) = self.resolve_path(path_str)?;
 
-        // If it's a directory, navigate to it
+        // Case 1: Directory navigation
         if let Node::Directory(_) = target_node {
             self.current_path = new_path;
             #[cfg(feature = "history")]
@@ -636,7 +648,7 @@ where
             return Ok(Response::success(""));
         }
 
-        // It's a command - extract metadata and execute
+        // Case 2: Tree command execution (Node::Command)
         if let Node::Command(cmd_meta) = target_node {
             // Check access control - use InvalidPath for security (don't reveal access denied)
             if let Some(user) = &self.current_user {
@@ -654,15 +666,15 @@ where
                 });
             }
 
-            // Check command kind and dispatch
+            // Dispatch to command handlers
             match cmd_meta.kind {
                 CommandKind::Sync => {
-                    // Execute synchronous command
+                    // Execute synchronous tree command
                     self.handlers.execute_sync(cmd_meta.name, args)
                 }
                 #[cfg(feature = "async")]
                 CommandKind::Async => {
-                    // Async command called from sync context
+                    // Async tree command called from sync context
                     Err(CliError::AsyncNotSupported)
                 }
             }
