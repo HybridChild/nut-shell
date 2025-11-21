@@ -1,12 +1,11 @@
-.vscode/
+.vscode
 .DS_Store
+.claude
+.cargo
+target
+Cargo.lock
+
+!/examples/**/.cargo/
 
 /reports
 /prompt.md
-
-/target/
-/.cargo/
-Cargo.lock
-
-!/examples/*/.cargo/
-/examples/*/target/
