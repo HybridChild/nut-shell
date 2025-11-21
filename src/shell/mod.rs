@@ -142,6 +142,7 @@ where
     parser: InputParser,
 
     /// Command history (using concrete sizes)
+    #[cfg_attr(not(feature = "history"), allow(dead_code))]
     history: CommandHistory<10, 128>,
 
     /// I/O interface
@@ -157,6 +158,37 @@ where
 
     /// Config type marker (zero-size)
     _config: PhantomData<C>,
+}
+
+// ============================================================================
+// Debug implementation
+// ============================================================================
+
+impl<'tree, L, IO, H, C> core::fmt::Debug for Shell<'tree, L, IO, H, C>
+where
+    L: AccessLevel,
+    IO: CharIo,
+    H: CommandHandlers<C>,
+    C: ShellConfig,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut debug_struct = f.debug_struct("Shell");
+        debug_struct
+            .field("state", &self.state)
+            .field("input_buffer", &self.input_buffer.as_str())
+            .field("current_path", &self.current_path);
+
+        if let Some(user) = &self.current_user {
+            debug_struct.field("current_user", &user.username.as_str());
+        } else {
+            debug_struct.field("current_user", &"None");
+        }
+
+        #[cfg(feature = "authentication")]
+        debug_struct.field("credential_provider", &"<dyn CredentialProvider>");
+
+        debug_struct.finish_non_exhaustive()
+    }
 }
 
 // ============================================================================
@@ -294,6 +326,44 @@ where
                 self.clear_line_and_redraw()
             }
         }
+    }
+
+    /// Poll for incoming characters and process them.
+    ///
+    /// This is a **convenience method** for simple polling loops where the Shell actively
+    /// reads from its I/O. For more control or better embedded patterns, use
+    /// [`process_char()`](Self::process_char) directly.
+    ///
+    /// # When to Use
+    ///
+    /// Use `poll()` for:
+    /// - Simple blocking UART in bare-metal systems
+    /// - Quick prototypes and examples
+    /// - Native applications with blocking stdio
+    ///
+    /// # When NOT to Use
+    ///
+    /// **Do not use `poll()` if you need:**
+    /// - **Interrupt-driven UART**: Read characters in an interrupt handler and buffer them,
+    ///   then call `process_char()` from your main loop
+    /// - **DMA-based I/O**: Use DMA circular buffers and call `process_char()` for each
+    ///   character from the buffer
+    /// - **Async/await patterns**: Use `process_char()` from within your async context
+    /// - **RTOS integration**: Read from RTOS queues and call `process_char()`
+    /// - **Low power modes**: Waking from sleep to read requires interrupt-based approach
+    ///
+    /// In these cases, your application should control **when** and **how** characters
+    /// are read, then feed them to the Shell via `process_char()`.
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())` if no character available or character processed successfully
+    /// - `Err` on I/O error
+    pub fn poll(&mut self) -> Result<(), IO::Error> {
+        if let Some(c) = self.io.get_char()? {
+            self.process_char(c)?;
+        }
+        Ok(())
     }
 
     /// Generate prompt string.

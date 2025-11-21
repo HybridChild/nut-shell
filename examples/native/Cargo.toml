@@ -1,0 +1,30 @@
+[package]
+name = "native_examples"
+version = "0.1.0"
+edition = "2024"
+authors = ["Esben Dueholm Nørgaard"]
+
+[dependencies]
+# Nut-shell library (parent crate)
+nut-shell = { path = "../..", default-features = false }
+
+# Utilities
+heapless = "0.9"
+
+[features]
+default = ["authentication", "completion", "history"]
+
+# Pass features through to nut-shell
+authentication = ["nut-shell/authentication"]
+completion = ["nut-shell/completion"]
+history = ["nut-shell/history"]
+async = ["nut-shell/async"]
+
+[[bin]]
+name = "basic"
+path = "bin/basic/main.rs"
+
+[profile.release]
+debug = true
+lto = true
+opt-level = "z"

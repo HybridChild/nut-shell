@@ -834,18 +834,20 @@ Phase 9:
    - ✅ Feature-conditional compilation (works with/without authentication)
    - ✅ Comprehensive documentation comments
 
-2. ⬜ Create `examples/rp2040_uart.rs` (optional, deferred):
-   - RP2040-specific UART I/O implementation
-   - Minimal command tree for embedded
-   - Hardware initialization
-   - Verify on actual Pico hardware
+2. ✅ Create `examples/rp2040_uart.rs`:
+   - ✅ RP2040-specific UART I/O implementation (GP0/GP1 at 115200 baud)
+   - ✅ Minimal command tree for embedded (system/, led commands)
+   - ✅ Hardware initialization (clocks, UART, GPIO)
+   - ✅ Compiles for thumbv6m-none-eabi target
+   - ⚠️ Hardware verification pending (requires physical Pico)
 
 3. ✅ Add documentation comments showing example usage
 
-**Success Criteria**: ✅ Can run interactive CLI session with examples
+**Success Criteria**: ✅ Can run interactive CLI session with examples (basic verified, RP2040 compiles)
 
 **Implementation Results**:
-- Created `examples/basic.rs` (~400 lines):
+
+**Basic Example** - `examples/basic.rs` (~400 lines):
   - Complete working CLI demonstrating all major features
   - Custom AccessLevel implementation (Guest/User/Admin)
   - Command tree with nested directories:
@@ -871,6 +873,41 @@ Phase 9:
   - How to set up authentication (conditional)
   - How to implement CharIo for native platform
   - How to create and run Shell in interactive mode
+
+**RP2040 Example** - Dedicated project in `examples/rp-pico/` (~430 lines):
+- **Structure**: Complete standalone Cargo project (mimics rgb-sequencer pattern)
+  - Dedicated Cargo.toml with nut-shell as path dependency
+  - memory.x linker script for RP2040
+  - .cargo/config.toml for default target and probe-rs runner
+  - bin/uart_cli/main.rs - main example binary
+  - Comprehensive README.md with hardware setup and build instructions
+- **Hardware configuration**:
+  - UART on GP0 (TX) and GP1 (RX)
+  - Baud rate: 115200
+  - System clock initialization from 12 MHz crystal
+  - Boot2 stage bootloader integration
+- **Implementation**:
+  - Custom AccessLevel (User/Admin - 2 levels optimized for embedded)
+  - Minimal command tree: `/system/` (info, reboot), `/led` (on/off)
+  - UartCharIo using rp2040-hal (non-blocking reads, blocking writes)
+  - CredentialProvider with 2 users: admin:pico123, user:pico456
+  - Authentication always enabled (compiled with authentication feature)
+- **Build process**:
+  - `cd examples/rp-pico`
+  - `cargo build --release --bin uart_cli`
+  - Default target: thumbv6m-none-eabi (set in .cargo/config.toml)
+  - ✅ Compiles successfully for embedded target
+- **Dependencies**: Self-contained in project Cargo.toml
+  - rp2040-hal, cortex-m, cortex-m-rt, embedded-hal, fugit, heapless
+  - rp2040-boot2 (stage 2 bootloader), rp-pico (board support)
+  - panic-halt for embedded panic handling
+- **Example demonstrates**:
+  - Dedicated embedded project structure (best practice pattern)
+  - RP2040 hardware setup (clocks, UART, GPIO, boot2)
+  - CharIo implementation for UART
+  - Minimal command trees for resource-constrained systems
+  - Shell integration patterns for embedded (documented in comments)
+  - Complete #![no_std] and #![no_main] embedded setup
 
 ---
 
@@ -1243,14 +1280,19 @@ cargo expand --lib                       # Expand macros
 ### In Progress
 - (None)
 
-### Completed (Phase 9: Examples - Partial)
+### Completed (Phase 9: Examples - Complete)
 - ✅ Phase 9.1: Basic Example (`examples/basic.rs`)
   - Complete native stdio CLI with all features demonstrated
   - Feature-conditional compilation verified
   - Comprehensive documentation included
+- ✅ Phase 9.2: RP2040 UART Example (`examples/rp2040_uart.rs`)
+  - Complete embedded CLI for Raspberry Pi Pico
+  - UART I/O on GP0/GP1 at 115200 baud
+  - Compiles for thumbv6m-none-eabi target
+  - Feature-conditional compilation verified
+  - Hardware verification pending (requires physical device)
 
 ### Upcoming
-- ⬜ Phase 9.2: RP2040 UART Example (optional, deferred)
 - ⬜ Phase 10: Testing & Polish
 
 ## Notes

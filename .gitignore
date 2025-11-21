@@ -1,12 +1,12 @@
-Cargo.lock
-
-reports
-prompt.md
-
-/target/
-.cargo/
 .vscode/
 .DS_Store
 
+/reports
+/prompt.md
+
+/target/
+/.cargo/
+Cargo.lock
+
+!/examples/*/.cargo/
 /examples/*/target/
-/examples/*/Cargo.lock
