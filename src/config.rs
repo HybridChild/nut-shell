@@ -8,6 +8,27 @@
 /// All values are const (zero runtime cost). Implementations define buffer sizes
 /// for input, paths, arguments, prompts, responses, and history.
 ///
+/// # ⚠️ Current Limitation: Values Not Yet Configurable
+///
+/// **IMPORTANT:** Due to Rust's current const generics limitations, changing these
+/// configuration values will NOT affect the actual buffer sizes used internally.
+/// All internal buffers are currently hardcoded to the values from `DefaultConfig`:
+///
+/// - `MAX_INPUT`: 128 (hardcoded)
+/// - `MAX_PATH_DEPTH`: 8 (hardcoded)
+/// - `MAX_ARGS`: 16 (hardcoded)
+/// - `MAX_PROMPT`: 128 (hardcoded, derived from MAX_INPUT)
+/// - `MAX_RESPONSE`: 256 (hardcoded)
+/// - `HISTORY_SIZE`: 10 (hardcoded)
+///
+/// These constants are **only used for message configuration** at present.
+/// The trait exists to establish the API contract for when const generics
+/// stabilize, at which point all TODO comments throughout the codebase
+/// will be addressed to make these values fully functional.
+///
+/// **You CAN customize:** The message strings (`MSG_*` constants) are fully
+/// functional and can be customized in your `ShellConfig` implementation.
+///
 /// See [TYPE_REFERENCE.md](../docs/TYPE_REFERENCE.md) "Configuration" section.
 pub trait ShellConfig {
     /// Maximum input buffer size (default: 128)

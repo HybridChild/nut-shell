@@ -43,7 +43,7 @@ pub enum CliState {
     /// CLI not active
     Inactive,
 
-    /// Awaiting authentication (feature-gated, but always defined)
+    /// Awaiting authentication
     #[cfg(feature = "authentication")]
     LoggedOut,
 
@@ -59,7 +59,7 @@ pub enum CliState {
 /// See [TYPE_REFERENCE.md](../../docs/TYPE_REFERENCE.md) for complete type definition.
 #[derive(Debug, Clone)]
 pub enum Request<C: ShellConfig> {
-    /// Authentication attempt (feature-gated: authentication)
+    /// Valid authentication attempt
     #[cfg(feature = "authentication")]
     Login {
         /// Username
@@ -68,7 +68,7 @@ pub enum Request<C: ShellConfig> {
         password: heapless::String<64>,
     },
 
-    /// Failed login (feature-gated: authentication)
+    /// Invalid authentication attempt
     #[cfg(feature = "authentication")]
     InvalidLogin,
 
@@ -78,21 +78,21 @@ pub enum Request<C: ShellConfig> {
         path: heapless::String<128>, // TODO: Use C::MAX_INPUT when const generics stabilize
         /// Command arguments
         args: heapless::Vec<heapless::String<128>, 16>, // TODO: Use C::MAX_INPUT and C::MAX_ARGS
-        /// Original command string (for history, feature-gated)
+        /// Original command string for history
         #[cfg(feature = "history")]
         original: heapless::String<128>, // TODO: Use C::MAX_INPUT
         /// Phantom data for config type (will be used when const generics stabilize)
         _phantom: PhantomData<C>,
     },
 
-    /// Request completions (feature-gated: completion)
+    /// Request completions
     #[cfg(feature = "completion")]
     TabComplete {
         /// Partial path to complete
         path: heapless::String<128>, // TODO: Use C::MAX_INPUT
     },
 
-    /// Navigate history (feature-gated: history)
+    /// Navigate history
     #[cfg(feature = "history")]
     History {
         /// Navigation direction
@@ -122,7 +122,6 @@ where
     H: CommandHandlers<C>,
     C: ShellConfig,
 {
-    // ALWAYS present (not feature-gated)
     /// Command tree root
     tree: &'tree Directory<L>,
 
@@ -135,13 +134,13 @@ where
     /// Input buffer (using concrete size for now - TODO: use C::MAX_INPUT when const generics stabilize)
     input_buffer: heapless::String<128>,
 
-    /// Current directory path (stack of child indices, using concrete size)
+    /// Current directory path (stack of child indices, using concrete size - TODO: use C::MAX_PATH_DEPTH when const generics stabilize)
     current_path: heapless::Vec<usize, 8>,
 
     /// Input parser (escape sequences)
     parser: InputParser,
 
-    /// Command history (using concrete sizes)
+    /// Command history (using concrete sizes - TODO: use C::HISTORY_SIZE and C::MAX_INPUT when const generics stabilize)
     #[cfg_attr(not(feature = "history"), allow(dead_code))]
     history: CommandHistory<10, 128>,
 
@@ -152,7 +151,7 @@ where
     handlers: H,
 
     // ONLY this field is feature-gated
-    /// Credential provider (feature-gated: authentication)
+    /// Credential provider
     #[cfg(feature = "authentication")]
     credential_provider: &'tree (dyn crate::auth::CredentialProvider<L, Error = ()> + 'tree),
 
@@ -420,6 +419,7 @@ where
     /// Generate prompt string.
     ///
     /// Format: `username@path> ` (or `@path> ` when no user/auth disabled)
+    // TODO: Use C::MAX_PROMPT when const generics stabilize
     fn generate_prompt(&self) -> heapless::String<128> {
         let mut prompt = heapless::String::new();
 
@@ -462,6 +462,7 @@ where
     }
 
     /// Get current path as string (for prompt).
+    // TODO: Use C::MAX_INPUT when const generics stabilize
     fn get_current_path_string(&self) -> Result<heapless::String<128>, CliError> {
         let mut path_str = heapless::String::new();
         let mut current: &Directory<L> = self.tree;
@@ -636,6 +637,7 @@ where
     /// not generic user input.
     fn execute_tree_path(&mut self, input: &str) -> Result<Response<C>, CliError> {
         // Parse path and arguments
+        // TODO: Use C::MAX_ARGS + 1 when const generics stabilize (command + args)
         let parts: heapless::Vec<&str, 17> = input.split_whitespace().collect();
         if parts.is_empty() {
             return Err(CliError::CommandNotFound);
@@ -694,11 +696,13 @@ where
     /// Resolve a path string to a node.
     ///
     /// Returns (node, path_stack) where path_stack is the navigation path.
+    // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
     fn resolve_path(
         &self,
         path_str: &str,
     ) -> Result<(&'tree Node<L>, heapless::Vec<usize, 8>), CliError> {
         // Start from current directory or root
+        // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
         let mut working_path: heapless::Vec<usize, 8> = if path_str.starts_with('/') {
             heapless::Vec::new() // Absolute path starts from root
         } else {
@@ -706,6 +710,7 @@ where
         };
 
         // Parse path
+        // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
         let segments: heapless::Vec<&str, 8> = path_str
             .trim_start_matches('/')
             .split('/')
@@ -764,6 +769,7 @@ where
     }
 
     /// Get directory at specific path.
+    // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
     fn get_dir_at_path(&self, path: &heapless::Vec<usize, 8>) -> Result<&'tree Directory<L>, CliError> {
         let mut current: &Directory<L> = self.tree;
 
@@ -778,6 +784,7 @@ where
     }
 
     /// Get node at specific path.
+    // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
     fn get_node_at_path(&self, path: &heapless::Vec<usize, 8>) -> Result<&'tree Node<L>, CliError> {
         if path.is_empty() {
             // Root directory - need to find a way to return it as a Node
@@ -785,6 +792,7 @@ where
             return Err(CliError::InvalidPath);
         }
 
+        // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
         let parent_path: heapless::Vec<usize, 8> = path.iter().take(path.len() - 1).copied().collect();
         let parent_dir = self.get_dir_at_path(&parent_path)?;
 

@@ -63,9 +63,11 @@ pub enum CliError {
     Timeout,
 
     /// Command executed but reported failure
+    // TODO: Use C::MAX_RESPONSE when const generics stabilize
     CommandFailed(heapless::String<256>),
 
     /// Generic error with message
+    // TODO: Use C::MAX_RESPONSE when const generics stabilize
     Other(heapless::String<256>),
 }
 
