@@ -25,6 +25,7 @@ use crate::tree::Node;
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompletionResult<const MAX_MATCHES: usize> {
     /// The completion text (common prefix if multiple matches)
+    // TODO: Use C::MAX_INPUT when const generics stabilize
     pub completion: heapless::String<128>,
 
     /// True if exactly one match found
@@ -34,6 +35,7 @@ pub struct CompletionResult<const MAX_MATCHES: usize> {
     pub is_directory: bool,
 
     /// All matching node names (for display)
+    // TODO: Consider using C::MAX_INPUT or a separate config constant when const generics stabilize
     pub all_matches: heapless::Vec<heapless::String<64>, MAX_MATCHES>,
 }
 
@@ -170,6 +172,7 @@ pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
         .map_err(|_| CliError::BufferFull)?;
 
     // Collect all match names for display
+    // TODO: Consider using C::MAX_INPUT or a separate config constant when const generics stabilize
     let mut all_matches: heapless::Vec<heapless::String<64>, MAX_MATCHES> = heapless::Vec::new();
     for (name, _) in matches.iter() {
         let mut match_str = heapless::String::new();

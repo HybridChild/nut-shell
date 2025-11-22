@@ -35,7 +35,7 @@ pub struct Response<C: ShellConfig> {
     /// Display prompt after response
     pub show_prompt: bool,
 
-    /// Prevent input from being saved to history (feature-gated: history)
+    /// Prevent input from being saved to history
     #[cfg(feature = "history")]
     pub exclude_from_history: bool,
 

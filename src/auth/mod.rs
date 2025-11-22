@@ -79,11 +79,11 @@ pub struct User<L: AccessLevel> {
     /// User's access level (always present)
     pub access_level: L,
 
-    /// Password hash (feature-gated: authentication)
+    /// Password hash
     #[cfg(feature = "authentication")]
     pub password_hash: [u8; 32],
 
-    /// Salt for password hashing (feature-gated: authentication)
+    /// Salt for password hashing
     #[cfg(feature = "authentication")]
     pub salt: [u8; 16],
 }
