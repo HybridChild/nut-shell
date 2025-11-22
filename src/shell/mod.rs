@@ -150,7 +150,6 @@ where
     /// Command handlers
     handlers: H,
 
-    // ONLY this field is feature-gated
     /// Credential provider
     #[cfg(feature = "authentication")]
     credential_provider: &'tree (dyn crate::auth::CredentialProvider<L, Error = ()> + 'tree),
@@ -202,9 +201,9 @@ where
     H: CommandHandlers<C>,
     C: ShellConfig,
 {
-    /// Create new Shell with authentication enabled.
+    /// Create new Shell with credential provider for when authentication enabled.
     ///
-    /// Starts in `LoggedOut` state, requiring login before commands can be executed.
+    /// Starts in `Inactive` state. Call `activate()` to show welcome message and prompt.
     pub fn new(
         tree: &'tree Directory<L>,
         handlers: H,
@@ -214,8 +213,8 @@ where
         Self {
             tree,
             handlers,
-            current_user: None, // Start logged out
-            state: CliState::LoggedOut,
+            current_user: None,
+            state: CliState::Inactive,
             input_buffer: heapless::String::new(),
             current_path: heapless::Vec::new(),
             parser: InputParser::new(),
@@ -235,15 +234,15 @@ where
     H: CommandHandlers<C>,
     C: ShellConfig,
 {
-    /// Create new Shell with authentication disabled.
+    /// Create new Shell
     ///
-    /// Starts in `LoggedIn` state with no user, ready to accept commands.
+    /// Starts in `Inactive` state. Call `activate()` to show welcome message and prompt.
     pub fn new(tree: &'tree Directory<L>, handlers: H, io: IO) -> Self {
         Self {
             tree,
             handlers,
-            current_user: None, // No user needed (auth disabled)
-            state: CliState::LoggedIn,
+            current_user: None,
+            state: CliState::Inactive,
             input_buffer: heapless::String::new(),
             current_path: heapless::Vec::new(),
             parser: InputParser::new(),
@@ -284,6 +283,22 @@ where
         }
 
         Ok(())
+    }
+
+    /// Deactivate the shell (transition to Inactive state).
+    ///
+    /// Clears user session, input buffer, and returns to root directory.
+    /// The shell will ignore all input until `activate()` is called again.
+    ///
+    /// This is useful for:
+    /// - Clean shutdown sequences
+    /// - Temporarily suspending the shell
+    /// - Resetting to initial state
+    pub fn deactivate(&mut self) {
+        self.state = CliState::Inactive;
+        self.current_user = None;
+        self.input_buffer.clear();
+        self.current_path.clear();
     }
 
     /// Process a single character of input.
@@ -1023,5 +1038,133 @@ mod tests {
 
         #[cfg(feature = "authentication")]
         assert_ne!(CliState::LoggedOut, CliState::LoggedIn);
+    }
+
+    #[test]
+    fn test_activate_deactivate_lifecycle() {
+        use crate::auth::AccessLevel;
+        use crate::config::DefaultConfig;
+        use crate::io::CharIo;
+        use crate::tree::Directory;
+
+        // Mock access level
+        #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+        enum MockLevel {
+            User = 0,
+        }
+        impl AccessLevel for MockLevel {
+            fn from_str(s: &str) -> Option<Self> {
+                match s {
+                    "User" => Some(Self::User),
+                    _ => None,
+                }
+            }
+            fn as_str(&self) -> &'static str {
+                "User"
+            }
+        }
+
+        // Mock I/O
+        struct MockIo;
+        impl CharIo for MockIo {
+            type Error = ();
+            fn get_char(&mut self) -> Result<Option<char>, ()> {
+                Ok(None)
+            }
+            fn put_char(&mut self, _c: char) -> Result<(), ()> {
+                Ok(())
+            }
+            fn write_str(&mut self, _s: &str) -> Result<(), ()> {
+                Ok(())
+            }
+        }
+
+        // Mock handlers
+        struct MockHandlers;
+        impl CommandHandlers<DefaultConfig> for MockHandlers {
+            fn execute_sync(
+                &self,
+                _name: &str,
+                _args: &[&str],
+            ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
+                Err(crate::error::CliError::CommandNotFound)
+            }
+
+            #[cfg(feature = "async")]
+            async fn execute_async(
+                &self,
+                _name: &str,
+                _args: &[&str],
+            ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
+                Err(crate::error::CliError::CommandNotFound)
+            }
+        }
+
+        // Test tree
+        const TEST_TREE: Directory<MockLevel> = Directory {
+            name: "/",
+            children: &[],
+            access_level: MockLevel::User,
+        };
+
+        let io = MockIo;
+        let handlers = MockHandlers;
+
+        // Create shell - should start in Inactive state
+        #[cfg(feature = "authentication")]
+        {
+            use crate::auth::CredentialProvider;
+            struct MockProvider;
+            impl CredentialProvider<MockLevel> for MockProvider {
+                type Error = ();
+                fn find_user(&self, _username: &str) -> Result<Option<crate::auth::User<MockLevel>>, ()> {
+                    Ok(None)
+                }
+                fn verify_password(&self, _user: &crate::auth::User<MockLevel>, _password: &str) -> bool {
+                    false
+                }
+                fn list_users(&self) -> Result<heapless::Vec<&str, 32>, ()> {
+                    Ok(heapless::Vec::new())
+                }
+            }
+            let provider = MockProvider;
+            let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+                Shell::new(&TEST_TREE, handlers, &provider, io);
+
+            // Should start in Inactive state
+            assert_eq!(shell.state, CliState::Inactive);
+            assert!(shell.current_user.is_none());
+
+            // Activate should transition to LoggedOut (auth enabled)
+            shell.activate().unwrap();
+            assert_eq!(shell.state, CliState::LoggedOut);
+
+            // Deactivate should return to Inactive
+            shell.deactivate();
+            assert_eq!(shell.state, CliState::Inactive);
+            assert!(shell.current_user.is_none());
+            assert!(shell.input_buffer.is_empty());
+            assert!(shell.current_path.is_empty());
+        }
+
+        #[cfg(not(feature = "authentication"))]
+        {
+            let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+                Shell::new(&TEST_TREE, handlers, io);
+
+            // Should start in Inactive state
+            assert_eq!(shell.state, CliState::Inactive);
+
+            // Activate should transition to LoggedIn (auth disabled)
+            shell.activate().unwrap();
+            assert_eq!(shell.state, CliState::LoggedIn);
+
+            // Deactivate should return to Inactive
+            shell.deactivate();
+            assert_eq!(shell.state, CliState::Inactive);
+            assert!(shell.current_user.is_none());
+            assert!(shell.input_buffer.is_empty());
+            assert!(shell.current_path.is_empty());
+        }
     }
 }

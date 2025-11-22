@@ -525,11 +525,18 @@ pub struct Shell<'tree, L, IO, H, C> {
 }
 ```
 
-**Constructor behavior:**
-- Auth enabled: `current_user = None`, `state = CliState::LoggedOut`
-- Auth disabled: `current_user = None`, `state = CliState::LoggedIn`
+**Constructor behavior and lifecycle:**
+- `Shell::new()` creates shell in `CliState::Inactive` state (both auth modes)
+- `Shell::activate()` transitions to appropriate state and shows welcome message:
+  - Auth enabled: `Inactive` → `LoggedOut` (awaiting login)
+  - Auth disabled: `Inactive` → `LoggedIn` (ready for commands)
+- `Shell::deactivate()` returns to `Inactive` state:
+  - Clears user session, input buffer, and current path
+  - Shell ignores all input until `activate()` is called again
+  - Useful for clean shutdown, temporary suspension, or reset to initial state
 
 **State and user semantics:**
+- `state = Inactive, current_user = None` → Shell created but not activated, or deactivated
 - `state = LoggedOut, current_user = None` → Awaiting login (auth enabled)
 - `state = LoggedIn, current_user = Some(user)` → Authenticated (auth enabled)
 - `state = LoggedIn, current_user = None` → Auth disabled (no user needed)
