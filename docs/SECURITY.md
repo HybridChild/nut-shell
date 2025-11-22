@@ -334,7 +334,13 @@ impl AccessLevel for MyAccessLevel {
 Access control is enforced during path resolution, checking each segment as the tree is traversed:
 
 ```rust
-impl<'tree, L: AccessLevel, IO: CharIo> Shell<'tree, L, IO> {
+impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
+where
+    L: AccessLevel,
+    IO: CharIo,
+    H: CommandHandlers<C>,
+    C: ShellConfig,
+{
     fn resolve_path(&self, path: &Path) -> Result<&Node<L>, CliError> {
         let mut current = self.get_current_directory();
 

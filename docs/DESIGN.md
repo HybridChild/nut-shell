@@ -134,11 +134,11 @@ pub struct CommandMeta<L: AccessLevel> {
 }
 
 // Execution logic (generic trait)
-pub trait CommandHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+pub trait CommandHandlers<C: ShellConfig> {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError>;
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 }
 
 // Shell generic over handlers and config
@@ -161,11 +161,11 @@ where
 ```rust
 struct BareMetalHandlers;
 
-impl CommandHandlers for BareMetalHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl<C: ShellConfig> CommandHandlers<C> for BareMetalHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match name {
-            "reboot" => reboot_fn(args),
-            "status" => status_fn(args),
+            "reboot" => reboot_fn::<C>(args),
+            "status" => status_fn::<C>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -183,19 +183,19 @@ loop {
 ```rust
 struct EmbassyHandlers;
 
-impl CommandHandlers for EmbassyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl<C: ShellConfig> CommandHandlers<C> for EmbassyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match name {
-            "reboot" => reboot_fn(args),
+            "reboot" => reboot_fn::<C>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match name {
-            "http-get" => http_get_async(args).await,    // Natural async!
-            "wifi-connect" => wifi_connect_async(args).await,
+            "http-get" => http_get_async::<C>(args).await,    // Natural async!
+            "wifi-connect" => wifi_connect_async::<C>(args).await,
             _ => Err(CliError::CommandNotFound),
         }
     }

@@ -9,10 +9,6 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
-use fixtures::{MockAccessLevel, MockHandlers, MockIo, TEST_TREE};
-use nut_shell::config::DefaultConfig;
-use nut_shell::shell::Shell;
-
 // ============================================================================
 // Command Execution Tests
 // ============================================================================

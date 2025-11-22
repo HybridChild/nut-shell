@@ -84,7 +84,7 @@ impl AccessLevel for Level {
 }
 
 // Define commands
-fn reboot_fn(args: &[&str]) -> Result<Response, CliError> {
+fn reboot_fn<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
     // Reboot implementation
     Ok(Response::success("Rebooting..."))
 }
@@ -116,10 +116,10 @@ const ROOT: Directory<Level> = Directory {
 // Implement command handlers
 struct MyHandlers;
 
-impl CommandHandlers for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl<C: ShellConfig> CommandHandlers<C> for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match name {
-            "reboot" => reboot_fn(args),
+            "reboot" => reboot_fn::<C>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -150,7 +150,7 @@ use embassy_executor::Spawner;
 use embassy_usb::class::cdc_acm::CdcAcmClass;
 
 // Async command
-async fn http_get_async(args: &[&str]) -> Result<Response, CliError> {
+async fn http_get_async<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
     let url = args[0];
     let response = HTTP_CLIENT.get(url).await?;
     Ok(Response::success(&response))
@@ -166,18 +166,18 @@ const HTTP_GET: CommandMeta<Level> = CommandMeta {
 };
 
 // Handler with async support
-impl CommandHandlers for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl<C: ShellConfig> CommandHandlers<C> for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match name {
-            "reboot" => reboot_fn(args),
+            "reboot" => reboot_fn::<C>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match name {
-            "http-get" => http_get_async(args).await,
+            "http-get" => http_get_async::<C>(args).await,
             _ => Err(CliError::CommandNotFound),
         }
     }

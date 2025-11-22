@@ -891,7 +891,7 @@ fn get_char(&mut self) -> Result<Option<char>, Self::Error> {
 3. Provide progress feedback via periodic responses
 
 ```rust
-async fn long_operation_async(args: &[&str]) -> Result<Response, CliError> {
+async fn long_operation_async<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
     // Option 1: Timeout
     embassy_time::with_timeout(Duration::from_secs(10), work()).await?;
 
@@ -1058,7 +1058,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 static LED_STATE: AtomicBool = AtomicBool::new(false);
 
-fn led_toggle_fn(_args: &[&str]) -> Result<Response, CliError> {
+fn led_toggle_fn<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
     let new_state = !LED_STATE.load(Ordering::Relaxed);
     LED_STATE.store(new_state, Ordering::Relaxed);
 
@@ -1073,8 +1073,8 @@ struct MyHandlers<'a> {
     system_state: &'a SystemState,
 }
 
-impl CommandHandlers for MyHandlers<'_> {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl<'a, C: ShellConfig> CommandHandlers<C> for MyHandlers<'a> {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match name {
             "status" => {
                 let info = self.system_state.get_status();
@@ -1098,8 +1098,13 @@ const FLASH_WRITE: CommandMeta<Level> = CommandMeta {
 };
 
 // Handler with natural async/await
-impl CommandHandlers for MyHandlers {
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+impl<C: ShellConfig> CommandHandlers<C> for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+        Err(CliError::CommandNotFound)
+    }
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match name {
             "flash-write" => {
                 for i in 0..100 {
@@ -1134,7 +1139,7 @@ io.flush().await?;
 **Use async commands for long operations:**
 ```rust
 // Good - non-blocking
-async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, CliError> {
+async fn execute_async<C: ShellConfig>(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
     match name {
         "long-op" => {
             for _ in 0..1000 {
@@ -1150,7 +1155,7 @@ async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response, Cli
 **Use heapless for collections:**
 ```rust
 // Good - no_std compatible
-fn command(_args: &[&str]) -> Result<Response, CliError> {
+fn command<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
     let mut data: heapless::Vec<u8, 32> = heapless::Vec::new();
     data.push(42).ok();
     Ok(Response::success("Done"))
@@ -1192,7 +1197,7 @@ for byte in batch {
 **Don't block in sync commands:**
 ```rust
 // AVOID - blocks entire CLI
-fn bad_command(_args: &[&str]) -> Result<Response, CliError> {
+fn bad_command<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
     for _ in 0..1000000 { }  // Blocks everything!
     Ok(Response::success("Done"))
 }
@@ -1203,7 +1208,7 @@ fn bad_command(_args: &[&str]) -> Result<Response, CliError> {
 **Don't allocate on heap:**
 ```rust
 // AVOID - no_std incompatible
-fn bad_command(_args: &[&str]) -> Result<Response, CliError> {
+fn bad_command<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
     let data = vec![1, 2, 3];  // Won't compile!
     Ok(Response::success("Done"))
 }
