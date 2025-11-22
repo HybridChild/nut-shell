@@ -292,11 +292,19 @@ where
     /// Main entry point for character-by-character processing.
     /// Returns Ok(()) on success, Err on I/O error.
     pub fn process_char(&mut self, c: char) -> Result<(), IO::Error> {
-        // Parse character
-        let event = self
-            .parser
-            .process_char(c, &mut self.input_buffer)
-            .map_err(|_| self.create_io_error())?;
+        // Parse character - handle errors locally
+        let event = match self.parser.process_char(c, &mut self.input_buffer) {
+            Ok(event) => event,
+            Err(CliError::BufferFull) => {
+                // Buffer full - beep and stop accepting input
+                self.io.put_char('\x07')?; // Bell character
+                return Ok(()); // Not an I/O error, just handled gracefully
+            }
+            Err(_) => {
+                // Other parser errors (shouldn't happen, but be defensive)
+                return Ok(());
+            }
+        };
 
         match event {
             ParseEvent::None => Ok(()), // Still accumulating sequence
@@ -808,15 +816,19 @@ where
                 Ok(completion) if completion.is_complete => {
                     // Single match - replace buffer and update display
                     self.input_buffer.clear();
-                    self.input_buffer
-                        .push_str(&completion.completion)
-                        .map_err(|_| self.create_io_error())?;
-
-                    // Redraw line
-                    self.io.write_str("\r")?; // Carriage return
-                    let prompt = self.generate_prompt();
-                    self.io.write_str(prompt.as_str())?;
-                    self.io.write_str(self.input_buffer.as_str())?;
+                    match self.input_buffer.push_str(&completion.completion) {
+                        Ok(()) => {
+                            // Redraw line
+                            self.io.write_str("\r")?; // Carriage return
+                            let prompt = self.generate_prompt();
+                            self.io.write_str(prompt.as_str())?;
+                            self.io.write_str(self.input_buffer.as_str())?;
+                        }
+                        Err(_) => {
+                            // Completion too long for buffer - beep
+                            self.io.put_char('\x07')?;
+                        }
+                    }
                 }
                 Ok(completion) if !completion.all_matches.is_empty() => {
                     // Multiple matches - show them
@@ -935,14 +947,6 @@ where
         self.generate_and_write_prompt()?;
         self.io.write_str(self.input_buffer.as_str())?;
         Ok(())
-    }
-
-    /// Create generic I/O error (for conversions).
-    fn create_io_error(&self) -> IO::Error {
-        // This is a workaround since we can't directly convert CliError to IO::Error
-        // In practice, the I/O error type would need to support this conversion
-        // For now, we'll use a default error value
-        unsafe { core::mem::zeroed() }
     }
 
     // ========================================

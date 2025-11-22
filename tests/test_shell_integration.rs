@@ -9,6 +9,9 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
+use fixtures::{MockHandlers, MockIo, TEST_TREE};
+use nut_shell::Shell;
+
 // ============================================================================
 // Command Execution Tests
 // ============================================================================
@@ -444,4 +447,67 @@ fn test_minimal_features() {
         let output = shell.__test_io_mut().output();
         assert!(output.contains("minimal"), "Basic functionality should work");
     }
+}
+
+// ============================================================================
+// Buffer Overflow Handling Tests
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_buffer_overflow_emits_bell() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Input buffer size is 128 chars (hardcoded in Shell for now)
+    // Fill it up completely
+    let long_input = "a".repeat(128);
+    for c in long_input.chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.__test_io_mut().clear_output();
+
+    // Try to add one more character - should trigger bell
+    shell.process_char('x').unwrap(); // Should succeed (returns Ok)
+
+    let output = shell.__test_io_mut().output();
+    assert!(output.contains('\x07'), "Should emit bell character on buffer full");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_buffer_overflow_continues_working() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+
+    // Fill buffer to capacity
+    let long_input = "a".repeat(128);
+    for c in long_input.chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    // Try to add more - should beep but not crash
+    shell.process_char('x').unwrap();
+    shell.process_char('y').unwrap();
+    shell.process_char('z').unwrap();
+
+    // Clear the buffer with double-ESC
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('\x1b').unwrap();
+
+    shell.__test_io_mut().clear_output();
+
+    // Should be able to use shell normally after overflow
+    for c in "echo test\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(output.contains("test"), "Shell should work normally after buffer overflow");
 }
