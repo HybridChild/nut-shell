@@ -732,9 +732,11 @@ where
                 // Directory navigation - update path and return
                 self.current_path = new_path;
                 #[cfg(feature = "history")]
-                return Ok(Response::success("").without_history());
+                return Ok(Response::success("")
+                    .without_history()
+                    .without_postfix_newline());
                 #[cfg(not(feature = "history"))]
-                return Ok(Response::success(""));
+                return Ok(Response::success("").without_postfix_newline());
             }
             Some(Node::Command(cmd_meta)) => {
                 // Case 2: Tree command execution
