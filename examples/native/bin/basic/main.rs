@@ -19,6 +19,9 @@
 //! - guest:guest123 (Guest access)
 
 use core::fmt::Write;
+use crossterm::{
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 use nut_shell::{
     auth::AccessLevel,
     config::DefaultConfig,
@@ -326,6 +329,28 @@ impl nut_shell::auth::CredentialProvider<ExampleAccessLevel> for ExampleCredenti
 }
 
 // =============================================================================
+// Terminal Raw Mode Guard
+// =============================================================================
+
+/// RAII guard that enables raw terminal mode on creation and restores on drop.
+/// This ensures the terminal is always restored, even on panic or error.
+struct RawModeGuard;
+
+impl RawModeGuard {
+    fn new() -> io::Result<Self> {
+        enable_raw_mode()?;
+        Ok(Self)
+    }
+}
+
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        // Always try to restore terminal mode
+        let _ = disable_raw_mode();
+    }
+}
+
+// =============================================================================
 // I/O Implementation
 // =============================================================================
 
@@ -402,6 +427,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Type '?' for help, 'logout' to exit (with auth), or Ctrl+C to quit.\n");
 
+    // Enable raw terminal mode to resemble embedded target behavior:
+    // - No local echo (shell controls all echoing for password masking)
+    // - No line buffering (process characters immediately)
+    // - No special key processing by terminal (Tab, arrows passed to shell)
+    let _raw_mode_guard = RawModeGuard::new()?;
+
     // Create I/O
     let io = StdioCharIo::new();
 
@@ -422,22 +453,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Activate shell (shows welcome message and prompt)
     shell.activate()?;
 
-    // Main loop - read characters from stdin and process
+    // Main loop - read characters and feed to shell
+    // This pattern resembles embedded target usage:
+    // - Embedded: Poll UART RX buffer for characters
+    // - Native: Poll stdin for characters
+    // - Both: Feed characters to shell.process_char() one at a time
+    // - Shell controls all output (including echo and password masking)
+    let stdin = io::stdin();
+    let mut stdin_handle = stdin.lock();
+
     loop {
-        // Read one character at a time
+        // Read one character at a time (like polling UART on embedded target)
         let mut buf = [0u8; 1];
-        match io::stdin().read(&mut buf) {
-            Ok(0) => break, // EOF
+        match stdin_handle.read(&mut buf) {
+            Ok(0) => break, // EOF (Ctrl+D on Unix)
             Ok(_) => {
+                // In raw mode, Ctrl+C becomes character 0x03 instead of sending SIGINT.
+                // For this native example, we detect it and exit gracefully.
+                // On embedded targets, you might:
+                // - Ignore Ctrl+C entirely (no concept of "interrupt")
+                // - Use it as a special command (e.g., abort current operation)
+                // - Implement different exit mechanisms (reset button, watchdog, etc.)
+                if buf[0] == 0x03 {
+                    println!("\r\n"); // Move to new line before exit
+                    break;
+                }
+
                 let c = buf[0] as char;
+                // Feed character to shell (shell controls echoing)
                 shell.process_char(c)?;
             }
             Err(e) => {
+                // Restore terminal before printing error
+                drop(_raw_mode_guard);
                 eprintln!("\nError reading input: {}", e);
                 break;
             }
         }
     }
 
+    // Guard will automatically restore terminal mode on drop
     Ok(())
 }

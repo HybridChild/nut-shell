@@ -11,6 +11,9 @@ nut-shell = { path = "../..", default-features = false }
 # Utilities
 heapless = "0.9"
 
+# Terminal control for raw mode (native examples only)
+crossterm = "0.29"
+
 [features]
 default = ["authentication", "completion", "history"]
 
