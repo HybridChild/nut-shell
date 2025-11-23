@@ -31,7 +31,10 @@ fn test_simple_command_execution() {
     }
 
     let output = shell.__test_io_mut().output();
-    assert!(output.contains("hello world"), "Output should contain echo result");
+    assert!(
+        output.contains("hello world"),
+        "Output should contain echo result"
+    );
 }
 
 #[test]
@@ -71,8 +74,10 @@ fn test_command_with_arguments() {
     }
 
     let output = shell.__test_io_mut().output();
-    assert!(output.contains("arg1") && output.contains("arg2") && output.contains("arg3"),
-            "Should include all arguments");
+    assert!(
+        output.contains("arg1") && output.contains("arg2") && output.contains("arg3"),
+        "Should include all arguments"
+    );
 }
 
 // ============================================================================
@@ -142,8 +147,16 @@ fn test_help_command() {
     }
 
     let output = shell.__test_io_mut().output();
-    assert!(output.contains("ls"), "Help should mention ls command: {}", output);
-    assert!(output.contains("clear"), "Help should mention clear command: {}", output);
+    assert!(
+        output.contains("ls"),
+        "Help should mention ls command: {}",
+        output
+    );
+    assert!(
+        output.contains("clear"),
+        "Help should mention clear command: {}",
+        output
+    );
 }
 
 #[test]
@@ -287,7 +300,11 @@ fn test_history_navigation_up_down() {
     shell.process_char('A').unwrap(); // Up again (should show "echo first")
 
     let buffer = shell.__test_get_input_buffer();
-    assert!(buffer.contains("echo first"), "Should show older command: {}", buffer);
+    assert!(
+        buffer.contains("echo first"),
+        "Should show older command: {}",
+        buffer
+    );
 
     // Press down arrow
     shell.process_char('\x1b').unwrap();
@@ -321,7 +338,10 @@ fn test_double_esc_clears_buffer() {
     }
 
     // Verify buffer has content
-    assert!(!shell.__test_get_input_buffer().is_empty(), "Buffer should have content");
+    assert!(
+        !shell.__test_get_input_buffer().is_empty(),
+        "Buffer should have content"
+    );
 
     // Double-ESC
     shell.process_char('\x1b').unwrap();
@@ -421,7 +441,11 @@ fn test_backspace_handling() {
     }
 
     let output = shell.__test_io_mut().output();
-    assert!(output.contains("test"), "Backspace editing should work: {}", output);
+    assert!(
+        output.contains("test"),
+        "Backspace editing should work: {}",
+        output
+    );
 }
 
 // ============================================================================
@@ -445,7 +469,10 @@ fn test_minimal_features() {
         }
 
         let output = shell.__test_io_mut().output();
-        assert!(output.contains("minimal"), "Basic functionality should work");
+        assert!(
+            output.contains("minimal"),
+            "Basic functionality should work"
+        );
     }
 }
 
@@ -475,7 +502,10 @@ fn test_buffer_overflow_emits_bell() {
     shell.process_char('x').unwrap(); // Should succeed (returns Ok)
 
     let output = shell.__test_io_mut().output();
-    assert!(output.contains('\x07'), "Should emit bell character on buffer full");
+    assert!(
+        output.contains('\x07'),
+        "Should emit bell character on buffer full"
+    );
 }
 
 #[test]
@@ -509,7 +539,10 @@ fn test_buffer_overflow_continues_working() {
     }
 
     let output = shell.__test_io_mut().output();
-    assert!(output.contains("test"), "Shell should work normally after buffer overflow");
+    assert!(
+        output.contains("test"),
+        "Shell should work normally after buffer overflow"
+    );
 }
 
 // ============================================================================
@@ -557,7 +590,10 @@ fn test_shell_activate_deactivate_reactivate() {
         shell.process_char(c).unwrap();
     }
     let output = shell.__test_io_mut().output();
-    assert!(output.contains("reactivated"), "Should work after reactivation");
+    assert!(
+        output.contains("reactivated"),
+        "Should work after reactivation"
+    );
 }
 
 // ============================================================================
@@ -661,8 +697,8 @@ fn test_command_too_many_args() {
 #[test]
 #[cfg(feature = "authentication")]
 fn test_access_level_enforcement() {
-    use nut_shell::auth::{ConstCredentialProvider, password::Sha256Hasher, User};
     use fixtures::MockAccessLevel;
+    use nut_shell::auth::{ConstCredentialProvider, User, password::Sha256Hasher};
 
     // Create test users with different access levels
     let hash = [0u8; 32];
@@ -689,16 +725,20 @@ fn test_access_level_enforcement() {
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_minimal_config_works() {
-    use nut_shell::config::MinimalConfig;
-    use nut_shell::shell::handlers::CommandHandlers;
     use nut_shell::Response;
+    use nut_shell::config::MinimalConfig;
     use nut_shell::error::CliError;
+    use nut_shell::shell::handlers::CommandHandlers;
 
     // Implement handlers for MinimalConfig
     struct MinimalHandlers;
 
     impl CommandHandlers<MinimalConfig> for MinimalHandlers {
-        fn execute_sync(&self, name: &str, _args: &[&str]) -> Result<Response<MinimalConfig>, CliError> {
+        fn execute_sync(
+            &self,
+            name: &str,
+            _args: &[&str],
+        ) -> Result<Response<MinimalConfig>, CliError> {
             match name {
                 "help" => Ok(Response::success("Help")),
                 "echo" => Ok(Response::success("Echo")),
@@ -707,7 +747,11 @@ fn test_minimal_config_works() {
         }
 
         #[cfg(feature = "async")]
-        async fn execute_async(&self, _name: &str, _args: &[&str]) -> Result<Response<MinimalConfig>, CliError> {
+        async fn execute_async(
+            &self,
+            _name: &str,
+            _args: &[&str],
+        ) -> Result<Response<MinimalConfig>, CliError> {
             Err(CliError::CommandNotFound)
         }
     }

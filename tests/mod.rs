@@ -60,8 +60,8 @@
 pub mod fixtures;
 
 // Test modules (implementation phases):
-mod test_tree; // Phase 3: Tree data model and metadata/execution separation
 mod test_request_response; // Phase 5: Request/Response types
+mod test_tree; // Phase 3: Tree data model and metadata/execution separation
 mod test_type_validation; // Checkpoint: Type-Level Integration Validation
 
 // Shell tests

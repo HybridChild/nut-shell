@@ -9,7 +9,7 @@
 mod fixtures;
 
 use fixtures::{MockAccessLevel, MockHandlers, MockIo, TEST_TREE};
-use nut_shell::auth::{password::Sha256Hasher, ConstCredentialProvider, User};
+use nut_shell::auth::{ConstCredentialProvider, User, password::Sha256Hasher};
 use nut_shell::config::DefaultConfig;
 use nut_shell::shell::Shell;
 
@@ -54,7 +54,10 @@ fn test_password_masking_basic() {
     }
 
     let output = shell.__test_io().output();
-    assert!(output.contains("admin"), "Username should be echoed normally");
+    assert!(
+        output.contains("admin"),
+        "Username should be echoed normally"
+    );
     assert!(!output.contains("*"), "No masking before colon");
 
     shell.__test_io_mut().clear_output();
@@ -96,13 +99,22 @@ fn test_password_masking_full_sequence() {
     let output = shell.__test_io().output();
 
     // Should contain "admin:" echoed normally
-    assert!(output.contains("admin:"), "Username and colon should be visible");
+    assert!(
+        output.contains("admin:"),
+        "Username and colon should be visible"
+    );
 
     // Should contain "*******" for the password (7 characters for "pass123")
-    assert!(output.contains("*******"), "Password should be masked (7 chars)");
+    assert!(
+        output.contains("*******"),
+        "Password should be masked (7 chars)"
+    );
 
     // Should NOT contain actual password
-    assert!(!output.contains("pass123"), "Actual password should not appear");
+    assert!(
+        !output.contains("pass123"),
+        "Actual password should not appear"
+    );
 }
 
 #[test]
@@ -126,13 +138,22 @@ fn test_password_with_special_chars() {
     let output = shell.__test_io().output();
 
     // Username should be visible (including @)
-    assert!(output.contains("user@example.com:"), "Username with @ should be visible");
+    assert!(
+        output.contains("user@example.com:"),
+        "Username with @ should be visible"
+    );
 
     // Password should be masked (5 characters = 5 asterisks)
-    assert!(output.contains("*****"), "Password with special chars should be masked");
+    assert!(
+        output.contains("*****"),
+        "Password with special chars should be masked"
+    );
 
     // Should NOT contain actual password
-    assert!(!output.contains("P@ss!"), "Actual password should not appear");
+    assert!(
+        !output.contains("P@ss!"),
+        "Actual password should not appear"
+    );
 }
 
 #[test]
@@ -156,15 +177,24 @@ fn test_password_with_multiple_colons() {
     let output = shell.__test_io().output();
 
     // First part should be visible
-    assert!(output.contains("admin:"), "Username and first colon visible");
+    assert!(
+        output.contains("admin:"),
+        "Username and first colon visible"
+    );
 
     // Password part should be fully masked (7 characters including colons)
     // "P:a:s:s" = 7 characters
     let asterisk_count = output.matches('*').count();
-    assert_eq!(asterisk_count, 7, "All password characters including colons should be masked");
+    assert_eq!(
+        asterisk_count, 7,
+        "All password characters including colons should be masked"
+    );
 
     // Should NOT contain the actual password characters
-    assert!(!output.contains("P:a:s:s"), "Actual password should not appear");
+    assert!(
+        !output.contains("P:a:s:s"),
+        "Actual password should not appear"
+    );
 }
 
 #[test]
@@ -195,7 +225,10 @@ fn test_password_masking_with_backspace() {
 
     let output_after = shell.__test_io().output();
     // Backspace sequence is "\x08 \x08" (backspace, space, backspace)
-    assert!(output_after.contains("\x08"), "Should send backspace sequence");
+    assert!(
+        output_after.contains("\x08"),
+        "Should send backspace sequence"
+    );
 }
 
 #[test]
@@ -222,7 +255,10 @@ fn test_password_masking_empty_username() {
     assert!(output.starts_with(":"), "Colon should be visible");
 
     // Password should be masked (8 characters)
-    assert!(output.contains("********"), "Password should be masked even with empty username");
+    assert!(
+        output.contains("********"),
+        "Password should be masked even with empty username"
+    );
 }
 
 #[test]
@@ -247,10 +283,16 @@ fn test_password_masking_unicode_chars() {
 
     // Should have 4 asterisks (one per character: p, ä, s, s)
     let asterisk_count = output.matches('*').count();
-    assert_eq!(asterisk_count, 4, "Unicode characters should be masked individually");
+    assert_eq!(
+        asterisk_count, 4,
+        "Unicode characters should be masked individually"
+    );
 
     // Should not contain actual unicode password
-    assert!(!output.contains("päss"), "Actual password should not appear");
+    assert!(
+        !output.contains("päss"),
+        "Actual password should not appear"
+    );
 }
 
 #[test]
@@ -296,11 +338,19 @@ fn test_character_by_character_masking() {
     // Type username
     shell.__test_io_mut().clear_output();
     shell.process_char('a').unwrap();
-    assert_eq!(shell.__test_io().output(), "a", "First char of username visible");
+    assert_eq!(
+        shell.__test_io().output(),
+        "a",
+        "First char of username visible"
+    );
 
     shell.__test_io_mut().clear_output();
     shell.process_char('d').unwrap();
-    assert_eq!(shell.__test_io().output(), "d", "Second char of username visible");
+    assert_eq!(
+        shell.__test_io().output(),
+        "d",
+        "Second char of username visible"
+    );
 
     // Type colon
     shell.__test_io_mut().clear_output();
@@ -310,15 +360,27 @@ fn test_character_by_character_masking() {
     // Type first password char
     shell.__test_io_mut().clear_output();
     shell.process_char('p').unwrap();
-    assert_eq!(shell.__test_io().output(), "*", "First password char masked");
+    assert_eq!(
+        shell.__test_io().output(),
+        "*",
+        "First password char masked"
+    );
 
     // Type second password char
     shell.__test_io_mut().clear_output();
     shell.process_char('a').unwrap();
-    assert_eq!(shell.__test_io().output(), "*", "Second password char masked");
+    assert_eq!(
+        shell.__test_io().output(),
+        "*",
+        "Second password char masked"
+    );
 
     // Type third password char
     shell.__test_io_mut().clear_output();
     shell.process_char('s').unwrap();
-    assert_eq!(shell.__test_io().output(), "*", "Third password char masked");
+    assert_eq!(
+        shell.__test_io().output(),
+        "*",
+        "Third password char masked"
+    );
 }

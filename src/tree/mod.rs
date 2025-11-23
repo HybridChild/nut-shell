@@ -8,8 +8,8 @@
 use crate::auth::AccessLevel;
 
 // Sub-modules
-pub mod path;
 pub mod completion;
+pub mod path;
 
 /// Command kind marker (sync or async).
 ///

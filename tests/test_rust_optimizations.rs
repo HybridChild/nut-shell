@@ -12,7 +12,7 @@ mod fixtures;
 use fixtures::{MockAccessLevel, TEST_TREE};
 use nut_shell::config::{DefaultConfig, MinimalConfig, ShellConfig};
 use nut_shell::shell::history::CommandHistory;
-use nut_shell::tree::{CommandMeta, CommandKind, Directory, Node};
+use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 
 // ============================================================================
 // Zero-Size Type Optimization Tests
@@ -146,8 +146,14 @@ fn test_nested_tree_is_const_initializable() {
 fn test_test_tree_is_const() {
     // TEST_TREE should be a const
     // We can verify this by checking it's directly usable
-    assert!(!TEST_TREE.name.is_empty(), "TEST_TREE should be initialized");
-    assert!(!TEST_TREE.children.is_empty(), "TEST_TREE should have children");
+    assert!(
+        !TEST_TREE.name.is_empty(),
+        "TEST_TREE should be initialized"
+    );
+    assert!(
+        !TEST_TREE.children.is_empty(),
+        "TEST_TREE should have children"
+    );
 }
 
 // ============================================================================

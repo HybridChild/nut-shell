@@ -47,22 +47,22 @@ use panic_halt as _;
 pub static BOOT2: [u8; 256] = rp2040_boot2::BOOT_LOADER_GENERIC_03H;
 
 use rp2040_hal::{
-    clocks::{init_clocks_and_plls, Clock},
+    Sio,
+    clocks::{Clock, init_clocks_and_plls},
     gpio::{FunctionUart, Pin, PullDown},
     pac,
     uart::{DataBits, StopBits, UartConfig, UartPeripheral},
     watchdog::Watchdog,
-    Sio,
 };
 
 use nut_shell::{
+    CliError,
     auth::AccessLevel,
     config::DefaultConfig,
     io::CharIo,
     response::Response,
-    shell::{handlers::CommandHandlers, Shell},
+    shell::{Shell, handlers::CommandHandlers},
     tree::{CommandKind, CommandMeta, Directory, Node},
-    CliError,
 };
 
 use nut_shell::auth::{PasswordHasher, Sha256Hasher, User};
@@ -144,11 +144,7 @@ const ROOT: Directory<PicoAccessLevel> = Directory {
 struct PicoHandlers;
 
 impl CommandHandlers<DefaultConfig> for PicoHandlers {
-    fn execute_sync(
-        &self,
-        name: &str,
-        args: &[&str],
-    ) -> Result<Response<DefaultConfig>, CliError> {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match name {
             "led" => {
                 let state = args[0];
@@ -180,7 +176,9 @@ impl CommandHandlers<DefaultConfig> for PicoHandlers {
             }
             "reboot" => {
                 // In a real implementation, trigger watchdog reset
-                Ok(Response::success("Rebooting...\r\n(Not implemented in example)"))
+                Ok(Response::success(
+                    "Rebooting...\r\n(Not implemented in example)",
+                ))
             }
             _ => Err(CliError::CommandNotFound),
         }
@@ -244,7 +242,8 @@ impl nut_shell::auth::CredentialProvider<PicoAccessLevel> for PicoCredentialProv
     }
 
     fn verify_password(&self, user: &User<PicoAccessLevel>, password: &str) -> bool {
-        self.hasher.verify(password, &user.salt, &user.password_hash)
+        self.hasher
+            .verify(password, &user.salt, &user.password_hash)
     }
 
     fn list_users(&self) -> Result<heapless::Vec<&str, 32>, Self::Error> {

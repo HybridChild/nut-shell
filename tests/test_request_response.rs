@@ -113,8 +113,7 @@ fn test_response_success_no_history() {
 #[test]
 #[cfg(feature = "history")]
 fn test_response_without_history_builder() {
-    let response = Response::<DefaultConfig>::success("Password set")
-        .without_history();
+    let response = Response::<DefaultConfig>::success("Password set").without_history();
     assert!(response.exclude_from_history);
 }
 
@@ -229,10 +228,7 @@ fn test_request_login() {
     let mut password = heapless::String::<64>::new();
     password.push_str("secret123").unwrap();
 
-    let request = Request::<DefaultConfig>::Login {
-        username,
-        password,
-    };
+    let request = Request::<DefaultConfig>::Login { username, password };
 
     match request {
         Request::Login { username, password } => {
@@ -268,9 +264,7 @@ fn test_request_tab_complete() {
     let mut path = heapless::String::<128>::new();
     path.push_str("sys").unwrap();
 
-    let request = Request::<DefaultConfig>::TabComplete {
-        path,
-    };
+    let request = Request::<DefaultConfig>::TabComplete { path };
 
     match request {
         Request::TabComplete { path } => {
@@ -430,8 +424,7 @@ fn test_request_response_workflow_error() {
 #[cfg(feature = "history")]
 fn test_history_workflow() {
     // Test that exclude_from_history flag works in workflow
-    let response = Response::<DefaultConfig>::success("Logged in")
-        .without_history();
+    let response = Response::<DefaultConfig>::success("Logged in").without_history();
 
     // Shell would check this flag before adding to history
     if !response.exclude_from_history {

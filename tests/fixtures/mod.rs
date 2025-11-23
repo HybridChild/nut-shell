@@ -8,13 +8,13 @@
 
 #![allow(dead_code)]
 
+use nut_shell::CharIo;
 use nut_shell::auth::AccessLevel;
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
 use nut_shell::shell::handlers::CommandHandlers;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
-use nut_shell::CharIo;
 use std::collections::VecDeque;
 
 // ============================================================================
@@ -365,10 +365,7 @@ pub const CMD_HW_TEMP: CommandMeta<MockAccessLevel> = CommandMeta {
 /// Hardware subdirectory
 pub const DIR_HARDWARE: Directory<MockAccessLevel> = Directory {
     name: "hardware",
-    children: &[
-        Node::Command(&CMD_HW_LED),
-        Node::Command(&CMD_HW_TEMP),
-    ],
+    children: &[Node::Command(&CMD_HW_LED), Node::Command(&CMD_HW_TEMP)],
     access_level: MockAccessLevel::User,
 };
 
@@ -399,10 +396,7 @@ pub const CMD_DEBUG_REG: CommandMeta<MockAccessLevel> = CommandMeta {
 /// Test directory: debug/ (admin only)
 pub const DIR_DEBUG: Directory<MockAccessLevel> = Directory {
     name: "debug",
-    children: &[
-        Node::Command(&CMD_DEBUG_MEM),
-        Node::Command(&CMD_DEBUG_REG),
-    ],
+    children: &[Node::Command(&CMD_DEBUG_MEM), Node::Command(&CMD_DEBUG_REG)],
     access_level: MockAccessLevel::Admin,
 };
 
@@ -488,12 +482,18 @@ impl CommandHandlers<DefaultConfig> for MockHandlers {
             // Network commands (system/network/)
             "config" => {
                 let params = args.join(" ");
-                Ok(Response::success(&format!("Network configured: {}", params)))
+                Ok(Response::success(&format!(
+                    "Network configured: {}",
+                    params
+                )))
             }
             "ping" => {
                 let host = args.get(0).unwrap_or(&"localhost");
                 let count = args.get(1).unwrap_or(&"4");
-                Ok(Response::success(&format!("Pinging {} ({} times)", host, count)))
+                Ok(Response::success(&format!(
+                    "Pinging {} ({} times)",
+                    host, count
+                )))
             }
 
             // Hardware commands (system/hardware/)
@@ -521,35 +521,34 @@ impl CommandHandlers<DefaultConfig> for MockHandlers {
             "test-prefix-newline" => {
                 Ok(Response::success("Message with prefix").with_prefix_newline())
             }
-            "test-indented" => {
-                Ok(Response::success("Line 1\r\nLine 2\r\nLine 3").indented())
-            }
-            "test-inline" => {
-                Ok(Response::success("... processing").inline())
-            }
+            "test-indented" => Ok(Response::success("Line 1\r\nLine 2\r\nLine 3").indented()),
+            "test-inline" => Ok(Response::success("... processing").inline()),
             "test-no-postfix" => {
                 Ok(Response::success("No trailing newline").without_postfix_newline())
             }
-            "test-no-prompt" => {
-                Ok(Response::success("No prompt after this").without_prompt())
-            }
-            "test-combined" => {
-                Ok(Response::success("Multi\r\nLine")
-                    .with_prefix_newline()
-                    .indented()
-                    .without_prompt())
-            }
+            "test-no-prompt" => Ok(Response::success("No prompt after this").without_prompt()),
+            "test-combined" => Ok(Response::success("Multi\r\nLine")
+                .with_prefix_newline()
+                .indented()
+                .without_prompt()),
 
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+    async fn execute_async(
+        &self,
+        name: &str,
+        args: &[&str],
+    ) -> Result<Response<DefaultConfig>, CliError> {
         match name {
             "async-wait" => {
                 // Simulate async operation
-                let duration = args.get(0).and_then(|s| s.parse::<u32>().ok()).unwrap_or(100);
+                let duration = args
+                    .get(0)
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .unwrap_or(100);
                 let formatted = format!("Waited {}ms", duration);
                 let mut msg = heapless::String::<64>::new();
                 let _ = msg.push_str(&formatted);
@@ -624,7 +623,10 @@ mod tests {
         assert!(MockAccessLevel::Admin > MockAccessLevel::User);
         assert!(MockAccessLevel::User > MockAccessLevel::Guest);
 
-        assert_eq!(MockAccessLevel::from_str("Admin"), Some(MockAccessLevel::Admin));
+        assert_eq!(
+            MockAccessLevel::from_str("Admin"),
+            Some(MockAccessLevel::Admin)
+        );
         assert_eq!(MockAccessLevel::from_str("Invalid"), None);
 
         assert_eq!(MockAccessLevel::Admin.as_str(), "Admin");

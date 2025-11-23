@@ -76,14 +76,25 @@ impl fmt::Display for CliError {
         match self {
             CliError::CommandNotFound => write!(f, "Command not found"),
             CliError::InvalidPath => write!(f, "Invalid path"),
-            CliError::InvalidArgumentCount { expected_min, expected_max, received } => {
+            CliError::InvalidArgumentCount {
+                expected_min,
+                expected_max,
+                received,
+            } => {
                 if expected_min == expected_max {
                     write!(f, "Expected {} arguments, got {}", expected_min, received)
                 } else {
-                    write!(f, "Expected {}-{} arguments, got {}", expected_min, expected_max, received)
+                    write!(
+                        f,
+                        "Expected {}-{} arguments, got {}",
+                        expected_min, expected_max, received
+                    )
                 }
             }
-            CliError::InvalidArgumentFormat { arg_index, expected } => {
+            CliError::InvalidArgumentFormat {
+                arg_index,
+                expected,
+            } => {
                 write!(f, "Argument {}: expected {}", arg_index + 1, expected)
             }
             CliError::BufferFull => write!(f, "Buffer full"),
@@ -113,7 +124,10 @@ mod tests {
 
     #[test]
     fn test_error_display() {
-        assert_eq!(format!("{}", CliError::CommandNotFound), "Command not found");
+        assert_eq!(
+            format!("{}", CliError::CommandNotFound),
+            "Command not found"
+        );
         assert_eq!(format!("{}", CliError::InvalidPath), "Invalid path");
 
         let err = CliError::InvalidArgumentCount {

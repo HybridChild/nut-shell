@@ -203,9 +203,18 @@ mod tests {
 
     #[test]
     fn test_access_level_from_str() {
-        assert_eq!(TestAccessLevel::from_str("Admin"), Some(TestAccessLevel::Admin));
-        assert_eq!(TestAccessLevel::from_str("User"), Some(TestAccessLevel::User));
-        assert_eq!(TestAccessLevel::from_str("Guest"), Some(TestAccessLevel::Guest));
+        assert_eq!(
+            TestAccessLevel::from_str("Admin"),
+            Some(TestAccessLevel::Admin)
+        );
+        assert_eq!(
+            TestAccessLevel::from_str("User"),
+            Some(TestAccessLevel::User)
+        );
+        assert_eq!(
+            TestAccessLevel::from_str("Guest"),
+            Some(TestAccessLevel::Guest)
+        );
         assert_eq!(TestAccessLevel::from_str("Invalid"), None);
     }
 

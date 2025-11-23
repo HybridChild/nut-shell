@@ -17,6 +17,7 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
+use nut_shell::CharIo;
 use nut_shell::auth::{AccessLevel, User};
 use nut_shell::config::{DefaultConfig, MinimalConfig, ShellConfig};
 use nut_shell::error::CliError;
@@ -25,7 +26,6 @@ use nut_shell::shell::handlers::CommandHandlers;
 use nut_shell::shell::{CliState, HistoryDirection, Request};
 use nut_shell::tree::path::Path;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
-use nut_shell::CharIo;
 
 use fixtures::{MockAccessLevel, MockHandlers, MockIo, TEST_TREE};
 

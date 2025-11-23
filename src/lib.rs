@@ -75,8 +75,8 @@ extern crate subtle;
 // ============================================================================
 
 // Phase 2: I/O & Access Control Foundation
-pub mod io;
 pub mod config;
+pub mod io;
 
 // Authentication module (always present, but with different contents based on features)
 pub mod auth;
@@ -101,13 +101,13 @@ pub mod shell;
 pub use io::CharIo;
 
 // Configuration
-pub use config::{ShellConfig, DefaultConfig, MinimalConfig};
+pub use config::{DefaultConfig, MinimalConfig, ShellConfig};
 
 // Error types
 pub use error::CliError;
 
 // Tree types (Phase 3)
-pub use tree::{Node, Directory, CommandMeta, CommandKind};
+pub use tree::{CommandKind, CommandMeta, Directory, Node};
 
 // Access control (always available, even without authentication feature)
 pub use auth::{AccessLevel, User};
@@ -116,12 +116,12 @@ pub use auth::{AccessLevel, User};
 pub use response::Response;
 
 // Shell types (Phase 6+)
-pub use shell::{Shell, Request, CliState, HistoryDirection};
 pub use shell::handlers::CommandHandlers;
+pub use shell::{CliState, HistoryDirection, Request, Shell};
 
 // Optional feature re-exports (authentication-only types)
 #[cfg(feature = "authentication")]
-pub use auth::{CredentialProvider, PasswordHasher, Sha256Hasher, ConstCredentialProvider};
+pub use auth::{ConstCredentialProvider, CredentialProvider, PasswordHasher, Sha256Hasher};
 
 // ============================================================================
 // Library Metadata

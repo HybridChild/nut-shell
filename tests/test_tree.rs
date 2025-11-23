@@ -209,13 +209,19 @@ async fn test_async_command_execution() {
     let result = handlers.execute_async("async-wait", &[]).await;
     assert!(result.is_ok());
     let response = result.unwrap();
-    assert!(response.message.as_str().contains("100ms") || response.message.as_str() == "Async complete");
+    assert!(
+        response.message.as_str().contains("100ms")
+            || response.message.as_str() == "Async complete"
+    );
 
     // Test async-wait with custom duration
     let result = handlers.execute_async("async-wait", &["250"]).await;
     assert!(result.is_ok());
     let response = result.unwrap();
-    assert!(response.message.as_str().contains("250ms") || response.message.as_str() == "Async complete");
+    assert!(
+        response.message.as_str().contains("250ms")
+            || response.message.as_str() == "Async complete"
+    );
 
     // Test unknown async command
     let result = handlers.execute_async("unknown-async", &[]).await;
@@ -360,14 +366,20 @@ fn test_deep_nesting_const_initialization() {
 
     // Each subdirectory has commands
     if let Some(Node::Directory(net)) = network {
-        assert!(net.children.len() >= 3, "Network should have at least 3 commands");
+        assert!(
+            net.children.len() >= 3,
+            "Network should have at least 3 commands"
+        );
         assert!(net.find_child("status").is_some());
         assert!(net.find_child("config").is_some());
         assert!(net.find_child("ping").is_some());
     }
 
     if let Some(Node::Directory(hw)) = hardware {
-        assert!(hw.children.len() >= 2, "Hardware should have at least 2 commands");
+        assert!(
+            hw.children.len() >= 2,
+            "Hardware should have at least 2 commands"
+        );
         assert!(hw.find_child("led").is_some());
         assert!(hw.find_child("temperature").is_some());
     }
@@ -376,7 +388,7 @@ fn test_deep_nesting_const_initialization() {
 #[test]
 fn test_varied_access_levels_in_tree() {
     // Validates that mixed access levels work in const tree
-    use fixtures::{CMD_HELP, CMD_REBOOT, CMD_NET_CONFIG, MockAccessLevel};
+    use fixtures::{CMD_HELP, CMD_NET_CONFIG, CMD_REBOOT, MockAccessLevel};
 
     // Different access levels across the tree
     assert_eq!(CMD_HELP.access_level, MockAccessLevel::Guest);
@@ -387,7 +399,7 @@ fn test_varied_access_levels_in_tree() {
 #[test]
 fn test_varied_argument_counts() {
     // Validates commands with different argument patterns
-    use fixtures::{CMD_HELP, CMD_ECHO, CMD_NET_CONFIG, CMD_NET_PING, CMD_HW_LED};
+    use fixtures::{CMD_ECHO, CMD_HELP, CMD_HW_LED, CMD_NET_CONFIG, CMD_NET_PING};
 
     // No args
     assert_eq!(CMD_HELP.min_args, 0);
@@ -413,7 +425,7 @@ fn test_varied_argument_counts() {
 #[test]
 fn test_const_tree_size() {
     // Validates tree structure counts for ROM size estimation
-    use fixtures::{TEST_TREE, DIR_SYSTEM, DIR_DEBUG};
+    use fixtures::{DIR_DEBUG, DIR_SYSTEM, TEST_TREE};
 
     // Count total nodes in tree
     let mut command_count = 0;
@@ -458,13 +470,19 @@ fn test_const_tree_size() {
     // Directories: system(1) + debug(1) + network(1) + hardware(1) = 4 (root doesn't count)
     #[cfg(not(feature = "async"))]
     {
-        assert_eq!(command_count, 17, "Should have exactly 17 commands without async");
+        assert_eq!(
+            command_count, 17,
+            "Should have exactly 17 commands without async"
+        );
         assert_eq!(directory_count, 4, "Should have exactly 4 directories");
     }
 
     #[cfg(feature = "async")]
     {
-        assert_eq!(command_count, 18, "Should have exactly 18 commands with async");
+        assert_eq!(
+            command_count, 18,
+            "Should have exactly 18 commands with async"
+        );
         assert_eq!(directory_count, 4, "Should have exactly 4 directories");
     }
 }
@@ -472,7 +490,7 @@ fn test_const_tree_size() {
 #[test]
 fn test_const_metadata_properties() {
     // Validates that CommandMeta is truly const-initializable
-    use fixtures::{CMD_NET_STATUS, CMD_DEBUG_REG};
+    use fixtures::{CMD_DEBUG_REG, CMD_NET_STATUS};
 
     // These should be compile-time constants (const fn)
     const _TEST_NAME: &'static str = CMD_NET_STATUS.name;

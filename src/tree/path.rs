@@ -90,11 +90,7 @@ impl<'a, const MAX_DEPTH: usize> Path<'a, MAX_DEPTH> {
         let is_absolute = input.starts_with('/');
 
         // Remove leading slash for parsing
-        let path_str = if is_absolute {
-            &input[1..]
-        } else {
-            input
-        };
+        let path_str = if is_absolute { &input[1..] } else { input };
 
         // Parse segments
         let mut segments = heapless::Vec::new();
@@ -122,9 +118,7 @@ impl<'a, const MAX_DEPTH: usize> Path<'a, MAX_DEPTH> {
             }
 
             // Add segment
-            segments
-                .push(segment)
-                .map_err(|_| CliError::PathTooDeep)?;
+            segments.push(segment).map_err(|_| CliError::PathTooDeep)?;
         }
 
         Ok(Self {

@@ -148,9 +148,7 @@ pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
 
         let mut all_matches = heapless::Vec::new();
         let mut match_str = heapless::String::new();
-        match_str
-            .push_str(name)
-            .map_err(|_| CliError::BufferFull)?;
+        match_str.push_str(name).map_err(|_| CliError::BufferFull)?;
         all_matches
             .push(match_str)
             .map_err(|_| CliError::BufferFull)?;
@@ -176,9 +174,7 @@ pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
     let mut all_matches: heapless::Vec<heapless::String<64>, MAX_MATCHES> = heapless::Vec::new();
     for (name, _) in matches.iter() {
         let mut match_str = heapless::String::new();
-        match_str
-            .push_str(name)
-            .map_err(|_| CliError::BufferFull)?;
+        match_str.push_str(name).map_err(|_| CliError::BufferFull)?;
         all_matches
             .push(match_str)
             .map_err(|_| CliError::BufferFull)?;

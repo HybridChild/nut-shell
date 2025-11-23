@@ -71,11 +71,7 @@ impl StdioStream {
 
     /// Get the output as a string (for testing).
     pub fn output_string(&self) -> String {
-        self.output
-            .lock()
-            .unwrap()
-            .iter()
-            .collect()
+        self.output.lock().unwrap().iter().collect()
     }
 
     /// Clear the output buffer.

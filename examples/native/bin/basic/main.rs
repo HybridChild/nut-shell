@@ -19,17 +19,15 @@
 //! - guest:guest123 (Guest access)
 
 use core::fmt::Write;
-use crossterm::{
-    terminal::{disable_raw_mode, enable_raw_mode},
-};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use nut_shell::{
+    CliError,
     auth::AccessLevel,
     config::DefaultConfig,
     io::CharIo,
     response::Response,
-    shell::{handlers::CommandHandlers, Shell},
+    shell::{Shell, handlers::CommandHandlers},
     tree::{CommandKind, CommandMeta, Directory, Node},
-    CliError,
 };
 use std::io::{self, Read};
 
@@ -174,15 +172,9 @@ const ROOT: Directory<ExampleAccessLevel> = Directory {
 struct ExampleHandlers;
 
 impl CommandHandlers<DefaultConfig> for ExampleHandlers {
-    fn execute_sync(
-        &self,
-        name: &str,
-        args: &[&str],
-    ) -> Result<Response<DefaultConfig>, CliError> {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match name {
-            "reboot" => {
-                Ok(Response::success("System rebooting...\r\nGoodbye!"))
-            }
+            "reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!")),
             "status" => {
                 let mut msg = heapless::String::<256>::new();
                 write!(msg, "System Status:\r\n").ok();
@@ -191,9 +183,9 @@ impl CommandHandlers<DefaultConfig> for ExampleHandlers {
                 write!(msg, "  Uptime: 42 hours").ok();
                 Ok(Response::success(&msg))
             }
-            "version" => {
-                Ok(Response::success("nut-shell v0.1.0\r\nRust embedded CLI framework"))
-            }
+            "version" => Ok(Response::success(
+                "nut-shell v0.1.0\r\nRust embedded CLI framework",
+            )),
             "get" => {
                 let key = args[0];
                 let mut msg = heapless::String::<256>::new();
@@ -221,9 +213,7 @@ impl CommandHandlers<DefaultConfig> for ExampleHandlers {
                     Ok(Response::success(&msg))
                 }
             }
-            "uptime" => {
-                Ok(Response::success("System uptime: 42 hours, 13 minutes"))
-            }
+            "uptime" => Ok(Response::success("System uptime: 42 hours, 13 minutes")),
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -237,7 +227,12 @@ impl CommandHandlers<DefaultConfig> for ExampleHandlers {
         // This example doesn't use async commands
         // Return error for any command name
         let mut msg = heapless::String::<256>::new();
-        write!(msg, "Async command '{}' not supported in this example", name).ok();
+        write!(
+            msg,
+            "Async command '{}' not supported in this example",
+            name
+        )
+        .ok();
         Err(CliError::Other(msg))
     }
 }
@@ -304,10 +299,7 @@ impl ExampleCredentialProvider {
 impl nut_shell::auth::CredentialProvider<ExampleAccessLevel> for ExampleCredentialProvider {
     type Error = ();
 
-    fn find_user(
-        &self,
-        username: &str,
-    ) -> Result<Option<User<ExampleAccessLevel>>, Self::Error> {
+    fn find_user(&self, username: &str) -> Result<Option<User<ExampleAccessLevel>>, Self::Error> {
         Ok(self
             .users
             .iter()
@@ -316,7 +308,8 @@ impl nut_shell::auth::CredentialProvider<ExampleAccessLevel> for ExampleCredenti
     }
 
     fn verify_password(&self, user: &User<ExampleAccessLevel>, password: &str) -> bool {
-        self.hasher.verify(password, &user.salt, &user.password_hash)
+        self.hasher
+            .verify(password, &user.salt, &user.password_hash)
     }
 
     fn list_users(&self) -> Result<heapless::Vec<&str, 32>, Self::Error> {
@@ -360,9 +353,7 @@ struct StdioCharIo {
 
 impl StdioCharIo {
     fn new() -> Self {
-        Self {
-            stdin: io::stdin(),
-        }
+        Self { stdin: io::stdin() }
     }
 }
 

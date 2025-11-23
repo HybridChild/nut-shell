@@ -447,7 +447,9 @@ mod tests {
         let mut decoder = InputDecoder::new();
 
         // Various control characters (except handled ones)
-        for c in ['\x00', '\x01', '\x02', '\x03', '\x04', '\x05', '\x06', '\x07'] {
+        for c in [
+            '\x00', '\x01', '\x02', '\x03', '\x04', '\x05', '\x06', '\x07',
+        ] {
             let event = decoder.decode_char(c);
             assert_eq!(event, InputEvent::None);
         }

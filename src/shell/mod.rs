@@ -12,14 +12,14 @@ use crate::tree::{CommandKind, Directory, Node};
 use core::marker::PhantomData;
 
 // Sub-modules
+pub mod decoder;
 pub mod handlers;
 pub mod history;
-pub mod decoder;
 
 // Re-export key types
+pub use decoder::{InputDecoder, InputEvent};
 pub use handlers::CommandHandlers;
 pub use history::CommandHistory;
-pub use decoder::{InputDecoder, InputEvent};
 
 /// History navigation direction.
 ///
@@ -691,10 +691,9 @@ where
                     CliError::BufferFull => self.io.write_str("Buffer full")?,
                     CliError::PathTooDeep => self.io.write_str("Path too deep")?,
                     #[cfg(feature = "async")]
-                    CliError::AsyncNotSupported => {
-                        self.io
-                            .write_str("Async command requires process_char_async()")?
-                    }
+                    CliError::AsyncNotSupported => self
+                        .io
+                        .write_str("Async command requires process_char_async()")?,
                     _ => self.io.write_str("Unknown error")?,
                 }
                 self.io.write_str("\r\n")?;
@@ -848,7 +847,10 @@ where
 
     /// Get directory at specific path.
     // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
-    fn get_dir_at_path(&self, path: &heapless::Vec<usize, 8>) -> Result<&'tree Directory<L>, CliError> {
+    fn get_dir_at_path(
+        &self,
+        path: &heapless::Vec<usize, 8>,
+    ) -> Result<&'tree Directory<L>, CliError> {
         let mut current: &Directory<L> = self.tree;
 
         for &index in path.iter() {
@@ -871,7 +873,8 @@ where
         }
 
         // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
-        let parent_path: heapless::Vec<usize, 8> = path.iter().take(path.len() - 1).copied().collect();
+        let parent_path: heapless::Vec<usize, 8> =
+            path.iter().take(path.len() - 1).copied().collect();
         let parent_dir = self.get_dir_at_path(&parent_path)?;
 
         let last_index = *path.last().ok_or(CliError::InvalidPath)?;
@@ -972,7 +975,8 @@ where
     /// Show help (? command).
     fn show_help(&mut self) -> Result<(), IO::Error> {
         self.io.write_str("  ?        - List global commands\r\n")?;
-        self.io.write_str("  ls       - List directory contents\r\n")?;
+        self.io
+            .write_str("  ls       - List directory contents\r\n")?;
 
         #[cfg(feature = "authentication")]
         self.io.write_str("  logout   - End session\r\n")?;
@@ -1190,10 +1194,17 @@ mod tests {
             struct MockProvider;
             impl CredentialProvider<MockLevel> for MockProvider {
                 type Error = ();
-                fn find_user(&self, _username: &str) -> Result<Option<crate::auth::User<MockLevel>>, ()> {
+                fn find_user(
+                    &self,
+                    _username: &str,
+                ) -> Result<Option<crate::auth::User<MockLevel>>, ()> {
                     Ok(None)
                 }
-                fn verify_password(&self, _user: &crate::auth::User<MockLevel>, _password: &str) -> bool {
+                fn verify_password(
+                    &self,
+                    _user: &crate::auth::User<MockLevel>,
+                    _password: &str,
+                ) -> bool {
                     false
                 }
                 fn list_users(&self) -> Result<heapless::Vec<&str, 32>, ()> {
@@ -1265,8 +1276,8 @@ mod tests {
         let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
             Shell::new(&TEST_TREE, handlers, io);
 
-        let response = crate::response::Response::<DefaultConfig>::success("Test")
-            .with_prefix_newline();
+        let response =
+            crate::response::Response::<DefaultConfig>::success("Test").with_prefix_newline();
         shell.write_formatted_response(&response).unwrap();
 
         // prefix newline + message + postfix newline
@@ -1281,8 +1292,8 @@ mod tests {
         let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
             Shell::new(&TEST_TREE, handlers, io);
 
-        let response = crate::response::Response::<DefaultConfig>::success("Line 1\r\nLine 2")
-            .indented();
+        let response =
+            crate::response::Response::<DefaultConfig>::success("Line 1\r\nLine 2").indented();
         shell.write_formatted_response(&response).unwrap();
 
         // Each line indented with 2 spaces + postfix newline
@@ -1297,8 +1308,8 @@ mod tests {
         let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
             Shell::new(&TEST_TREE, handlers, io);
 
-        let response = crate::response::Response::<DefaultConfig>::success("Single line")
-            .indented();
+        let response =
+            crate::response::Response::<DefaultConfig>::success("Single line").indented();
         shell.write_formatted_response(&response).unwrap();
 
         // Single line indented
@@ -1346,8 +1357,8 @@ mod tests {
         let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
             Shell::new(&TEST_TREE, handlers, io);
 
-        let response = crate::response::Response::<DefaultConfig>::success("Raw")
-            .without_postfix_newline();
+        let response =
+            crate::response::Response::<DefaultConfig>::success("Raw").without_postfix_newline();
         shell.write_formatted_response(&response).unwrap();
 
         // No formatting at all
@@ -1390,10 +1401,13 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_inline_message_flag() {
         // Test that inline_message flag is properly recognized
-        let response = crate::response::Response::<DefaultConfig>::success("... processing")
-            .inline();
+        let response =
+            crate::response::Response::<DefaultConfig>::success("... processing").inline();
 
-        assert!(response.inline_message, "inline() should set inline_message flag");
+        assert!(
+            response.inline_message,
+            "inline() should set inline_message flag"
+        );
 
         // Note: The actual inline behavior (no newline after input) is tested
         // via integration tests, as it requires simulating full command execution.

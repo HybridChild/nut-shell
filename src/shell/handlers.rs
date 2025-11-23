@@ -75,7 +75,11 @@ mod tests {
     struct TestHandlers;
 
     impl CommandHandlers<DefaultConfig> for TestHandlers {
-        fn execute_sync(&self, name: &str, _args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+        fn execute_sync(
+            &self,
+            name: &str,
+            _args: &[&str],
+        ) -> Result<Response<DefaultConfig>, CliError> {
             match name {
                 "test" => Ok(Response::success("OK")),
                 _ => Err(CliError::CommandNotFound),
@@ -83,7 +87,11 @@ mod tests {
         }
 
         #[cfg(feature = "async")]
-        async fn execute_async(&self, name: &str, _args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+        async fn execute_async(
+            &self,
+            name: &str,
+            _args: &[&str],
+        ) -> Result<Response<DefaultConfig>, CliError> {
             match name {
                 "async-test" => Ok(Response::success("Async OK")),
                 _ => Err(CliError::CommandNotFound),

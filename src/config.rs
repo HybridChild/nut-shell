@@ -153,13 +153,19 @@ mod tests {
 
     #[test]
     fn test_default_config_messages() {
+        assert_eq!(DefaultConfig::MSG_WELCOME, "Welcome to nut-shell!\r\n");
         assert_eq!(
-            DefaultConfig::MSG_WELCOME,
-            "Welcome to nut-shell!\r\n"
+            DefaultConfig::MSG_LOGIN_PROMPT,
+            "Login. Type <username>:<password>: "
         );
-        assert_eq!(DefaultConfig::MSG_LOGIN_PROMPT, "Login. Type <username>:<password>: ");
-        assert_eq!(DefaultConfig::MSG_LOGIN_SUCCESS, "Login succesful! Type '?' for help.\r\n");
-        assert_eq!(DefaultConfig::MSG_LOGIN_FAILED, "Login failed. Try again.\r\n");
+        assert_eq!(
+            DefaultConfig::MSG_LOGIN_SUCCESS,
+            "Login succesful! Type '?' for help.\r\n"
+        );
+        assert_eq!(
+            DefaultConfig::MSG_LOGIN_FAILED,
+            "Login failed. Try again.\r\n"
+        );
         assert_eq!(DefaultConfig::MSG_LOGOUT, "Logged out.\r\n");
         assert_eq!(
             DefaultConfig::MSG_INVALID_LOGIN_FORMAT,
@@ -169,10 +175,7 @@ mod tests {
 
     #[test]
     fn test_minimal_config_messages() {
-        assert_eq!(
-            MinimalConfig::MSG_WELCOME,
-            "Welcome!\r\n"
-        );
+        assert_eq!(MinimalConfig::MSG_WELCOME, "Welcome!\r\n");
         assert_eq!(MinimalConfig::MSG_LOGIN_PROMPT, "Login: ");
         assert_eq!(MinimalConfig::MSG_LOGIN_SUCCESS, "Logged in.\r\n");
         assert_eq!(MinimalConfig::MSG_LOGIN_FAILED, "Login failed.\r\n");
@@ -206,7 +209,10 @@ mod tests {
 
         // Verify custom messages
         assert_eq!(CustomConfig::MSG_WELCOME, "🚀 Custom System Ready\r\n");
-        assert_eq!(CustomConfig::MSG_LOGIN_PROMPT, "Enter credentials (user:pass): ");
+        assert_eq!(
+            CustomConfig::MSG_LOGIN_PROMPT,
+            "Enter credentials (user:pass): "
+        );
         assert_eq!(CustomConfig::MSG_LOGIN_SUCCESS, "✓ Access granted\r\n");
         assert_eq!(CustomConfig::MSG_LOGIN_FAILED, "✗ Access denied\r\n");
         assert_eq!(CustomConfig::MSG_LOGOUT, "Session ended\r\n");
