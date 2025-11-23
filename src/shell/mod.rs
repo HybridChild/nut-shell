@@ -923,6 +923,7 @@ where
                     // Multiple matches - show them
                     self.io.write_str("\r\n")?;
                     for m in completion.all_matches.iter() {
+                        self.io.write_str("  ")?; // 2-space indentation
                         self.io.write_str(m.as_str())?;
                         self.io.write_str("  ")?;
                     }
