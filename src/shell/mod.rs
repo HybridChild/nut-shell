@@ -268,17 +268,17 @@ where
     ///
     /// Transitions from `Inactive` to appropriate state (LoggedOut or LoggedIn).
     pub fn activate(&mut self) -> Result<(), IO::Error> {
+        self.io.write_str(C::MSG_WELCOME)?;
+
         #[cfg(feature = "authentication")]
         {
             self.state = CliState::LoggedOut;
-            self.io.write_str(C::MSG_WELCOME_AUTH)?;
             self.io.write_str(C::MSG_LOGIN_PROMPT)?;
         }
 
         #[cfg(not(feature = "authentication"))]
         {
             self.state = CliState::LoggedIn;
-            self.io.write_str(C::MSG_WELCOME_NO_AUTH)?;
             self.generate_and_write_prompt()?;
         }
 
@@ -971,15 +971,14 @@ where
 
     /// Show help (? command).
     fn show_help(&mut self) -> Result<(), IO::Error> {
-        self.io.write_str("Global commands:\r\n")?;
-        self.io.write_str("  ?         - Show this help\r\n")?;
-        self.io.write_str("  ls        - List directory contents\r\n")?;
+        self.io.write_str("  ?        - List global commands\r\n")?;
+        self.io.write_str("  ls       - List directory contents\r\n")?;
 
         #[cfg(feature = "authentication")]
-        self.io.write_str("  logout    - End session\r\n")?;
+        self.io.write_str("  logout   - End session\r\n")?;
 
-        self.io.write_str("  clear     - Clear screen\r\n")?;
-        self.io.write_str("  ESC ESC   - Clear input buffer\r\n")?;
+        self.io.write_str("  clear    - Clear screen\r\n")?;
+        self.io.write_str("  ESC ESC  - Clear input buffer\r\n")?;
 
         Ok(())
     }
@@ -1119,7 +1118,7 @@ mod tests {
                 output: heapless::String::new(),
             }
         }
-        fn get_output(&self) -> &str {
+        fn _get_output(&self) -> &str {
             &self.output
         }
     }

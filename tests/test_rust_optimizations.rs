@@ -168,8 +168,7 @@ fn test_config_constants_are_zero_cost() {
         const MAX_RESPONSE: usize = 256;
         const HISTORY_SIZE: usize = 10;
 
-        const MSG_WELCOME_AUTH: &'static str = "";
-        const MSG_WELCOME_NO_AUTH: &'static str = "";
+        const MSG_WELCOME: &'static str = "";
         const MSG_LOGIN_PROMPT: &'static str = "";
         const MSG_LOGIN_SUCCESS: &'static str = "";
         const MSG_LOGIN_FAILED: &'static str = "";

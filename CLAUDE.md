@@ -384,8 +384,7 @@ impl ShellConfig for MyAppConfig {
     const HISTORY_SIZE: usize = 10;
 
     // Customize messages for your application
-    const MSG_WELCOME_AUTH: &'static str = "🔐 MyDevice v1.0 - Login Required\r\n";
-    const MSG_WELCOME_NO_AUTH: &'static str = "🚀 MyDevice v1.0 Ready\r\n";
+    const MSG_WELCOME: &'static str = "🚀 MyDevice v1.0 Ready\r\n";
     const MSG_LOGIN_PROMPT: &'static str = "Login (user:pass): ";
     const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted\r\n";
     const MSG_LOGIN_FAILED: &'static str = "✗ Access denied\r\n";
