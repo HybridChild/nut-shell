@@ -7,7 +7,9 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
+#[cfg(not(feature = "authentication"))]
 use fixtures::{MockHandlers, MockIo, TEST_TREE};
+#[cfg(not(feature = "authentication"))]
 use nut_shell::Shell;
 use nut_shell::Response;
 use nut_shell::config::DefaultConfig;

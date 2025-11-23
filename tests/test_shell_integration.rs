@@ -9,9 +9,7 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
-#[allow(unused_imports)]
 use fixtures::{MockHandlers, MockIo, TEST_TREE};
-#[allow(unused_imports)]
 use nut_shell::Shell;
 
 // ============================================================================

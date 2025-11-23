@@ -561,7 +561,7 @@ where
         }
     }
 
-    /// Handle login attempt (username or password).
+    /// Handle a valid login attempt.
     #[cfg(feature = "authentication")]
     fn handle_login_input(&mut self, input: &str) -> Result<(), IO::Error> {
         // Login doesn't support inline mode - always add newline
