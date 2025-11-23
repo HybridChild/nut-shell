@@ -14,12 +14,12 @@ use core::marker::PhantomData;
 // Sub-modules
 pub mod handlers;
 pub mod history;
-pub mod parser;
+pub mod decoder;
 
 // Re-export key types
 pub use handlers::CommandHandlers;
 pub use history::CommandHistory;
-pub use parser::{InputParser, ParseEvent};
+pub use decoder::{InputDecoder, InputEvent};
 
 /// History navigation direction.
 ///
@@ -137,8 +137,8 @@ where
     /// Current directory path (stack of child indices, using concrete size - TODO: use C::MAX_PATH_DEPTH when const generics stabilize)
     current_path: heapless::Vec<usize, 8>,
 
-    /// Input parser (escape sequences)
-    parser: InputParser,
+    /// Input decoder (escape sequence state machine)
+    decoder: InputDecoder,
 
     /// Command history (using concrete sizes - TODO: use C::HISTORY_SIZE and C::MAX_INPUT when const generics stabilize)
     #[cfg_attr(not(feature = "history"), allow(dead_code))]
@@ -217,7 +217,7 @@ where
             state: CliState::Inactive,
             input_buffer: heapless::String::new(),
             current_path: heapless::Vec::new(),
-            parser: InputParser::new(),
+            decoder: InputDecoder::new(),
             history: CommandHistory::new(),
             io,
             credential_provider,
@@ -245,7 +245,7 @@ where
             state: CliState::Inactive,
             input_buffer: heapless::String::new(),
             current_path: heapless::Vec::new(),
-            parser: InputParser::new(),
+            decoder: InputDecoder::new(),
             history: CommandHistory::new(),
             io,
             _config: PhantomData,
@@ -306,48 +306,52 @@ where
     /// Main entry point for character-by-character processing.
     /// Returns Ok(()) on success, Err on I/O error.
     pub fn process_char(&mut self, c: char) -> Result<(), IO::Error> {
-        // Parse character - handle errors locally
-        let event = match self.parser.process_char(c, &mut self.input_buffer) {
-            Ok(event) => event,
-            Err(CliError::BufferFull) => {
-                // Buffer full - beep and stop accepting input
-                self.io.put_char('\x07')?; // Bell character
-                return Ok(()); // Not an I/O error, just handled gracefully
-            }
-            Err(_) => {
-                // Other parser errors (shouldn't happen, but be defensive)
-                return Ok(());
-            }
-        };
+        // Decode character into logical event
+        let event = self.decoder.decode_char(c);
 
         match event {
-            ParseEvent::None => Ok(()), // Still accumulating sequence
+            InputEvent::None => Ok(()), // Still accumulating sequence
 
-            ParseEvent::Character(ch) => {
-                // Determine what to echo based on password masking
-                let echo_char = self.get_echo_char(ch);
-                self.io.put_char(echo_char)?;
+            InputEvent::Char(ch) => {
+                // Try to add to buffer
+                match self.input_buffer.push(ch) {
+                    Ok(_) => {
+                        // Successfully added - echo (with password masking if applicable)
+                        let echo_char = self.get_echo_char(ch);
+                        self.io.put_char(echo_char)?;
+                        Ok(())
+                    }
+                    Err(_) => {
+                        // Buffer full - beep and ignore
+                        self.io.put_char('\x07')?; // Bell character
+                        Ok(())
+                    }
+                }
+            }
+
+            InputEvent::Backspace => {
+                // Remove from buffer if not empty
+                if !self.input_buffer.is_empty() {
+                    self.input_buffer.pop();
+                    // Echo backspace sequence
+                    self.io.write_str("\x08 \x08")?;
+                }
                 Ok(())
             }
 
-            ParseEvent::Backspace => {
-                // Echo backspace sequence
-                self.io.write_str("\x08 \x08")?;
-                Ok(())
-            }
-
-            ParseEvent::Enter => self.handle_enter(),
-
-            ParseEvent::Tab => self.handle_tab(),
-
-            ParseEvent::UpArrow => self.handle_history(HistoryDirection::Previous),
-
-            ParseEvent::DownArrow => self.handle_history(HistoryDirection::Next),
-
-            ParseEvent::ClearAndRedraw => {
-                // Buffer already cleared by parser
+            InputEvent::DoubleEsc => {
+                // Clear buffer and redraw (Shell's interpretation of double-ESC)
+                self.input_buffer.clear();
                 self.clear_line_and_redraw()
             }
+
+            InputEvent::Enter => self.handle_enter(),
+
+            InputEvent::Tab => self.handle_tab(),
+
+            InputEvent::UpArrow => self.handle_history(HistoryDirection::Previous),
+
+            InputEvent::DownArrow => self.handle_history(HistoryDirection::Next),
         }
     }
 
