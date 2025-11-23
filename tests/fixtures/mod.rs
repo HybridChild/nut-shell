@@ -187,6 +187,64 @@ pub const CMD_REBOOT: CommandMeta<MockAccessLevel> = CommandMeta {
     max_args: 0,
 };
 
+// ============================================================================
+// Test Commands for Response Formatting
+// ============================================================================
+
+pub const CMD_TEST_PREFIX_NEWLINE: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "test-prefix-newline",
+    description: "Test prefix newline formatting",
+    access_level: MockAccessLevel::Guest,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+pub const CMD_TEST_INDENTED: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "test-indented",
+    description: "Test indented formatting",
+    access_level: MockAccessLevel::Guest,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+pub const CMD_TEST_INLINE: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "test-inline",
+    description: "Test inline formatting",
+    access_level: MockAccessLevel::Guest,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+pub const CMD_TEST_NO_POSTFIX: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "test-no-postfix",
+    description: "Test without postfix newline",
+    access_level: MockAccessLevel::Guest,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+pub const CMD_TEST_NO_PROMPT: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "test-no-prompt",
+    description: "Test without prompt",
+    access_level: MockAccessLevel::Guest,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+pub const CMD_TEST_COMBINED: CommandMeta<MockAccessLevel> = CommandMeta {
+    name: "test-combined",
+    description: "Test combined formatting flags",
+    access_level: MockAccessLevel::Guest,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
 /// Test command: status (in system/ directory)
 pub const CMD_STATUS: CommandMeta<MockAccessLevel> = CommandMeta {
     name: "status",
@@ -387,6 +445,13 @@ pub const TEST_TREE: Directory<MockAccessLevel> = Directory {
         Node::Command(&CMD_ECHO),
         Node::Directory(&DIR_SYSTEM),
         Node::Directory(&DIR_DEBUG),
+        // Test commands for Response formatting
+        Node::Command(&CMD_TEST_PREFIX_NEWLINE),
+        Node::Command(&CMD_TEST_INDENTED),
+        Node::Command(&CMD_TEST_INLINE),
+        Node::Command(&CMD_TEST_NO_POSTFIX),
+        Node::Command(&CMD_TEST_NO_PROMPT),
+        Node::Command(&CMD_TEST_COMBINED),
     ],
     access_level: MockAccessLevel::Guest,
 };
@@ -450,6 +515,29 @@ impl CommandHandlers<DefaultConfig> for MockHandlers {
             "registers" => {
                 let reg = args.get(0).unwrap_or(&"0x00");
                 Ok(Response::success(&format!("Register {}: 0x1234", reg)))
+            }
+
+            // Test commands for Response formatting flags
+            "test-prefix-newline" => {
+                Ok(Response::success("Message with prefix").with_prefix_newline())
+            }
+            "test-indented" => {
+                Ok(Response::success("Line 1\r\nLine 2\r\nLine 3").indented())
+            }
+            "test-inline" => {
+                Ok(Response::success("... processing").inline())
+            }
+            "test-no-postfix" => {
+                Ok(Response::success("No trailing newline").without_postfix_newline())
+            }
+            "test-no-prompt" => {
+                Ok(Response::success("No prompt after this").without_prompt())
+            }
+            "test-combined" => {
+                Ok(Response::success("Multi\r\nLine")
+                    .with_prefix_newline()
+                    .indented()
+                    .without_prompt())
             }
 
             _ => Err(CliError::CommandNotFound),
@@ -544,8 +632,8 @@ mod tests {
 
     #[test]
     fn test_tree_structure() {
-        // Root has 3 children (help, echo, system, debug)
-        assert_eq!(TEST_TREE.children.len(), 4);
+        // Root has 4 base + 6 test commands = 10 children
+        assert_eq!(TEST_TREE.children.len(), 10);
 
         // Can find root commands
         assert!(TEST_TREE.find_child("help").is_some());

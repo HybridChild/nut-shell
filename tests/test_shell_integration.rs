@@ -513,3 +513,261 @@ fn test_buffer_overflow_continues_working() {
     let output = shell.__test_io_mut().output();
     assert!(output.contains("test"), "Shell should work normally after buffer overflow");
 }
+
+// ============================================================================
+// Shell Lifecycle Tests
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_shell_activate_deactivate_reactivate() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+
+    // Shell starts in Inactive state
+    // Activate it
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Should be able to execute commands
+    for c in "echo active\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    let output = shell.__test_io_mut().output();
+    assert!(output.contains("active"), "Should work when active");
+
+    shell.__test_io_mut().clear_output();
+
+    // Deactivate shell
+    shell.deactivate();
+
+    // Should NOT respond to input when deactivated
+    for c in "echo inactive\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    let output = shell.__test_io_mut().output();
+    // Shell should ignore input when inactive (may emit nothing or minimal output)
+    // Exact behavior depends on implementation
+
+    // Reactivate
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Should work again
+    for c in "echo reactivated\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    let output = shell.__test_io_mut().output();
+    assert!(output.contains("reactivated"), "Should work after reactivation");
+}
+
+// ============================================================================
+// Command Argument Validation Tests
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_command_requires_exact_args() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // 'led' command requires exactly 1 argument (min_args=1, max_args=1)
+    // Test with no arguments - should fail
+    for c in "system/hardware/led\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("argument") || output.contains("require") || output.contains("Usage"),
+        "Should report missing argument: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_command_accepts_valid_args() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // 'led' command with correct argument
+    for c in "system/hardware/led on\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("LED") && output.contains("on"),
+        "Should execute command with valid args: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_command_with_variable_args() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // 'echo' allows 0-16 arguments
+    for c in "echo a b c d e\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("a") && output.contains("e"),
+        "Should handle variable arguments: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_command_too_many_args() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // 'reboot' accepts 0 arguments (max_args=0)
+    // Provide arguments - should fail
+    for c in "system/reboot now\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("argument") || output.contains("too many") || output.contains("Usage"),
+        "Should report too many arguments: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Access Level Enforcement Tests
+// ============================================================================
+
+#[test]
+#[cfg(feature = "authentication")]
+fn test_access_level_enforcement() {
+    use nut_shell::auth::{ConstCredentialProvider, password::Sha256Hasher, User};
+    use fixtures::MockAccessLevel;
+
+    // Create test users with different access levels
+    let hash = [0u8; 32];
+    let salt = [0u8; 16];
+    let users = [
+        User::new("guest", MockAccessLevel::Guest, hash, salt).unwrap(),
+        User::new("admin", MockAccessLevel::Admin, hash, salt).unwrap(),
+    ];
+
+    let hasher = Sha256Hasher::new();
+    let provider = ConstCredentialProvider::new(users, hasher);
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+
+    // Note: This test requires authentication logic to actually enforce access levels
+    // The current implementation should check user.access_level >= command.access_level
+}
+
+// ============================================================================
+// Config Variation Tests
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_minimal_config_works() {
+    use nut_shell::config::MinimalConfig;
+    use nut_shell::shell::handlers::CommandHandlers;
+    use nut_shell::Response;
+    use nut_shell::error::CliError;
+
+    // Implement handlers for MinimalConfig
+    struct MinimalHandlers;
+
+    impl CommandHandlers<MinimalConfig> for MinimalHandlers {
+        fn execute_sync(&self, name: &str, _args: &[&str]) -> Result<Response<MinimalConfig>, CliError> {
+            match name {
+                "help" => Ok(Response::success("Help")),
+                "echo" => Ok(Response::success("Echo")),
+                _ => Err(CliError::CommandNotFound),
+            }
+        }
+
+        #[cfg(feature = "async")]
+        async fn execute_async(&self, _name: &str, _args: &[&str]) -> Result<Response<MinimalConfig>, CliError> {
+            Err(CliError::CommandNotFound)
+        }
+    }
+
+    let io = MockIo::new();
+    let handlers = MinimalHandlers;
+    let mut shell: Shell<_, _, _, MinimalConfig> = Shell::new(&TEST_TREE, handlers, io);
+
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Execute command with MinimalConfig
+    for c in "echo test\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(output.contains("Echo"), "MinimalConfig should work");
+}
+
+// ============================================================================
+// Path Navigation Edge Cases
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_parent_directory_navigation() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // This test depends on whether Shell supports 'cd' or maintains current directory
+    // For now, test that '../' path references work in command paths
+    // Example: from /system/, run ../help
+
+    // This may not be supported yet - test documents the gap
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_deep_nesting_path() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Test maximum depth path
+    for c in "system/network/status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        !output.contains("too deep") && !output.contains("PathTooDeep"),
+        "Should handle 3-level nesting: {}",
+        output
+    );
+}

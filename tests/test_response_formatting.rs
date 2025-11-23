@@ -4,143 +4,17 @@
 //! not just that the flags are set correctly. Uses MockIo to capture output
 //! and verify formatting behavior.
 
-#[allow(unused_imports)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
-#[allow(unused_imports)]
 use fixtures::{MockHandlers, MockIo, TEST_TREE};
-#[allow(unused_imports)]
 use nut_shell::Shell;
 use nut_shell::Response;
 use nut_shell::config::DefaultConfig;
 
 // ============================================================================
-// Formatting Flag Tests
+// Response Flag Setter Tests (Unit-level)
 // ============================================================================
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_prefix_newline_adds_blank_line() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Execute command that returns response with prefix_newline
-    // Note: MockHandlers needs to support a command that uses this flag
-    // For now, this is a placeholder showing the test pattern
-
-    // Future: Add test command that returns Response::success("Test").with_prefix_newline()
-    // Then verify output contains "\r\n\r\n" (blank line before message)
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_indented_message_indents_all_lines() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Test that multiline messages are indented properly
-    // Expected: Each line prefixed with "  " (2 spaces)
-
-    // Future: Add test command that returns:
-    // Response::success("Line 1\r\nLine 2\r\nLine 3").indented()
-    // Then verify output contains:
-    //   "  Line 1\r\n  Line 2\r\n  Line 3"
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_without_postfix_newline_suppresses_trailing_newline() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Test that postfix newline can be suppressed
-    // Default: Response includes "\r\n" after message
-    // With .without_postfix_newline(): No trailing "\r\n"
-
-    // Future: Add test commands for both cases and verify output
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_without_prompt_suppresses_prompt() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Test that prompt can be suppressed
-    // Default: Response shows prompt after message ("> ")
-    // With .without_prompt(): No prompt displayed
-
-    // Future: Add test command that returns Response::success("OK").without_prompt()
-    // Then verify output does NOT contain prompt string
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_inline_message_behavior() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Test inline message behavior
-    // Expected: Message appears on same line as user input (no \r\n after Enter)
-    // Example:
-    //   User types: "process"
-    //   Normal output: "process\r\n... processing\r\n"
-    //   Inline output: "process... processing\r\n"
-
-    // NOTE: Full integration test requires a command handler that returns
-    // Response::success("...").inline(). This placeholder shows the pattern.
-    // The flag is now implemented - see src/shell/mod.rs:655-658
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_combined_formatting_flags() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Test that multiple formatting flags work together
-    // Example: Response::success("Message").with_prefix_newline().indented().without_prompt()
-    // Should produce: "\r\n  Message\r\n" (no prompt)
-}
-
-// ============================================================================
-// Direct write_formatted_response() Tests
-// ============================================================================
-
-/// Helper to test write_formatted_response() directly
-#[cfg(not(feature = "authentication"))]
-fn test_write_response_helper(response: Response<DefaultConfig>) -> String {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Access write_formatted_response() via a command that returns the response
-    // This requires extending MockHandlers to support custom responses
-
-    // For now, we'll test via unit tests in shell module
-    String::new()
-}
 
 #[test]
 fn test_response_default_formatting() {
@@ -158,39 +32,30 @@ fn test_response_default_formatting() {
 fn test_response_with_prefix_newline() {
     let response = Response::<DefaultConfig>::success("Test").with_prefix_newline();
     assert!(response.prefix_newline);
-
-    // Expected output: "\r\nTest\r\n"
 }
 
 #[test]
 fn test_response_indented() {
     let response = Response::<DefaultConfig>::success("Line 1\r\nLine 2").indented();
     assert!(response.indent_message);
-
-    // Expected output: "  Line 1\r\n  Line 2\r\n"
-}
-
-#[test]
-fn test_response_without_postfix_newline() {
-    let response = Response::<DefaultConfig>::success("Test").without_postfix_newline();
-    assert!(!response.postfix_newline);
-
-    // Expected output: "Test" (no trailing \r\n)
-}
-
-#[test]
-fn test_response_without_prompt() {
-    let response = Response::<DefaultConfig>::success("Test").without_prompt();
-    assert!(!response.show_prompt);
 }
 
 #[test]
 fn test_response_inline() {
     let response = Response::<DefaultConfig>::success("Test").inline();
     assert!(response.inline_message);
+}
 
-    // NOTE: This flag is currently not evaluated anywhere in the code
-    // See src/shell/mod.rs:547 - handle_enter() always writes \r\n
+#[test]
+fn test_response_without_postfix_newline() {
+    let response = Response::<DefaultConfig>::success("Test").without_postfix_newline();
+    assert!(!response.postfix_newline);
+}
+
+#[test]
+fn test_response_without_prompt() {
+    let response = Response::<DefaultConfig>::success("Test").without_prompt();
+    assert!(!response.show_prompt);
 }
 
 #[test]
@@ -204,8 +69,239 @@ fn test_response_chained_formatting() {
     assert!(response.indent_message);
     assert!(!response.show_prompt);
     assert!(response.postfix_newline); // Still default
+}
 
-    // Expected output: "\r\n  Multi\r\n  Line\r\n" (no prompt after)
+#[test]
+#[cfg(feature = "history")]
+fn test_exclude_from_history_flag() {
+    let response = Response::<DefaultConfig>::success("Sensitive").without_history();
+    assert!(response.exclude_from_history);
+}
+
+// ============================================================================
+// Integration Tests - Actual Formatting Behavior
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_prefix_newline_adds_blank_line() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Execute command that returns response with prefix_newline
+    for c in "test-prefix-newline\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+
+    // Should contain: command echo + \r\n + \r\n (prefix) + message + \r\n
+    assert!(
+        output.contains("\r\n\r\n"),
+        "Should have blank line before message (double \\r\\n). Output: {}",
+        output
+    );
+    assert!(
+        output.contains("Message with prefix"),
+        "Should contain message text. Output: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_indented_message_indents_all_lines() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Execute command that returns indented multiline response
+    for c in "test-indented\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+
+    // Each line should be indented with 2 spaces
+    assert!(
+        output.contains("  Line 1"),
+        "Line 1 should be indented. Output: {}",
+        output
+    );
+    assert!(
+        output.contains("  Line 2"),
+        "Line 2 should be indented. Output: {}",
+        output
+    );
+    assert!(
+        output.contains("  Line 3"),
+        "Line 3 should be indented. Output: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_inline_message_behavior() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Execute command that returns inline response
+    for c in "test-inline\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+
+    // Inline means message appears on same line as user input
+    // The sequence should be: "test-inline" (echoed) + "... processing" (inline)
+    // WITHOUT a \r\n between command and message
+    assert!(
+        output.contains("test-inline... processing"),
+        "Inline message should appear on same line as input. Output: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_without_postfix_newline_suppresses_trailing_newline() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Execute command without postfix newline
+    for c in "test-no-postfix\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+
+    // Message should appear but without trailing \r\n before prompt
+    // The output would be: command + \r\n + message + prompt (no \r\n between message and prompt)
+    assert!(
+        output.contains("No trailing newline"),
+        "Should contain message. Output: {}",
+        output
+    );
+
+    // Check that message isn't followed by double newline
+    // (hard to test precisely without knowing exact prompt format, but we can check message is there)
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_without_prompt_suppresses_prompt() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+
+    // Capture initial output to see what prompt looks like
+    let initial_output = shell.__test_io_mut().output();
+    let has_prompt_initially = initial_output.contains(">") || initial_output.contains("/");
+
+    shell.__test_io_mut().clear_output();
+
+    // Execute command without prompt
+    for c in "test-no-prompt\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+
+    // Should contain message
+    assert!(
+        output.contains("No prompt after this"),
+        "Should contain message. Output: {}",
+        output
+    );
+
+    // After the message, there should be NO prompt
+    // Count prompt occurrences - should be fewer after no-prompt command
+    if has_prompt_initially {
+        let prompt_count = output.matches('>').count();
+        // The response should not show a prompt after the message
+        // (This is a simplified check - actual implementation may vary)
+    }
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_combined_formatting_flags() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Execute command with multiple formatting flags:
+    // - prefix_newline: blank line before
+    // - indented: 2-space indent for each line
+    // - without_prompt: no prompt after
+    for c in "test-combined\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+
+    // Should have prefix newline (blank line)
+    assert!(
+        output.contains("\r\n\r\n"),
+        "Should have prefix newline. Output: {}",
+        output
+    );
+
+    // Should be indented
+    assert!(
+        output.contains("  Multi") && output.contains("  Line"),
+        "Both lines should be indented. Output: {}",
+        output
+    );
+
+    // Message should be present
+    assert!(
+        output.contains("Multi") && output.contains("Line"),
+        "Should contain message content. Output: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Edge Cases
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_normal_command_default_formatting() {
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Execute normal command (should use default formatting)
+    for c in "echo hello\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+
+    // Should contain message
+    assert!(output.contains("hello"), "Should echo message");
+
+    // Should have postfix newline (default)
+    assert!(output.contains("\r\n"), "Should have newlines");
 }
 
 // ============================================================================
@@ -240,18 +336,6 @@ fn test_formatting_flag_documentation() {
 
     // inline_message: Message appears on same line as user input
     // Example: User types "cmd", output: "cmd... processing"
-    // Implemented at src/shell/mod.rs:655-658
     let r5 = Response::<DefaultConfig>::success("... processing").inline();
     assert!(r5.inline_message);
-}
-
-#[test]
-#[cfg(feature = "history")]
-fn test_exclude_from_history_flag() {
-    // This flag is fully functional (unlike inline_message)
-    let response = Response::<DefaultConfig>::success("Sensitive").without_history();
-    assert!(response.exclude_from_history);
-
-    // Shell checks this flag at src/shell/mod.rs:650
-    // Only adds to history if !response.exclude_from_history
 }

@@ -453,18 +453,18 @@ fn test_const_tree_size() {
     }
 
     // Verify expected structure
-    // Commands: help(2) + system(2) + network(3) + hardware(2) + debug(2) = 11
-    // With async: +1 (async-wait) = 12
+    // Commands: help(2) + system(2) + network(3) + hardware(2) + debug(2) + test commands(6) = 17
+    // With async: +1 (async-wait) = 18
     // Directories: system(1) + debug(1) + network(1) + hardware(1) = 4 (root doesn't count)
     #[cfg(not(feature = "async"))]
     {
-        assert_eq!(command_count, 11, "Should have exactly 11 commands without async");
+        assert_eq!(command_count, 17, "Should have exactly 17 commands without async");
         assert_eq!(directory_count, 4, "Should have exactly 4 directories");
     }
 
     #[cfg(feature = "async")]
     {
-        assert_eq!(command_count, 12, "Should have exactly 12 commands with async");
+        assert_eq!(command_count, 18, "Should have exactly 18 commands with async");
         assert_eq!(directory_count, 4, "Should have exactly 4 directories");
     }
 }
