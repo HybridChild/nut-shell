@@ -785,11 +785,41 @@ fn test_parent_directory_navigation() {
     shell.activate().unwrap();
     shell.__test_io_mut().clear_output();
 
-    // This test depends on whether Shell supports 'cd' or maintains current directory
-    // For now, test that '../' path references work in command paths
-    // Example: from /system/, run ../help
+    // Navigate into a subdirectory
+    for c in "system\n".chars() {
+        shell.process_char(c).unwrap();
+    }
 
-    // This may not be supported yet - test documents the gap
+    // Clear output to isolate next command
+    shell.__test_io_mut().clear_output();
+
+    // Navigate back to parent (root) using ".."
+    for c in "..\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    // Verify we're back at root - the command should succeed without error
+    let output = shell.__test_io_mut().output();
+    assert!(
+        !output.contains("Error") && !output.contains("Invalid path"),
+        "Should successfully navigate back to root: {}",
+        output
+    );
+
+    // Clear output again
+    shell.__test_io_mut().clear_output();
+
+    // Now execute a root-level command to verify we're actually at root
+    for c in "echo test\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("test"),
+        "Should be able to execute root-level command: {}",
+        output
+    );
 }
 
 #[test]

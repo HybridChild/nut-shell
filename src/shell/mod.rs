@@ -723,61 +723,62 @@ where
         let path_str = parts[0];
         let args = &parts[1..];
 
-        // Resolve path to node
+        // Resolve path to node (None represents root directory)
         let (target_node, new_path) = self.resolve_path(path_str)?;
 
         // Case 1: Directory navigation
-        if let Node::Directory(_) = target_node {
-            self.current_path = new_path;
-            #[cfg(feature = "history")]
-            return Ok(Response::success("").without_history());
-            #[cfg(not(feature = "history"))]
-            return Ok(Response::success(""));
-        }
+        match target_node {
+            None | Some(Node::Directory(_)) => {
+                // Directory navigation - update path and return
+                self.current_path = new_path;
+                #[cfg(feature = "history")]
+                return Ok(Response::success("").without_history());
+                #[cfg(not(feature = "history"))]
+                return Ok(Response::success(""));
+            }
+            Some(Node::Command(cmd_meta)) => {
+                // Case 2: Tree command execution
+                // Check access control - use InvalidPath for security (don't reveal access denied)
+                if let Some(user) = &self.current_user {
+                    if user.access_level < cmd_meta.access_level {
+                        return Err(CliError::InvalidPath);
+                    }
+                }
 
-        // Case 2: Tree command execution (Node::Command)
-        if let Node::Command(cmd_meta) = target_node {
-            // Check access control - use InvalidPath for security (don't reveal access denied)
-            if let Some(user) = &self.current_user {
-                if user.access_level < cmd_meta.access_level {
-                    return Err(CliError::InvalidPath);
+                // Validate argument count
+                if args.len() < cmd_meta.min_args || args.len() > cmd_meta.max_args {
+                    return Err(CliError::InvalidArgumentCount {
+                        expected_min: cmd_meta.min_args,
+                        expected_max: cmd_meta.max_args,
+                        received: args.len(),
+                    });
+                }
+
+                // Dispatch to command handlers
+                match cmd_meta.kind {
+                    CommandKind::Sync => {
+                        // Execute synchronous tree command
+                        self.handlers.execute_sync(cmd_meta.name, args)
+                    }
+                    #[cfg(feature = "async")]
+                    CommandKind::Async => {
+                        // Async tree command called from sync context
+                        Err(CliError::AsyncNotSupported)
+                    }
                 }
             }
-
-            // Validate argument count
-            if args.len() < cmd_meta.min_args || args.len() > cmd_meta.max_args {
-                return Err(CliError::InvalidArgumentCount {
-                    expected_min: cmd_meta.min_args,
-                    expected_max: cmd_meta.max_args,
-                    received: args.len(),
-                });
-            }
-
-            // Dispatch to command handlers
-            match cmd_meta.kind {
-                CommandKind::Sync => {
-                    // Execute synchronous tree command
-                    self.handlers.execute_sync(cmd_meta.name, args)
-                }
-                #[cfg(feature = "async")]
-                CommandKind::Async => {
-                    // Async tree command called from sync context
-                    Err(CliError::AsyncNotSupported)
-                }
-            }
-        } else {
-            Err(CliError::CommandNotFound)
         }
     }
 
     /// Resolve a path string to a node.
     ///
     /// Returns (node, path_stack) where path_stack is the navigation path.
+    /// Node is None when path resolves to root directory.
     // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
     fn resolve_path(
         &self,
         path_str: &str,
-    ) -> Result<(&'tree Node<L>, heapless::Vec<usize, 8>), CliError> {
+    ) -> Result<(Option<&'tree Node<L>>, heapless::Vec<usize, 8>), CliError> {
         // Start from current directory or root
         // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
         let mut working_path: heapless::Vec<usize, 8> = if path_str.starts_with('/') {
@@ -828,7 +829,7 @@ where
                             .map_err(|_| CliError::PathTooDeep)?;
                     } else {
                         // It's a command - return it
-                        return Ok((child, working_path));
+                        return Ok((Some(child), working_path));
                     }
                     found = true;
                     break;
@@ -841,8 +842,14 @@ where
         }
 
         // Path resolved to a directory
+        // Handle root directory specially (when path is empty)
+        if working_path.is_empty() {
+            // Return None to represent root directory
+            return Ok((None, working_path));
+        }
+
         let dir_node = self.get_node_at_path(&working_path)?;
-        Ok((dir_node, working_path))
+        Ok((Some(dir_node), working_path))
     }
 
     /// Get directory at specific path.
