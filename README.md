@@ -57,7 +57,7 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for rationale.
 ### Basic Example (Bare-Metal)
 
 ```rust
-use nut_shell::{Shell, CommandMeta, CommandKind, Directory, Node, AccessLevel};
+use nut_shell::{Shell, CommandMeta, CommandKind, Directory, Node, AccessLevel, ShellConfig, Response, CliError, CommandHandlers, DefaultConfig};
 
 // Define access levels
 #[derive(Copy, Clone, PartialEq, PartialOrd)]
@@ -82,6 +82,9 @@ impl AccessLevel for Level {
         }
     }
 }
+
+// Use default configuration
+type MyConfig = DefaultConfig;
 
 // Define commands
 fn reboot_fn<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
@@ -116,10 +119,10 @@ const ROOT: Directory<Level> = Directory {
 // Implement command handlers
 struct MyHandlers;
 
-impl<C: ShellConfig> CommandHandlers<C> for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+impl CommandHandlers<MyConfig> for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match name {
-            "reboot" => reboot_fn::<C>(args),
+            "reboot" => reboot_fn::<MyConfig>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -148,6 +151,10 @@ fn main() -> ! {
 ```rust
 use embassy_executor::Spawner;
 use embassy_usb::class::cdc_acm::CdcAcmClass;
+use nut_shell::{Shell, CommandMeta, CommandKind, Response, CliError, CommandHandlers, ShellConfig, DefaultConfig};
+
+// Use default configuration
+type MyConfig = DefaultConfig;
 
 // Async command
 async fn http_get_async<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
@@ -166,18 +173,18 @@ const HTTP_GET: CommandMeta<Level> = CommandMeta {
 };
 
 // Handler with async support
-impl<C: ShellConfig> CommandHandlers<C> for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+impl CommandHandlers<MyConfig> for MyHandlers {
+    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match name {
-            "reboot" => reboot_fn::<C>(args),
+            "reboot" => reboot_fn::<MyConfig>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match name {
-            "http-get" => http_get_async::<C>(args).await,
+            "http-get" => http_get_async::<MyConfig>(args).await,
             _ => Err(CliError::CommandNotFound),
         }
     }

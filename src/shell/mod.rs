@@ -466,6 +466,45 @@ where
         self.io.write_str(prompt.as_str())
     }
 
+    /// Write formatted response to I/O, applying all Response formatting flags.
+    ///
+    /// This is the key method that makes Response flags functional.
+    /// It interprets and applies:
+    /// - `prefix_newline`: Adds blank line before message
+    /// - `indent_message`: Indents all lines with 2 spaces
+    /// - `postfix_newline`: Adds newline after message
+    ///
+    /// Note: `inline_message` is handled by the caller (handle_input_line at line 655-658)
+    /// and `show_prompt` is handled by the caller (handle_input_line at line 670-672).
+    fn write_formatted_response(&mut self, response: &Response<C>) -> Result<(), IO::Error> {
+        // Prefix newline (blank line before output)
+        if response.prefix_newline {
+            self.io.write_str("\r\n")?;
+        }
+
+        // Write message (with optional indentation)
+        if response.indent_message {
+            // Split by lines and indent each
+            for (i, line) in response.message.split("\r\n").enumerate() {
+                if i > 0 {
+                    self.io.write_str("\r\n")?;
+                }
+                self.io.write_str("  ")?; // 2-space indent
+                self.io.write_str(line)?;
+            }
+        } else {
+            // Write message as-is
+            self.io.write_str(&response.message)?;
+        }
+
+        // Postfix newline
+        if response.postfix_newline {
+            self.io.write_str("\r\n")?;
+        }
+
+        Ok(())
+    }
+
     /// Get current directory node.
     fn get_current_dir(&self) -> Result<&'tree Directory<L>, CliError> {
         let mut current: &Directory<L> = self.tree;
@@ -506,7 +545,8 @@ where
 
     /// Handle Enter key (submit command or login).
     fn handle_enter(&mut self) -> Result<(), IO::Error> {
-        self.io.write_str("\r\n")?;
+        // Note: Newline after input is written by the handlers
+        // (conditionally based on Response.inline_message flag for commands)
 
         let input = self.input_buffer.clone();
         self.input_buffer.clear();
@@ -521,11 +561,12 @@ where
         }
     }
 
-    /// Handle login input (username or password).
+    /// Handle login attempt (username or password).
     #[cfg(feature = "authentication")]
     fn handle_login_input(&mut self, input: &str) -> Result<(), IO::Error> {
-        // Login logic will be implemented here
-        // For now, just prompt for password or attempt login
+        // Login doesn't support inline mode - always add newline
+        self.io.write_str("\r\n")?;
+
         if input.contains(':') {
             // Format: username:password
             let parts: heapless::Vec<&str, 2> = input.splitn(2, ':').collect();
@@ -570,29 +611,35 @@ where
     fn handle_input_line(&mut self, input: &str) -> Result<(), IO::Error> {
         // Skip empty input
         if input.trim().is_empty() {
+            self.io.write_str("\r\n")?;
             self.generate_and_write_prompt()?;
             return Ok(());
         }
 
         // Check for global commands first (non-tree operations)
+        // Global commands don't support inline mode
         match input.trim() {
             "?" => {
+                self.io.write_str("\r\n")?;
                 self.show_help()?;
                 self.generate_and_write_prompt()?;
                 return Ok(());
             }
             "ls" => {
+                self.io.write_str("\r\n")?;
                 self.show_ls()?;
                 self.generate_and_write_prompt()?;
                 return Ok(());
             }
             "clear" => {
+                // Clear screen - no newline needed before ANSI clear sequence
                 self.io.write_str("\x1b[2J\x1b[H")?; // ANSI clear screen
                 self.generate_and_write_prompt()?;
                 return Ok(());
             }
             #[cfg(feature = "authentication")]
             "logout" => {
+                self.io.write_str("\r\n")?;
                 self.current_user = None;
                 self.state = CliState::LoggedOut;
                 self.current_path.clear();
@@ -606,9 +653,13 @@ where
         // Handle tree operations (navigation or command execution)
         match self.execute_tree_path(input) {
             Ok(response) => {
-                // Write response
-                self.io.write_str(response.message.as_str())?;
-                self.io.write_str("\r\n")?;
+                // Add newline after input UNLESS response wants inline mode
+                if !response.inline_message {
+                    self.io.write_str("\r\n")?;
+                }
+
+                // Write formatted response (implements all Response flags!)
+                self.write_formatted_response(&response)?;
 
                 // Add to history if not excluded
                 #[cfg(feature = "history")]
@@ -616,15 +667,23 @@ where
                     self.history.add(input);
                 }
 
-                self.generate_and_write_prompt()?;
+                // Show prompt if requested by response
+                if response.show_prompt {
+                    self.generate_and_write_prompt()?;
+                }
             }
             Err(e) => {
+                // Errors don't support inline mode - add newline
+                self.io.write_str("\r\n")?;
+
+                // Write error message
                 self.io.write_str("Error: ")?;
                 match e {
                     CliError::CommandNotFound => self.io.write_str("Command not found")?,
                     CliError::InvalidPath => self.io.write_str("Invalid path")?,
                     CliError::InvalidArgumentCount { .. } => {
-                        self.io.write_str("Invalid argument count")?
+                        // TODO: Format detailed error message when write! macro available in no_std
+                        self.io.write_str("Invalid argument count")?;
                     }
                     CliError::InvalidArgumentFormat { .. } => {
                         self.io.write_str("Invalid argument format")?
@@ -1028,6 +1087,82 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::AccessLevel;
+    use crate::config::DefaultConfig;
+    use crate::io::CharIo;
+    use crate::tree::Directory;
+
+    // Mock access level
+    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    enum MockLevel {
+        User = 0,
+    }
+    impl AccessLevel for MockLevel {
+        fn from_str(s: &str) -> Option<Self> {
+            match s {
+                "User" => Some(Self::User),
+                _ => None,
+            }
+        }
+        fn as_str(&self) -> &'static str {
+            "User"
+        }
+    }
+
+    // Mock I/O that captures output
+    struct MockIo {
+        output: heapless::String<512>,
+    }
+    impl MockIo {
+        fn new() -> Self {
+            Self {
+                output: heapless::String::new(),
+            }
+        }
+        fn get_output(&self) -> &str {
+            &self.output
+        }
+    }
+    impl CharIo for MockIo {
+        type Error = ();
+        fn get_char(&mut self) -> Result<Option<char>, ()> {
+            Ok(None)
+        }
+        fn put_char(&mut self, c: char) -> Result<(), ()> {
+            self.output.push(c).map_err(|_| ())
+        }
+        fn write_str(&mut self, s: &str) -> Result<(), ()> {
+            self.output.push_str(s).map_err(|_| ())
+        }
+    }
+
+    // Mock handlers
+    struct MockHandlers;
+    impl CommandHandlers<DefaultConfig> for MockHandlers {
+        fn execute_sync(
+            &self,
+            _name: &str,
+            _args: &[&str],
+        ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
+            Err(crate::error::CliError::CommandNotFound)
+        }
+
+        #[cfg(feature = "async")]
+        async fn execute_async(
+            &self,
+            _name: &str,
+            _args: &[&str],
+        ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
+            Err(crate::error::CliError::CommandNotFound)
+        }
+    }
+
+    // Test tree
+    const TEST_TREE: Directory<MockLevel> = Directory {
+        name: "/",
+        children: &[],
+        access_level: MockLevel::User,
+    };
 
     #[test]
     fn test_history_direction() {
@@ -1046,72 +1181,7 @@ mod tests {
 
     #[test]
     fn test_activate_deactivate_lifecycle() {
-        use crate::auth::AccessLevel;
-        use crate::config::DefaultConfig;
-        use crate::io::CharIo;
-        use crate::tree::Directory;
-
-        // Mock access level
-        #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-        enum MockLevel {
-            User = 0,
-        }
-        impl AccessLevel for MockLevel {
-            fn from_str(s: &str) -> Option<Self> {
-                match s {
-                    "User" => Some(Self::User),
-                    _ => None,
-                }
-            }
-            fn as_str(&self) -> &'static str {
-                "User"
-            }
-        }
-
-        // Mock I/O
-        struct MockIo;
-        impl CharIo for MockIo {
-            type Error = ();
-            fn get_char(&mut self) -> Result<Option<char>, ()> {
-                Ok(None)
-            }
-            fn put_char(&mut self, _c: char) -> Result<(), ()> {
-                Ok(())
-            }
-            fn write_str(&mut self, _s: &str) -> Result<(), ()> {
-                Ok(())
-            }
-        }
-
-        // Mock handlers
-        struct MockHandlers;
-        impl CommandHandlers<DefaultConfig> for MockHandlers {
-            fn execute_sync(
-                &self,
-                _name: &str,
-                _args: &[&str],
-            ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
-                Err(crate::error::CliError::CommandNotFound)
-            }
-
-            #[cfg(feature = "async")]
-            async fn execute_async(
-                &self,
-                _name: &str,
-                _args: &[&str],
-            ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
-                Err(crate::error::CliError::CommandNotFound)
-            }
-        }
-
-        // Test tree
-        const TEST_TREE: Directory<MockLevel> = Directory {
-            name: "/",
-            children: &[],
-            access_level: MockLevel::User,
-        };
-
-        let io = MockIo;
+        let io = MockIo::new();
         let handlers = MockHandlers;
 
         // Create shell - should start in Inactive state
@@ -1170,5 +1240,164 @@ mod tests {
             assert!(shell.input_buffer.is_empty());
             assert!(shell.current_path.is_empty());
         }
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_default() {
+        // Test default formatting (no flags set)
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        let response = crate::response::Response::<DefaultConfig>::success("Test message");
+        shell.write_formatted_response(&response).unwrap();
+
+        // Default: message + postfix newline
+        assert_eq!(shell.io.get_output(), "Test message\r\n");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_with_prefix_newline() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        let response = crate::response::Response::<DefaultConfig>::success("Test")
+            .with_prefix_newline();
+        shell.write_formatted_response(&response).unwrap();
+
+        // prefix newline + message + postfix newline
+        assert_eq!(shell.io.get_output(), "\r\nTest\r\n");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_indented() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        let response = crate::response::Response::<DefaultConfig>::success("Line 1\r\nLine 2")
+            .indented();
+        shell.write_formatted_response(&response).unwrap();
+
+        // Each line indented with 2 spaces + postfix newline
+        assert_eq!(shell.io.get_output(), "  Line 1\r\n  Line 2\r\n");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_indented_single_line() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        let response = crate::response::Response::<DefaultConfig>::success("Single line")
+            .indented();
+        shell.write_formatted_response(&response).unwrap();
+
+        // Single line indented
+        assert_eq!(shell.io.get_output(), "  Single line\r\n");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_without_postfix_newline() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        let response = crate::response::Response::<DefaultConfig>::success("No newline")
+            .without_postfix_newline();
+        shell.write_formatted_response(&response).unwrap();
+
+        // Message without trailing newline
+        assert_eq!(shell.io.get_output(), "No newline");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_combined_flags() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        let response = crate::response::Response::<DefaultConfig>::success("Multi\r\nLine")
+            .with_prefix_newline()
+            .indented();
+        shell.write_formatted_response(&response).unwrap();
+
+        // Prefix newline + indented lines + postfix newline
+        assert_eq!(shell.io.get_output(), "\r\n  Multi\r\n  Line\r\n");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_all_flags_off() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        let response = crate::response::Response::<DefaultConfig>::success("Raw")
+            .without_postfix_newline();
+        shell.write_formatted_response(&response).unwrap();
+
+        // No formatting at all
+        assert_eq!(shell.io.get_output(), "Raw");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_empty_message() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        let response = crate::response::Response::<DefaultConfig>::success("");
+        shell.write_formatted_response(&response).unwrap();
+
+        // Empty message still gets postfix newline
+        assert_eq!(shell.io.get_output(), "\r\n");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_indented_multiline() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        let response = crate::response::Response::<DefaultConfig>::success("A\r\nB\r\nC\r\nD")
+            .indented()
+            .without_postfix_newline();
+        shell.write_formatted_response(&response).unwrap();
+
+        // All 4 lines indented, no trailing newline
+        assert_eq!(shell.io.get_output(), "  A\r\n  B\r\n  C\r\n  D");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_inline_message_flag() {
+        // Test that inline_message flag is properly recognized
+        let response = crate::response::Response::<DefaultConfig>::success("... processing")
+            .inline();
+
+        assert!(response.inline_message, "inline() should set inline_message flag");
+
+        // Note: The actual inline behavior (no newline after input) is tested
+        // via integration tests, as it requires simulating full command execution.
+        // This test verifies the flag is set correctly.
     }
 }
