@@ -158,5 +158,4 @@ mod tests {
         assert!(!hasher.verify("passwore", &salt, &hash)); // Last char different
         assert!(!hasher.verify("PASSWORD", &salt, &hash)); // All chars different
     }
-
 }

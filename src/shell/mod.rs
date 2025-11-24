@@ -505,6 +505,20 @@ where
         Ok(())
     }
 
+    /// Format error message using Display trait.
+    ///
+    /// Converts CliError to a heapless string using its Display implementation.
+    /// Returns a buffer containing the formatted error message.
+    // TODO: Use C::MAX_RESPONSE when const generics stabilize
+    fn format_error(error: &CliError) -> heapless::String<256> {
+        use core::fmt::Write;
+        let mut buffer = heapless::String::new();
+        // Write using Display trait implementation
+        // Ignore write errors (buffer full) - partial message is better than none
+        let _ = write!(&mut buffer, "{}", error);
+        buffer
+    }
+
     /// Get current directory node.
     fn get_current_dir(&self) -> Result<&'tree Directory<L>, CliError> {
         let mut current: &Directory<L> = self.tree;
@@ -676,26 +690,10 @@ where
                 // Errors don't support inline mode - add newline
                 self.io.write_str("\r\n")?;
 
-                // Write error message
+                // Format and write error message using Display trait
                 self.io.write_str("Error: ")?;
-                match e {
-                    CliError::CommandNotFound => self.io.write_str("Command not found")?,
-                    CliError::InvalidPath => self.io.write_str("Invalid path")?,
-                    CliError::InvalidArgumentCount { .. } => {
-                        // TODO: Format detailed error message when write! macro available in no_std
-                        self.io.write_str("Invalid argument count")?;
-                    }
-                    CliError::InvalidArgumentFormat { .. } => {
-                        self.io.write_str("Invalid argument format")?
-                    }
-                    CliError::BufferFull => self.io.write_str("Buffer full")?,
-                    CliError::PathTooDeep => self.io.write_str("Path too deep")?,
-                    #[cfg(feature = "async")]
-                    CliError::AsyncNotSupported => self
-                        .io
-                        .write_str("Async command requires process_char_async()")?,
-                    _ => self.io.write_str("Unknown error")?,
-                }
+                let error_msg = Self::format_error(&e);
+                self.io.write_str(error_msg.as_str())?;
                 self.io.write_str("\r\n")?;
                 self.generate_and_write_prompt()?;
             }
@@ -1132,7 +1130,9 @@ mod tests {
                 output: heapless::String::new(),
             }
         }
-        fn _get_output(&self) -> &str {
+
+        #[allow(dead_code)]
+        fn get_output(&self) -> &str {
             &self.output
         }
     }
