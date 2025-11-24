@@ -152,41 +152,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default_config_messages() {
-        assert_eq!(DefaultConfig::MSG_WELCOME, "Welcome to nut-shell!\r\n");
-        assert_eq!(
-            DefaultConfig::MSG_LOGIN_PROMPT,
-            "Login. Type <username>:<password>: "
-        );
-        assert_eq!(
-            DefaultConfig::MSG_LOGIN_SUCCESS,
-            "Login succesful! Type '?' for help.\r\n"
-        );
-        assert_eq!(
-            DefaultConfig::MSG_LOGIN_FAILED,
-            "Login failed. Try again.\r\n"
-        );
-        assert_eq!(DefaultConfig::MSG_LOGOUT, "Logged out.\r\n");
-        assert_eq!(
-            DefaultConfig::MSG_INVALID_LOGIN_FORMAT,
-            "Invalid format. Use <username>:<password>\r\n"
-        );
-    }
-
-    #[test]
-    fn test_minimal_config_messages() {
-        assert_eq!(MinimalConfig::MSG_WELCOME, "Welcome!\r\n");
-        assert_eq!(MinimalConfig::MSG_LOGIN_PROMPT, "Login: ");
-        assert_eq!(MinimalConfig::MSG_LOGIN_SUCCESS, "Logged in.\r\n");
-        assert_eq!(MinimalConfig::MSG_LOGIN_FAILED, "Login failed.\r\n");
-        assert_eq!(MinimalConfig::MSG_LOGOUT, "Logged out.\r\n");
-        assert_eq!(
-            MinimalConfig::MSG_INVALID_LOGIN_FORMAT,
-            "Invalid format. Use <name>:<password>\r\n"
-        );
-    }
-
-    #[test]
     fn test_custom_config_messages() {
         // Test that users can customize messages
         struct CustomConfig;

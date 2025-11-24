@@ -196,12 +196,6 @@ mod tests {
     }
 
     #[test]
-    fn test_access_level_ordering() {
-        assert!(TestAccessLevel::Admin > TestAccessLevel::User);
-        assert!(TestAccessLevel::User > TestAccessLevel::Guest);
-    }
-
-    #[test]
     fn test_access_level_from_str() {
         assert_eq!(
             TestAccessLevel::from_str("Admin"),

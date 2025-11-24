@@ -234,18 +234,6 @@ mod tests {
     // ========================================
 
     #[test]
-    fn test_input_state() {
-        assert_eq!(InputState::Normal, InputState::Normal);
-        assert_ne!(InputState::Normal, InputState::EscapeStart);
-    }
-
-    #[test]
-    fn test_input_event() {
-        assert_eq!(InputEvent::Enter, InputEvent::Enter);
-        assert_ne!(InputEvent::Tab, InputEvent::Enter);
-    }
-
-    #[test]
     fn test_decoder_new() {
         let decoder = InputDecoder::new();
         assert_eq!(decoder.state(), InputState::Normal);

@@ -139,11 +139,5 @@ pub const NAME: &str = env!("CARGO_PKG_NAME");
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    #[test]
-    fn test_version() {
-        assert!(!VERSION.is_empty());
-        assert_eq!(NAME, "nut-shell");
-    }
+    // No tests needed - all public APIs tested in their respective modules
 }

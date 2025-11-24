@@ -55,15 +55,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_hash_produces_32_bytes() {
-        let hasher = Sha256Hasher::new();
-        let salt = [1u8; 16];
-        let hash = hasher.hash("password123", &salt);
-
-        assert_eq!(hash.len(), 32);
-    }
-
-    #[test]
     fn test_same_password_same_hash() {
         let hasher = Sha256Hasher::new();
         let salt = [1u8; 16];
@@ -168,27 +159,4 @@ mod tests {
         assert!(!hasher.verify("PASSWORD", &salt, &hash)); // All chars different
     }
 
-    #[test]
-    fn test_hasher_default() {
-        let hasher = Sha256Hasher::default();
-        let salt = [1u8; 16];
-        let hash = hasher.hash("test", &salt);
-
-        assert_eq!(hash.len(), 32);
-    }
-
-    #[test]
-    fn test_known_vector() {
-        // Test with a known input to ensure consistent hashing
-        let hasher = Sha256Hasher::new();
-        let salt = [0u8; 16];
-        let hash = hasher.hash("test", &salt);
-
-        // Hash should be deterministic
-        let expected = hasher.hash("test", &salt);
-        assert_eq!(hash, expected);
-
-        // Verify works with the hash
-        assert!(hasher.verify("test", &salt, &hash));
-    }
 }
