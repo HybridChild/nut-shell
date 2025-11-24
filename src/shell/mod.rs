@@ -688,7 +688,7 @@ where
             }
             Err(e) => {
                 // Errors don't support inline mode - add newline
-                self.io.write_str("\r\n")?;
+                self.io.write_str("\r\n  ")?;
 
                 // Format and write error message using Display trait
                 self.io.write_str("Error: ")?;
@@ -796,12 +796,14 @@ where
             .collect();
 
         // Navigate through segments
-        for segment in segments.iter() {
+        for (seg_idx, segment) in segments.iter().enumerate() {
             if *segment == ".." {
                 // Parent directory
                 working_path.pop();
                 continue;
             }
+
+            let is_last_segment = seg_idx == segments.len() - 1;
 
             // Find child with this name
             let current_dir = self.get_dir_at_path(&working_path)?;
@@ -828,8 +830,13 @@ where
                             .push(index)
                             .map_err(|_| CliError::PathTooDeep)?;
                     } else {
-                        // It's a command - return it
-                        return Ok((Some(child), working_path));
+                        // It's a command - can only return if this is the last segment
+                        if is_last_segment {
+                            return Ok((Some(child), working_path));
+                        } else {
+                            // Trying to navigate through a command - invalid path structure
+                            return Err(CliError::InvalidPath);
+                        }
                     }
                     found = true;
                     break;
