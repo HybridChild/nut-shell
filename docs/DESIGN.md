@@ -25,88 +25,19 @@ This document records the architectural decisions for **nut-shell**. It explains
 
 ## Command Syntax
 
-The CLI uses a path-based syntax that mirrors filesystem navigation, optimized for embedded systems with minimal parsing overhead.
+Path-based syntax optimized for embedded systems with minimal parsing overhead (~50 lines).
 
-### Core Syntax Rules
+**Core syntax:**
+- **Navigation:** `system`, `system/network`, `..`, `/hw/led` (absolute/relative paths)
+- **Execution:** `reboot`, `/system/reboot`, `led/set 255 0 0` (positional args only)
+- **Global commands:** `ls` (list), `?` (help), `logout` (auth only), `clear`
 
-**Note:** Examples show prompts with authentication enabled (`user@path>`). Without authentication, the username prefix may be omitted or use a default value (implementation-defined).
+**Disambiguation:** Reserved keywords → path resolution → tree lookup → execute or navigate based on node type
 
-**Navigation** (both absolute and relative):
-```
-user@/> system              # Navigate to directory (relative)
-user@/system> network       # Navigate to subdirectory (relative)
-user@/system/network> ..    # Navigate to parent directory
-user@/system> /hw/led       # Navigate using absolute path
-user@/system> /             # Navigate to root
-```
-
-**Command Execution** (both absolute and relative):
-```
-user@/system> reboot           # Execute command in current directory (relative)
-user@/> /system/reboot         # Execute command using absolute path
-user@/hw/led> set 255 0 0      # Execute with positional arguments (relative)
-user@/> /hw/led/set 255 0 0    # Execute with args using absolute path
-```
-
-**Global Commands** (reserved keywords):
-```
-ls        # List current directory contents with descriptions
-?         # Show available global commands (help)
-logout    # End session (only when authentication feature enabled)
-clear     # Clear screen (optional, platform-dependent)
-```
-
-### Disambiguation Rules
-
-1. **Reserved keyword check**: Check if input matches reserved keywords (`ls`, `?`, `logout`, `clear`)
-2. **Path resolution**: Parse input as path + optional arguments
-3. **Tree lookup**: Walk tree structure to resolve path
-4. **Node type determines behavior**:
-   - If path resolves to `Node::Directory` → navigate to that directory
-   - If path resolves to `Node::Command` → execute that command
-5. **Validation**: No command or directory may use reserved keyword names (enforced at tree construction)
-
-### Design Rationale
-
-**Why path-based navigation?**
-- Natural for hierarchical structures
-- Enables both quick navigation (`system`) and direct access (`system/network/status`)
-- Scriptable over serial connection
-- Minimal parser complexity (~50 lines)
-
-**Why positional arguments only?**
-- No `--flags` or `-options` reduces parser complexity
-- Embedded systems typically have simple command signatures
-- Fixed argument counts validated per command
-- Familiar to engineers (like embedded command protocols)
-
-### Parsing Implementation
-
-```rust
-// Pseudocode for input processing
-fn parse_input(input: &str) -> Result<Request, ParseError> {
-    let (path_str, args) = split_on_whitespace(input);
-
-    // 1. Check reserved keywords first
-    match path_str {
-        "ls" | "?" | "logout" | "clear" => return global_command(path_str),
-        _ => {}
-    }
-
-    // 2. Parse as path
-    let path = Path::parse(path_str)?;
-
-    // 3. Resolve against tree
-    // Note: resolve_path() performs access control checks during traversal
-    // Returns "Invalid path" error for both non-existent and inaccessible nodes
-    match current_dir.resolve_path(&path)? {
-        Node::Directory(_) => Request::Navigate(path),
-        Node::Command(_) => Request::Execute(path, args),
-    }
-}
-```
-
-**Zero allocation**: All parsing uses fixed-size `heapless::Vec` buffers, no heap required.
+**Design rationale:**
+- Path-based enables both quick navigation and direct command access
+- Positional args only (no `--flags`) reduces parser complexity
+- Zero allocation parsing with `heapless::Vec` buffers
 
 ## Key Design Decisions
 

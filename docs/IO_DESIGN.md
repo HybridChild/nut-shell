@@ -326,249 +326,29 @@ See [DESIGN.md](DESIGN.md) section 1 for complete architecture details and imple
 
 ---
 
-## Reference Implementations
-
-These are complete, production-ready CharIo implementations for common platforms. Use as templates during implementation.
+## Platform Implementation Guidelines
 
 ### USB-CDC (Embassy Async)
+**Critical points:**
+- Normalize line endings: `\r` → `\r\n` for terminals
+- Track disconnect state, return error when disconnected
+- Buffer to `heapless::Vec<u8, 256>`, flush after `process_char_async()`
+- USB packets are 64 bytes, batch multiple chars per transfer
 
-**Key implementation concerns:**
-- Line ending normalization: Convert `\r` to `\r\n` for terminal compatibility
-- Disconnect detection: Track connection state, return error when disconnected
-- Packet-based buffering: USB transfers 64-byte packets, buffer multiple chars
-- Flush timing: Must call `flush()` after each `process_char_async()` call
-
-**Reference implementation:**
-
-```rust
-use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
-use heapless::Vec;
-
-pub struct UsbCdcIo<'d> {
-    class: CdcAcmClass<'d, embassy_usb::driver::Driver<'d, USB>>,
-    rx_buffer: Vec<u8, 64>,
-    tx_buffer: Vec<u8, 256>,
-    disconnected: bool,
-}
-
-impl<'d> UsbCdcIo<'d> {
-    pub fn new(class: CdcAcmClass<'d, embassy_usb::driver::Driver<'d, USB>>) -> Self {
-        Self {
-            class,
-            rx_buffer: Vec::new(),
-            tx_buffer: Vec::new(),
-            disconnected: false,
-        }
-    }
-
-    /// Flush output buffer to USB (call after process_char)
-    pub async fn flush(&mut self) -> Result<(), Error> {
-        if !self.tx_buffer.is_empty() {
-            self.class.write_packet(&self.tx_buffer).await?;
-            self.tx_buffer.clear();
-        }
-        Ok(())
-    }
-
-    /// Background task to handle USB events
-    pub async fn poll_connection(&mut self) {
-        self.class.wait_connection().await;
-        self.disconnected = false;
-    }
-
-    /// Read task: fills rx_buffer from USB
-    pub async fn read_task(&mut self) -> Result<(), Error> {
-        let mut buf = [0u8; 64];
-        loop {
-            let n = self.class.read_packet(&mut buf).await?;
-            for &byte in &buf[..n] {
-                self.rx_buffer.push(byte).ok();  // Drop if buffer full
-            }
-        }
-    }
-}
-
-impl CharIo for UsbCdcIo<'_> {
-    type Error = Error;
-
-    fn get_char(&mut self) -> Result<Option<char>, Self::Error> {
-        if self.disconnected {
-            return Err(Error::Disconnected);
-        }
-
-        if let Some(&byte) = self.rx_buffer.first() {
-            self.rx_buffer.remove(0);
-            Ok(Some(byte as char))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
-        // Normalize line endings for terminals (CRLF)
-        let bytes: &[u8] = match c {
-            '\r' => b"\r\n",  // CR becomes CRLF
-            '\n' => return Ok(()),  // LF alone ignored (handled by \r)
-            _ => &[c as u8],
-        };
-
-        for &byte in bytes {
-            self.tx_buffer.push(byte)
-                .map_err(|_| Error::BufferFull)?;
-        }
-        Ok(())
-    }
-}
-```
-
----
-
-### UART Bare-Metal (Interrupt-Driven RX)
-
-**Key implementation concerns:**
-- ISR buffering: Only buffer characters in ISR, process in main loop
-- Critical sections: Use `cortex_m::interrupt::free()` for shared queue access
-- Blocking TX: Acceptable in bare-metal (no other tasks blocked)
-- Queue overflow: Drop characters silently (backpressure)
-- MUST NOT call `process_char()` from ISR (not ISR-safe)
-
-**Reference implementation:**
-
-```rust
-use cortex_m::interrupt::Mutex;
-use core::cell::RefCell;
-use heapless::Deque;
-use rp2040_hal::uart::{UartPeripheral, Enabled};
-
-// Global RX buffer filled by ISR
-static RX_QUEUE: Mutex<RefCell<Deque<u8, 64>>> =
-    Mutex::new(RefCell::new(Deque::new()));
-
-// ISR handler (install this for UART IRQ)
-#[interrupt]
-fn UART0_IRQ() {
-    // SAFETY: Access to UART peripheral in ISR context
-    let uart = unsafe { &*UART0::ptr() };
-
-    while uart.is_readable() {
-        let byte = uart.read_byte();
-
-        cortex_m::interrupt::free(|cs| {
-            RX_QUEUE.borrow(cs).borrow_mut().push_back(byte).ok();
-            // Drop byte if queue full (backpressure)
-        });
-    }
-
-    // Clear interrupt flag
-    uart.clear_rx_interrupt();
-}
-
-pub struct UartIo {
-    uart: UartPeripheral<Enabled, UART0, (Pin0, Pin1)>,
-}
-
-impl UartIo {
-    pub fn new(uart: UartPeripheral<Enabled, UART0, (Pin0, Pin1)>) -> Self {
-        // Enable RX interrupt
-        uart.enable_rx_interrupt();
-
-        Self { uart }
-    }
-}
-
-impl CharIo for UartIo {
-    type Error = core::convert::Infallible;
-
-    fn get_char(&mut self) -> Result<Option<char>, Self::Error> {
-        let byte = cortex_m::interrupt::free(|cs| {
-            RX_QUEUE.borrow(cs).borrow_mut().pop_front()
-        });
-
-        Ok(byte.map(|b| b as char))
-    }
-
-    fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
-        // Blocking write is acceptable in bare-metal
-        self.uart.write_byte(c as u8);
-        Ok(())
-    }
-}
-```
-
----
+### UART Bare-Metal (Interrupt-Driven)
+**Critical points:**
+- ISR fills queue (`heapless::Deque<u8, 64>`), main loop reads
+- Use `cortex_m::interrupt::free()` for critical sections
+- Blocking TX acceptable (no tasks to block)
+- Never call `process_char()` from ISR (not ISR-safe)
 
 ### UART Embassy Async (DMA)
+**Critical points:**
+- Separate read task and shell task
+- DMA for zero-copy transfers
+- Buffer to `heapless::Vec`, flush via `write_all().await`
+- Handle UART errors gracefully (don't crash shell)
 
-**Key implementation concerns:**
-- DMA efficiency: Zero-copy transfers for both RX and TX
-- Task separation: Separate read task and shell task
-- Shared state: CharIo buffer access may need synchronization (Mutex/channels)
-- Error handling: UART errors should not crash shell task
-
-**Reference implementation:**
-
-```rust
-use embassy_rp::uart::{Uart, BufferedUart, BufferedUartRx, BufferedUartTx};
-use embassy_rp::peripherals::UART0;
-use heapless::Vec;
-
-pub struct EmbassyUartIo {
-    rx_buffer: Vec<u8, 64>,
-    tx_buffer: Vec<u8, 256>,
-}
-
-impl EmbassyUartIo {
-    pub fn new() -> Self {
-        Self {
-            rx_buffer: Vec::new(),
-            tx_buffer: Vec::new(),
-        }
-    }
-
-    /// Read task: fills rx_buffer from UART
-    pub async fn read_task(&mut self, rx: &mut BufferedUartRx<'_, UART0>) -> ! {
-        let mut buf = [0u8; 64];
-        loop {
-            match rx.read(&mut buf).await {
-                Ok(n) => {
-                    for &byte in &buf[..n] {
-                        self.rx_buffer.push(byte).ok();
-                    }
-                }
-                Err(_) => {
-                    // UART error, could log or reset
-                }
-            }
-        }
-    }
-
-    /// Flush output buffer to UART
-    pub async fn flush(&mut self, tx: &mut BufferedUartTx<'_, UART0>) -> Result<(), Error> {
-        if !self.tx_buffer.is_empty() {
-            tx.write_all(&self.tx_buffer).await?;
-            self.tx_buffer.clear();
-        }
-        Ok(())
-    }
-}
-
-impl CharIo for EmbassyUartIo {
-    type Error = Error;
-
-    fn get_char(&mut self) -> Result<Option<char>, Self::Error> {
-        if let Some(&byte) = self.rx_buffer.first() {
-            self.rx_buffer.remove(0);
-            Ok(Some(byte as char))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
-        self.tx_buffer.push(c as u8)
-            .map_err(|_| Error::BufferFull)
-    }
-}
-```
+**For complete working implementations, see `examples/` directory.**
 
 ---

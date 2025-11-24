@@ -331,73 +331,15 @@ impl AccessLevel for MyAccessLevel {
 
 ### Path-Based Access Validation
 
-Access control is enforced during path resolution, checking each segment as the tree is traversed:
+Access control is enforced during path resolution. Each segment is checked during tree traversal.
 
-```rust
-impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
-where
-    L: AccessLevel,
-    IO: CharIo,
-    H: CommandHandlers<C>,
-    C: ShellConfig,
-{
-    fn resolve_path(&self, path: &Path) -> Result<&Node<L>, CliError> {
-        let mut current = self.get_current_directory();
-
-        for segment in path.segments() {
-            // Find child by name
-            let child = current.find_child(segment)
-                .ok_or(CliError::InvalidPath)?;
-
-            // Check access to this node
-            self.check_access(child)?;
-            //   └─ Returns InvalidPath if denied (see implementation above)
-
-            // Continue traversal if directory
-            if let Node::Directory(dir) = child {
-                current = dir;
-            } else {
-                return Ok(child);  // Command found
-            }
-        }
-
-        Ok(Node::Directory(current))
-    }
-
-    // Access check implementation shown in "Access Control Implementation Pattern" above
-}
-```
-
-**Key security properties:**
-- Access checked **at every path segment** during traversal
-- Inaccessible nodes return same error as non-existent nodes
+**Security properties:**
+- Access checked at **every path segment** during traversal
+- Inaccessible nodes return `InvalidPath` (same as non-existent nodes)
 - No information leakage about node existence
-- Parent directory access doesn't imply child access (each node checked independently)
+- Parent access doesn't imply child access
 
-### Node Access Levels
-
-```rust
-const REBOOT_CMD: CommandMeta<MyAccessLevel> = CommandMeta {
-    name: "reboot",
-    description: "Reboot the system",
-    access_level: MyAccessLevel::Admin,  // Requires Admin
-    kind: CommandKind::Sync,
-    min_args: 0,
-    max_args: 0,
-};
-
-const SYSTEM_DIR: Directory<MyAccessLevel> = Directory {
-    name: "system",
-    access_level: MyAccessLevel::User,  // Requires User level
-    children: &[
-        Node::Command(&REBOOT_CMD),
-    ],
-};
-
-const ROOT: &[Node<MyAccessLevel>] = &[
-    Node::Directory(&SYSTEM_DIR),
-];
-```
+**Implementation details:** See [DESIGN.md](DESIGN.md) for path resolution and node access level patterns.
 
 ---
 
@@ -449,143 +391,13 @@ See [DESIGN.md](DESIGN.md) for feature gating patterns and architectural details
 
 ## Testing & Validation
 
-### Unit Tests
+**Test coverage:**
+- **Password hashing:** SHA-256 correctness, salt uniqueness, constant-time comparison
+- **Authentication flow:** Login/logout state transitions, invalid credentials handling
+- **Access control:** Permission enforcement during path traversal, error uniformity (InvalidPath for both nonexistent and inaccessible)
+- **Security assertions:** No plaintext password fields (compile-time check), timing attack resistance, per-user salt uniqueness
 
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_password_hashing() {
-        let hasher = Sha256Hasher;
-        let salt = [0u8; 16];
-        let password = "test_password";
-
-        let hash = hasher.hash(password, &salt);
-        assert!(hasher.verify(password, &salt, &hash));
-        assert!(!hasher.verify("wrong", &salt, &hash));
-    }
-
-    #[test]
-    fn test_constant_time_comparison() {
-        // Verify timing attack resistance
-        let hasher = Sha256Hasher;
-        let salt = [0u8; 16];
-
-        let correct = "correct_password";
-        let wrong1 = "c";  // Differs at first char
-        let wrong2 = "correct_passwor";  // Differs at last char
-
-        let hash = hasher.hash(correct, &salt);
-
-        // All comparisons should take similar time
-        let start = now();
-        hasher.verify(wrong1, &salt, &hash);
-        let time1 = elapsed(start);
-
-        let start = now();
-        hasher.verify(wrong2, &salt, &hash);
-        let time2 = elapsed(start);
-
-        // Times should be within 1% (constant-time)
-        assert!((time1 as f64 - time2 as f64).abs() / time1 as f64 < 0.01);
-    }
-}
-```
-
-### Integration Tests
-
-```rust
-#[test]
-fn test_login_flow() {
-    let provider = TestProvider::new(&[
-        ("admin", "hashed_password", AccessLevel::Admin),
-    ]);
-
-    let mut shell = Shell::new(root, provider, test_io);
-
-    // Should start logged out
-    assert_eq!(shell.state(), CliState::LoggedOut);
-
-    // Invalid login
-    assert!(shell.login("admin", "wrong").is_err());
-    assert_eq!(shell.state(), CliState::LoggedOut);
-
-    // Valid login
-    assert!(shell.login("admin", "correct").is_ok());
-    assert_eq!(shell.state(), CliState::LoggedIn);
-}
-
-#[test]
-fn test_access_control() {
-    let provider = TestProvider::new(&[
-        ("user", "hash", AccessLevel::User),
-        ("admin", "hash", AccessLevel::Admin),
-    ]);
-
-    let mut shell = Shell::new(root, provider, test_io);
-
-    // Login as user
-    shell.login("user", "password").unwrap();
-
-    // Can access User-level commands
-    assert!(shell.execute("system info").is_ok());
-
-    // Cannot access Admin-level commands (returns InvalidPath to hide existence)
-    assert_eq!(
-        shell.execute("system reboot"),
-        Err(CliError::InvalidPath)
-    );
-}
-```
-
-### Security Tests
-
-```rust
-#[test]
-fn test_only_hashes_in_binary() {
-    // Verify that User struct contains only password_hash field, no plaintext
-    // This is a compile-time check - if this compiles, passwords are hashed
-    let user = User {
-        username: heapless::String::from("test"),
-        #[cfg(feature = "authentication")]
-        password_hash: [0u8; 32],  // Hash only, no plaintext field exists
-        #[cfg(feature = "authentication")]
-        salt: [0u8; 16],
-        access_level: MyAccessLevel::User,
-    };
-
-    // User struct should not have a plaintext password field
-    // (This won't compile if someone adds one)
-    let _ = user.password_hash;  // OK - hash field exists
-    // let _ = user.password;    // Would fail - no such field
-}
-
-#[test]
-fn test_salt_uniqueness() {
-    // Ensure different users have different salts
-    let users = load_users();
-    let salts: HashSet<_> = users.iter().map(|u| u.salt).collect();
-
-    assert_eq!(salts.len(), users.len(), "Salts must be unique per user");
-}
-
-#[test]
-fn test_constant_time_verify() {
-    // Verify that password verification uses constant-time comparison
-    let hasher = Sha256Hasher;
-    let salt = [1u8; 16];
-    let correct_password = "correct_password";
-    let hash = hasher.hash(correct_password, &salt);
-
-    // These should take similar time regardless of how many characters match
-    assert!(!hasher.verify("x", &salt, &hash));
-    assert!(!hasher.verify("correct_passwor", &salt, &hash));
-    assert!(!hasher.verify("xorrect_password", &salt, &hash));
-    assert!(hasher.verify(correct_password, &salt, &hash));
-}
-```
+**See `tests/test_auth_*.rs` for complete test implementations.**
 
 ---
 

@@ -54,163 +54,45 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for rationale.
 
 ## Quick Start
 
-### Basic Example (Bare-Metal)
-
+**Bare-Metal Pattern:**
 ```rust
-use nut_shell::{Shell, CommandMeta, CommandKind, Directory, Node, AccessLevel, ShellConfig, Response, CliError, CommandHandlers, DefaultConfig};
+// 1. Define command tree with metadata
+const REBOOT: CommandMeta<Level> = CommandMeta { /* ... */ };
+const ROOT: Directory<Level> = Directory { /* ... */ };
 
-// Define access levels
-#[derive(Copy, Clone, PartialEq, PartialOrd)]
-enum Level {
-    User = 0,
-    Admin = 1,
-}
-
-impl AccessLevel for Level {
-    fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "User" => Some(Self::User),
-            "Admin" => Some(Self::Admin),
-            _ => None,
-        }
-    }
-
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::User => "User",
-            Self::Admin => "Admin",
-        }
-    }
-}
-
-// Use default configuration
-type MyConfig = DefaultConfig;
-
-// Define commands
-fn reboot_fn<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
-    // Reboot implementation
-    Ok(Response::success("Rebooting..."))
-}
-
-const REBOOT: CommandMeta<Level> = CommandMeta {
-    name: "reboot",
-    description: "Reboot the device",
-    access_level: Level::Admin,
-    kind: CommandKind::Sync,
-    min_args: 0,
-    max_args: 0,
-};
-
-// Build command tree
-const ROOT: Directory<Level> = Directory {
-    name: "",
-    children: &[
-        Node::Directory(&Directory {
-            name: "system",
-            access_level: Level::User,
-            children: &[
-                Node::Command(&REBOOT),
-            ],
-        }),
-    ],
-    access_level: Level::User,
-};
-
-// Implement command handlers
-struct MyHandlers;
-
+// 2. Implement CommandHandlers trait
 impl CommandHandlers<MyConfig> for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
-        match name {
-            "reboot" => reboot_fn::<MyConfig>(args),
-            _ => Err(CliError::CommandNotFound),
-        }
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
+        match id { "reboot" => reboot_fn::<MyConfig>(args), _ => Err(CliError::CommandNotFound) }
     }
 }
 
-// Main loop (bare-metal)
-#[entry]
-fn main() -> ! {
-    let uart = setup_uart();
-    let mut io = UartIo::new(uart);
-    let handlers = MyHandlers;
-    let mut shell = Shell::new(&ROOT, handlers, &mut io);
-
-    shell.activate().ok();
-
-    loop {
-        if let Ok(Some(c)) = io.get_char() {
-            shell.process_char(c).ok();
-        }
+// 3. Main loop
+let mut shell = Shell::new(&ROOT, handlers, io);
+shell.activate().ok();
+loop {
+    if let Some(c) = io.get_char()? {
+        shell.process_char(c)?;
     }
 }
 ```
 
-### Async Example (Embassy)
-
+**Async Pattern** (Embassy):
 ```rust
-use embassy_executor::Spawner;
-use embassy_usb::class::cdc_acm::CdcAcmClass;
-use nut_shell::{Shell, CommandMeta, CommandKind, Response, CliError, CommandHandlers, ShellConfig, DefaultConfig};
-
-// Use default configuration
-type MyConfig = DefaultConfig;
-
-// Async command
-async fn http_get_async<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
-    let url = args[0];
-    let response = HTTP_CLIENT.get(url).await?;
-    Ok(Response::success(&response))
-}
-
-const HTTP_GET: CommandMeta<Level> = CommandMeta {
-    name: "http-get",
-    description: "Fetch URL via HTTP",
-    access_level: Level::User,
-    kind: CommandKind::Async,  // Mark as async
-    min_args: 1,
-    max_args: 1,
-};
-
-// Handler with async support
-impl CommandHandlers<MyConfig> for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
-        match name {
-            "reboot" => reboot_fn::<MyConfig>(args),
-            _ => Err(CliError::CommandNotFound),
-        }
-    }
-
-    #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
-        match name {
-            "http-get" => http_get_async::<MyConfig>(args).await,
-            _ => Err(CliError::CommandNotFound),
-        }
-    }
-}
-
 #[embassy_executor::task]
 async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
-    let mut io = EmbassyUsbIo::new(usb);
-    let handlers = MyHandlers;
     let mut shell = Shell::new(&ROOT, handlers, io);
-
     shell.activate().ok();
-    io.flush().await.ok();
 
-    let mut buffer = [0u8; 64];
     loop {
-        let n = io.class.read_packet(&mut buffer).await.unwrap();
-
-        for &byte in &buffer[..n] {
-            shell.process_char_async(byte as char).await.ok();
-        }
-
-        io.flush().await.ok();
+        let c = read_char().await;
+        shell.process_char_async(c).await?;
+        io.flush().await?;
     }
 }
 ```
+
+**See [docs/EXAMPLES.md](docs/EXAMPLES.md) for complete working examples with full code.**
 
 ---
 
@@ -354,78 +236,19 @@ See [docs/README.md](docs/README.md) for complete documentation navigation.
 
 ## Build Commands
 
-### Development
 ```bash
-cargo check                   # Fast compile check
-cargo test                    # Run tests
-cargo clippy                  # Lint code
-cargo fmt                     # Format code
+cargo test --all-features                    # Test all features
+cargo test --no-default-features             # Test minimal
+cargo check --target thumbv6m-none-eabi      # Verify no_std
 ```
 
-### Feature Testing
-```bash
-cargo test --all-features                    # Test with all features
-cargo test --no-default-features             # Test minimal config
-cargo test --features authentication         # Test auth only
-cargo test --features completion,history     # Test interactive features
-```
-
-### Embedded Target
-```bash
-cargo check --target thumbv6m-none-eabi                      # Verify no_std
-cargo build --target thumbv6m-none-eabi --release            # Release build
-cargo size --target thumbv6m-none-eabi --release -- -A       # Measure size
-```
-
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for comprehensive build workflows and CI simulation.
+**See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for complete workflows.**
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Before implementing new features, please review:
-
-1. **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** - Understand what we include/exclude
-2. **[docs/DESIGN.md](docs/DESIGN.md)** - Review design patterns and rationale
-3. **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Follow build and testing workflows
-
-**Feature requests:** Must align with embedded-first philosophy. Ask:
-- Is this typical for embedded CLIs?
-- Can terminal emulators/host tools handle this instead?
-- What's the flash/RAM cost?
-- Can it be feature-gated?
-
----
-
-## Design Principles
-
-1. **Simplicity over features** - Every feature is a liability
-2. **Const over runtime** - Prefer compile-time decisions
-3. **Embedded-first mindset** - Design for RP2040, not Linux
-4. **Graceful degradation** - Features independently disable-able
-5. **Security by design** - Either secure or explicitly unsecured
-6. **Zero-cost abstractions** - Generics compile to optimal code
-7. **Path-based philosophy** - Unix-style navigation
-8. **Interactive discovery** - Learn through `?`, `ls`, tab completion
-
-See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for complete framework.
-
----
-
-## Success Metrics
-
-A successful CLI library for embedded systems should:
-
-- ✅ Compile on `thumbv6m-none-eabi` (RP2040 target)
-- ✅ Fit in 32KB flash (with all default features)
-- ✅ Use <8KB RAM (with default configuration)
-- ✅ Zero heap allocation (pure stack + static)
-- ✅ Enable feature toggling (each feature independently disable-able)
-- ✅ Provide interactive UX (when features enabled)
-- ✅ Degrade gracefully (minimal build still useful)
-- ✅ Maintain security (when authentication enabled)
-- ✅ Remain maintainable (<5000 lines of code total)
-- ✅ Serve real use cases (actual embedded deployments)
+Contributions welcome! Review [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for feature criteria and [docs/DESIGN.md](docs/DESIGN.md) for architectural patterns before implementing features.
 
 ---
 

@@ -69,95 +69,22 @@ Complete documentation for the nut-shell embedded CLI library.
 ## Documentation Overview
 
 ### [EXAMPLES.md](EXAMPLES.md) - Usage Guide
-**28KB • Practical Examples**
-
-Comprehensive usage examples and tutorials:
-- Quick start (minimal example)
-- Buffer sizing guide
-- Platform examples (native stdio, RP2040 UART, Embassy async)
-- Configuration examples (custom configs, feature combinations)
-- Common patterns (command trees, handlers, authentication)
-- Troubleshooting
-
-**Read this when:** You're integrating nut-shell into your project.
-
----
+Usage examples, platform implementations, configuration, troubleshooting. **Read when integrating nut-shell.**
 
 ### [DESIGN.md](DESIGN.md) - Architecture
-**29KB • Design Decisions**
-
-Architectural decisions and patterns:
-- Command syntax rationale (path-based navigation)
-- Metadata/execution separation pattern (sync + async commands)
-- Feature gating patterns (unified architecture, stub functions)
-- Access control system
-- Module structure
-- Design trade-offs and alternatives considered
-
-**Read this when:** You want to understand why design choices were made or need to implement features following established patterns.
-
----
+Design decisions, patterns, feature gating, rationale. **Read when understanding why or implementing features.**
 
 ### [SECURITY.md](SECURITY.md) - Authentication & Access Control
-**25KB • Security Architecture**
-
-Security design and implementation guidance:
-- Security considerations and limitations
-- Password hashing (SHA-256 with salts)
-- Credential storage options (build-time, flash, custom)
-- Access control system (path-based validation)
-- Authentication feature gating
-- Implementation patterns
-- Testing and validation strategies
-- Threat model and assumptions
-
-**Read this when:** Implementing authentication or evaluating security requirements.
-
----
+Password hashing, credential storage, access control, threat model. **Read when implementing authentication.**
 
 ### [PHILOSOPHY.md](PHILOSOPHY.md) - Design Philosophy
-**18KB • Feature Framework**
-
-Project philosophy and decision framework:
-- Core principle: Essential CLI primitives only
-- What we include (core functionality, interactive features)
-- What we exclude (with rationale)
-- Decision framework (5 key questions for new features)
-- Design principles (8 core principles)
-- Evolution guidelines
-
-**Read this when:** Evaluating feature requests or understanding project scope.
-
----
+Feature decision framework, what we include/exclude. **Read when evaluating feature requests.**
 
 ### [IO_DESIGN.md](IO_DESIGN.md) - I/O Abstraction
-**16KB • CharIo Guide**
-
-I/O abstraction design and implementation:
-- Design problem (bare-metal vs async runtimes)
-- Explicit buffering model
-- CharIo trait design
-- Sync and async patterns
-- Platform implementation examples
-- Buffering strategy rationale
-
-**Read this when:** Implementing CharIo for a new platform or debugging I/O issues.
-
----
+CharIo trait, buffering model, platform adapters. **Read when implementing CharIo.**
 
 ### [DEVELOPMENT.md](DEVELOPMENT.md) - Development Guide
-**10KB • Build & Test**
-
-Build commands and development workflows:
-- Quick reference (check, test, clippy, fmt)
-- Feature validation (test all combinations)
-- Embedded target verification
-- Pre-commit validation
-- CI simulation
-- Troubleshooting
-- Project structure
-
-**Read this when:** Building, testing, or contributing to the project.
+Build commands, testing workflows, CI. **Read when building or contributing.**
 
 ---
 
@@ -186,36 +113,6 @@ Build commands and development workflows:
 
 ### "Where's the API documentation?"
 → Run `cargo doc --open` for complete API docs generated from source code
-
----
-
-## Document Relationships
-
-```
-┌─────────────────┐
-│  PHILOSOPHY.md  │  ← Why we build what we build
-└────────┬────────┘
-         │ guides
-         ▼
-┌─────────────────┐
-│    DESIGN.md    │  ← Why it's designed this way
-└────────┬────────┘
-         │ implements
-         ▼
-┌─────────────────┐
-│   Source Code   │  ← The implementation (see cargo doc)
-└────────┬────────┘
-         │ documented by
-         ├────────────────────────┐
-         │                        │
-         ▼                        ▼
-┌─────────────────┐      ┌───────────────┐
-│  EXAMPLES.md    │      │ SECURITY.md   │
-│  IO_DESIGN.md   │      │               │
-│  DEVELOPMENT.md │      │               │
-└─────────────────┘      └───────────────┘
-    User guides          Security guide
-```
 
 ---
 

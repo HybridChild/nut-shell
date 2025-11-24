@@ -10,10 +10,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **nut-shell** is a lightweight library for adding a flexible command-line interface to embedded systems. The implementation targets **no_std** environments with static allocation, specifically designed for platforms like the Raspberry Pi Pico (RP2040).
 
-_A complete CLI framework for embedded systems, in a nutshell._
-
-**Current Status:** Production-ready library ✅ (all implementation phases complete)
-
 **Important Note on Contributing:**
 The library is now complete and production-ready. When contributing:
 - **Follow established patterns** - See DESIGN.md for architectural patterns
@@ -43,64 +39,73 @@ The library is now complete and production-ready. When contributing:
 
 ### Adding a New Command
 
-**Commands use metadata/execution separation pattern** (CommandMeta + CommandHandlers trait). See [docs/DESIGN.md](docs/DESIGN.md) section 1 for complete architecture details.
+**Pattern:** Metadata/execution separation (CommandMeta + CommandHandlers trait)
+
+**Steps:**
+1. Define command function: `fn cmd<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError>`
+2. Create const metadata: `CommandMeta { id, name, access_level, kind: Sync/Async, ... }`
+3. Add to tree: `Node::Command(&CMD)` in directory's children
+4. Implement handler: Map command ID to function in `CommandHandlers::execute_sync/async()`
+
+**Key points:**
+- Unique `id` field for dispatch (allows duplicate display names in different dirs)
+- `CommandKind::Sync` or `Async` marker determines handler method
+- Async requires `async` feature and `process_char_async()`
+
+**See [docs/EXAMPLES.md](docs/EXAMPLES.md) for complete examples.** Full architecture in [docs/DESIGN.md](docs/DESIGN.md) section 1.
+
+### Implementing Global Commands (ls, ?, clear, logout)
+
+Global commands are reserved keywords handled outside the tree structure.
+
+**Help command (?) output format:**
+```rust
+fn show_help(&mut self) -> Result<(), IO::Error> {
+    self.io.write_str("  ?        - List global commands\r\n")?;
+    self.io
+        .write_str("  ls       - List directory contents\r\n")?;
+
+    #[cfg(feature = "authentication")]
+    self.io.write_str("  logout   - End session\r\n")?;
+
+    self.io.write_str("  clear    - Clear screen\r\n")?;
+    self.io.write_str("  ESC ESC  - Clear input buffer\r\n")?;
+
+    Ok(())
+}
+```
+
+**Important:**
+- `ESC ESC` is not a command (it's a keyboard shortcut), but include it in `?` output for discoverability
+- `logout` only shown when authentication feature enabled
+
+### Implementing a Feature-Gated Module
+
+**Stub Function Pattern** (recommended - minimizes `#[cfg]` branching):
+```rust
+// Module always exists, contents gated
+#[cfg(feature = "my_feature")]
+pub fn do_something() -> Result<Vec<&str, 32>> { /* real impl */ }
+
+#[cfg(not(feature = "my_feature"))]
+pub fn do_something() -> Result<Vec<&str, 32>> { Ok(Vec::new()) }  // No-op stub
+```
+
+**Benefits:** Single code path, zero `#[cfg]` in Shell code, compiler optimizes away stubs
+
+**Stub Type Pattern** (for stateful types): Use zero-size PhantomData stub + identical API
+
+**See [docs/DESIGN.md](docs/DESIGN.md) "Feature Gating & Optional Features" for complete patterns, variations, and examples.**
+
+### Implementing CommandHandlers Trait
+
+Maps command IDs to functions. Generic over `ShellConfig` for buffer size matching.
 
 ```rust
-// 1. Define configuration (choose or create custom)
-type MyConfig = DefaultConfig;  // or MinimalConfig, or custom
-
-// 2. Define the command function (sync or async)
-fn reboot_fn<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
-    // Synchronous implementation
-    Ok(Response::success("Rebooting..."))
-}
-
-async fn http_get_async<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
-    // Asynchronous implementation (requires async feature)
-    let response = HTTP_CLIENT.get(args[0]).await?;
-    Ok(Response::success(&response))
-}
-
-// 3. Create const command metadata (no execute function)
-const REBOOT: CommandMeta<MyAccessLevel> = CommandMeta {
-    id: "reboot",
-    name: "reboot",
-    description: "Reboot the device",
-    access_level: MyAccessLevel::Admin,
-    kind: CommandKind::Sync,  // Mark as sync
-    min_args: 0,
-    max_args: 0,
-};
-
-const HTTP_GET: CommandMeta<MyAccessLevel> = CommandMeta {
-    id: "http_get",
-    name: "http-get",
-    description: "Fetch URL via HTTP",
-    access_level: MyAccessLevel::User,
-    kind: CommandKind::Async,  // Mark as async
-    min_args: 1,
-    max_args: 1,
-};
-
-// 4. Add to tree
-const SYSTEM_DIR: Directory<MyAccessLevel> = Directory {
-    name: "system",
-    children: &[
-        Node::Command(&REBOOT),
-        Node::Command(&HTTP_GET),
-        // ... other nodes
-    ],
-    access_level: MyAccessLevel::User,
-};
-
-// 5. Implement CommandHandlers trait (maps IDs to functions)
-struct MyHandlers;
-
 impl CommandHandlers<MyConfig> for MyHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
             "reboot" => reboot_fn::<MyConfig>(args),
-            // ... other sync commands
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -109,216 +114,13 @@ impl CommandHandlers<MyConfig> for MyHandlers {
     async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
             "http_get" => http_get_async::<MyConfig>(args).await,
-            // ... other async commands
-            _ => Err(CliError::CommandNotFound),
-        }
-    }
-}
-
-// 6. Instantiate Shell with handlers and config
-let handlers = MyHandlers;
-let mut shell: Shell<_, _, _, _, MyConfig> = Shell::new(&SYSTEM_DIR, handlers, io);
-```
-
-**Key points:**
-- Command metadata (tree) is separate from execution logic (handlers)
-- Each command has a unique `id` field for handler dispatch (allows duplicate display names)
-- Commands marked as `Sync` or `Async` via `CommandKind`
-- Handler trait dispatches by unique ID to actual functions
-- Async commands require `async` feature and use `process_char_async()`
-
-### Implementing Global Commands (ls, ?, clear, logout)
-
-Global commands are reserved keywords handled outside the tree structure.
-
-**Help command (?) output format:**
-```rust
-fn help_command() -> Response {
-    let mut output = heapless::String::<256>::new();
-
-    output.push_str("  ?         - List global commands\r\n").ok();
-    output.push_str("  ls        - Detail items in current directory\r\n").ok();
-
-    #[cfg(feature = "authentication")]
-    output.push_str("  logout    - Exit current session\r\n").ok();
-
-    output.push_str("  clear     - Clear screen\r\n").ok();
-    output.push_str("  ESC ESC   - Clear input buffer\r\n").ok();
-
-    Response::success(&output)
-}
-```
-
-**Important:**
-- `ESC ESC` is not a command (it's a keyboard shortcut), but include it in `?` output for discoverability
-- `logout` only shown when authentication feature enabled
-- Use consistent spacing/alignment for readability
-
-### Implementing a Feature-Gated Module
-
-For complete feature gating patterns, configuration examples, and build instructions, see DESIGN.md "Feature Gating & Optional Features" section.
-
-**Recommended Pattern: Stub Function Pattern** (aligns with unified architecture)
-
-```rust
-// src/tree/my_feature.rs - Module always exists
-#![cfg_attr(not(feature = "my_feature"), allow(unused_variables))]
-
-// Feature-enabled: Full implementation
-#[cfg(feature = "my_feature")]
-pub fn do_something<L: AccessLevel>(
-    node: &Node<L>,
-    input: &str,
-) -> Result<heapless::Vec<&str, 32>, CliError> {
-    // Real implementation
-}
-
-// Feature-disabled: Stub with identical signature
-#[cfg(not(feature = "my_feature"))]
-pub fn do_something<L: AccessLevel>(
-    _node: &Node<L>,
-    _input: &str,
-) -> Result<heapless::Vec<&str, 32>, CliError> {
-    Ok(heapless::Vec::new())  // No-op/empty result
-}
-```
-
-```rust
-// src/tree/mod.rs
-pub mod my_feature;  // Always include (contents are gated)
-pub use my_feature::do_something;
-
-// src/shell/mod.rs - NO feature gates needed!
-impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
-where
-    H: CommandHandlers<C>,
-    C: ShellConfig,
-{
-    fn some_method(&mut self) -> Result<(), CliError> {
-        // Works in both modes - stub returns empty when disabled
-        let results = my_feature::do_something(node, input)?;
-
-        if !results.is_empty() {
-            // Process results
-        }
-        // Empty = feature disabled, naturally no-op
-
-        Ok(())
-    }
-}
-```
-
-**Why use the stub function pattern?**
-- Single code path (no duplicate implementations)
-- Zero `#[cfg]` in main Shell code
-- Compiler optimizes away stub calls
-- Aligns with unified architecture pattern
-
-**Pattern Variations:**
-
-For stateful types (like `CommandHistory`):
-```rust
-// Feature-enabled: Full struct
-#[cfg(feature = "history")]
-pub struct CommandHistory<const N: usize, const INPUT_SIZE: usize> {
-    buffer: heapless::Vec<heapless::String<INPUT_SIZE>, N>,
-    position: Option<usize>,
-}
-
-// Feature-disabled: Zero-size stub
-#[cfg(not(feature = "history"))]
-pub struct CommandHistory<const N: usize, const INPUT_SIZE: usize> {
-    _phantom: core::marker::PhantomData<[(); N]>,
-}
-
-// Both modes implement identical API
-impl<const N: usize, const INPUT_SIZE: usize> CommandHistory<N, INPUT_SIZE> {
-    pub fn new() -> Self { /* ... */ }
-    pub fn add(&mut self, cmd: &str) { /* real or no-op */ }
-    pub fn previous(&mut self) -> Option<heapless::String<INPUT_SIZE>> { /* real or None */ }
-}
-```
-
-**Alternative (when stub function pattern doesn't fit):**
-```rust
-#[cfg(feature = "my_feature")]
-pub mod my_module;
-
-#[cfg(not(feature = "my_feature"))]
-impl SomeType {
-    pub fn feature_method(&self) -> Result<()> { Ok(()) }
-}
-```
-
-### Implementing CommandHandlers Trait
-
-The CommandHandlers trait maps command names to execution functions. Generic over ShellConfig to match Response buffer sizes.
-
-```rust
-pub trait CommandHandlers<C: ShellConfig> {
-    /// Execute synchronous command
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
-
-    /// Execute asynchronous command (optional, feature-gated)
-    #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
-}
-```
-
-**Basic implementation:**
-```rust
-type MyConfig = DefaultConfig;  // Choose configuration
-
-struct MyHandlers;
-
-impl CommandHandlers<MyConfig> for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
-        match name {
-            "reboot" => reboot_fn::<MyConfig>(args),
-            "status" => status_fn::<MyConfig>(args),
-            "led-toggle" => led_toggle_fn::<MyConfig>(args),
-            _ => Err(CliError::CommandNotFound),
-        }
-    }
-
-    #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
-        match name {
-            "http-get" => http_get_async::<MyConfig>(args).await,
-            "wifi-connect" => wifi_connect_async::<MyConfig>(args).await,
-            "flash-write" => flash_write_async::<MyConfig>(args).await,
             _ => Err(CliError::CommandNotFound),
         }
     }
 }
 ```
 
-**Stateful handlers (using shared references):**
-```rust
-type MyConfig = DefaultConfig;
-
-struct MyHandlers<'a> {
-    system: &'a SystemState,
-}
-
-impl<'a> CommandHandlers<MyConfig> for MyHandlers<'a> {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
-        match name {
-            "status" => {
-                let info = self.system.get_status();
-                Ok(Response::success(&info))
-            }
-            _ => Err(CliError::CommandNotFound),
-        }
-    }
-}
-```
-
-**Best practices:**
-- Keep handler implementations simple (just dispatch)
-- Command functions can access statics or captured state
-- Use `CommandNotFound` for unrecognized commands
-- Handler doesn't need to validate args (Shell does this)
+**Stateful:** Add fields to handler struct, access in match arms. **See [docs/EXAMPLES.md](docs/EXAMPLES.md) for complete patterns.**
 
 ### Implementing AccessLevel Trait
 
@@ -704,115 +506,27 @@ type History = CommandHistory<0, 128>;  // Stub compiled instead
 
 ## Testing Patterns
 
-### Test Const Initialization
-```rust
-#[test]
-fn test_tree_is_const() {
-    // Just referencing TREE proves it compiles as const
-    let _tree = &EXAMPLE_TREE;
-}
-```
+**Key patterns:**
+- **Const initialization test:** Reference tree in test to verify const compilation
+- **Mock I/O:** `VecDeque` for input, `Vec` for output capture
+- **Integration tests:** Process characters sequentially, assert state changes
+- **Feature testing:** Use `#[cfg(not(feature = "..."))]` for disabled path tests
 
-### Mock I/O for Testing
-```rust
-struct MockIo {
-    input: VecDeque<char>,
-    output: Vec<char>,
-}
-
-impl CharIo for MockIo {
-    type Error = ();
-    fn get_char(&mut self) -> Result<Option<char>> {
-        Ok(self.input.pop_front())
-    }
-    fn put_char(&mut self, c: char) -> Result<()> {
-        self.output.push(c);
-        Ok(())
-    }
-}
-```
-
-### Integration Test Pattern
-```rust
-#[test]
-fn test_login_and_command() {
-    let mut io = MockIo::new("admin:pass123\nsystem/reboot\n");
-    let mut shell = Shell::new(&TREE, provider, &mut io);
-
-    // Process login
-    shell.process_char('a');
-    shell.process_char('d');
-    // ... assert state changes
-}
-```
-
-### Testing Escape Sequences
-```rust
-#[test]
-fn test_double_esc_clears_buffer() {
-    let mut parser = InputParser::new();
-    let mut buffer = heapless::String::<128>::new();
-    buffer.push_str("some input").unwrap();
-
-    // First ESC
-    let event = parser.process_char('\x1b', &mut buffer).unwrap();
-    assert_eq!(event, ParseEvent::None);  // Waiting for next char
-    assert_eq!(buffer.as_str(), "some input");  // Not cleared yet
-
-    // Second ESC
-    let event = parser.process_char('\x1b', &mut buffer).unwrap();
-    assert_eq!(event, ParseEvent::ClearAndRedraw);
-    assert_eq!(buffer.as_str(), "");  // Cleared!
-}
-
-#[test]
-fn test_esc_bracket_is_sequence() {
-    let mut parser = InputParser::new();
-    let mut buffer = heapless::String::<128>::new();
-
-    // ESC [ A (up arrow)
-    parser.process_char('\x1b', &mut buffer).unwrap();
-    parser.process_char('[', &mut buffer).unwrap();
-    let event = parser.process_char('A', &mut buffer).unwrap();
-
-    assert_eq!(event, ParseEvent::UpArrow);  // Not cleared!
-}
-```
+**See test files for complete examples.**
 
 ---
 
-## Common Build Commands - Quick Reference
-
-Quick reference for frequent operations:
+## Common Build Commands
 
 ```bash
-# Development
-cargo check                              # Fast compile check
-cargo test                               # Run tests (all features enabled by default)
-cargo clippy                             # Lint code
-cargo fmt                                # Format code
-
-# Feature testing
-cargo test --all-features                # Test with all features (authentication, completion, history)
-cargo test --no-default-features         # Test minimal configuration (no optional features)
-cargo test --features authentication     # Test auth only
-cargo test --features completion,history # Test interactive features only
-
-# Embedded target
-cargo check --target thumbv6m-none-eabi  # Verify no_std compliance
-cargo build --target thumbv6m-none-eabi --release  # Release build (all features)
-cargo build --target thumbv6m-none-eabi --release --no-default-features  # Minimal build
-cargo size --target thumbv6m-none-eabi --release -- -A  # Measure binary size
-
-# Size optimization comparisons
-cargo size --target thumbv6m-none-eabi --release --all-features -- -A
-cargo size --target thumbv6m-none-eabi --release --no-default-features --features authentication -- -A
-
-# Pre-commit
-cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-features
+cargo check                              # Fast check
+cargo test --all-features                # Test all features
+cargo test --no-default-features         # Test minimal
+cargo check --target thumbv6m-none-eabi  # Verify no_std
+cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-features  # Pre-commit
 ```
 
-**For comprehensive build workflows, CI configuration, and troubleshooting:** See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+**See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for complete build workflows and CI configuration.**
 
 ---
 
