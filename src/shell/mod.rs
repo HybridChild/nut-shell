@@ -8,6 +8,7 @@ use crate::config::ShellConfig;
 use crate::error::CliError;
 use crate::io::CharIo;
 use crate::response::Response;
+use crate::tree::completion::suggest_completions;
 use crate::tree::{CommandKind, Directory, Node};
 use core::marker::PhantomData;
 
@@ -909,7 +910,7 @@ where
             };
 
             // Suggest completions
-            let result = crate::tree::completion::suggest_completions::<L, 16>(
+            let result = suggest_completions::<L, 16>(
                 current_dir,
                 self.input_buffer.as_str(),
                 self.current_user.as_ref(),

@@ -44,9 +44,6 @@ use crate::error::CliError;
 /// - `MAX_DEPTH`: Maximum path depth (from ShellConfig::MAX_PATH_DEPTH)
 #[derive(Debug, PartialEq)]
 pub struct Path<'a, const MAX_DEPTH: usize> {
-    /// Original path string
-    _original: &'a str,
-
     /// Whether this is an absolute path (starts with `/`)
     is_absolute: bool,
 
@@ -100,7 +97,6 @@ impl<'a, const MAX_DEPTH: usize> Path<'a, MAX_DEPTH> {
             // Absolute path "/" refers to root
             if is_absolute {
                 return Ok(Self {
-                    _original: input,
                     is_absolute,
                     segments,
                 });
@@ -122,7 +118,6 @@ impl<'a, const MAX_DEPTH: usize> Path<'a, MAX_DEPTH> {
         }
 
         Ok(Self {
-            _original: input,
             is_absolute,
             segments,
         })

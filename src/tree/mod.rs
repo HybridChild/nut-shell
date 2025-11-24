@@ -46,7 +46,7 @@ pub struct CommandMeta<L: AccessLevel> {
     /// Command name (display name, can duplicate across directories)
     pub name: &'static str,
 
-    /// Command description (shown in ls and help)
+    /// Command description (shown by ls command)
     pub description: &'static str,
 
     /// Minimum access level required
