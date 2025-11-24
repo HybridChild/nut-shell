@@ -63,6 +63,7 @@ async fn http_get_async<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, Cl
 
 // 3. Create const command metadata (no execute function)
 const REBOOT: CommandMeta<MyAccessLevel> = CommandMeta {
+    id: "reboot",
     name: "reboot",
     description: "Reboot the device",
     access_level: MyAccessLevel::Admin,
@@ -72,6 +73,7 @@ const REBOOT: CommandMeta<MyAccessLevel> = CommandMeta {
 };
 
 const HTTP_GET: CommandMeta<MyAccessLevel> = CommandMeta {
+    id: "http_get",
     name: "http-get",
     description: "Fetch URL via HTTP",
     access_level: MyAccessLevel::User,
@@ -91,12 +93,12 @@ const SYSTEM_DIR: Directory<MyAccessLevel> = Directory {
     access_level: MyAccessLevel::User,
 };
 
-// 5. Implement CommandHandlers trait (maps names to functions)
+// 5. Implement CommandHandlers trait (maps IDs to functions)
 struct MyHandlers;
 
 impl CommandHandlers<MyConfig> for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
-        match name {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
+        match id {
             "reboot" => reboot_fn::<MyConfig>(args),
             // ... other sync commands
             _ => Err(CliError::CommandNotFound),
@@ -104,9 +106,9 @@ impl CommandHandlers<MyConfig> for MyHandlers {
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
-        match name {
-            "http-get" => http_get_async::<MyConfig>(args).await,
+    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
+        match id {
+            "http_get" => http_get_async::<MyConfig>(args).await,
             // ... other async commands
             _ => Err(CliError::CommandNotFound),
         }
@@ -120,8 +122,9 @@ let mut shell: Shell<_, _, _, _, MyConfig> = Shell::new(&SYSTEM_DIR, handlers, i
 
 **Key points:**
 - Command metadata (tree) is separate from execution logic (handlers)
+- Each command has a unique `id` field for handler dispatch (allows duplicate display names)
 - Commands marked as `Sync` or `Async` via `CommandKind`
-- Handler trait dispatches by name to actual functions
+- Handler trait dispatches by unique ID to actual functions
 - Async commands require `async` feature and use `process_char_async()`
 
 ### Implementing Global Commands (ls, ?, clear, logout)
@@ -473,7 +476,8 @@ mod tests {
 ```rust
 // Metadata (const-initializable)
 pub struct CommandMeta<L: AccessLevel> {
-    pub name: &'static str,
+    pub id: &'static str,          // Unique identifier for handler dispatch
+    pub name: &'static str,        // Display name (can duplicate)
     pub description: &'static str,
     pub access_level: L,
     pub kind: CommandKind,  // Sync or Async marker
@@ -483,10 +487,10 @@ pub struct CommandMeta<L: AccessLevel> {
 
 // Execution logic (user-implemented trait, generic over config)
 pub trait CommandHandlers<C: ShellConfig> {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
+    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 }
 
 // Shell is generic over handlers and config
@@ -502,6 +506,7 @@ where
 
 **Benefits:**
 - Metadata stays const-initializable (lives in ROM)
+- Unique ID field allows commands with same display name in different directories
 - Async commands supported naturally (trait method can be async)
 - Zero-cost for sync-only builds (monomorphization)
 - Single codebase for both sync and async

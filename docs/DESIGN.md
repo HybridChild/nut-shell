@@ -125,7 +125,8 @@ fn parse_input(input: &str) -> Result<Request, ParseError> {
 ```rust
 // Metadata (const-initializable, in ROM)
 pub struct CommandMeta<L: AccessLevel> {
-    pub name: &'static str,
+    pub id: &'static str,          // Unique identifier for handler dispatch
+    pub name: &'static str,        // Display name (can duplicate)
     pub description: &'static str,
     pub access_level: L,
     pub kind: CommandKind,  // Sync or Async marker
@@ -135,10 +136,10 @@ pub struct CommandMeta<L: AccessLevel> {
 
 // Execution logic (generic trait)
 pub trait CommandHandlers<C: ShellConfig> {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
+    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 }
 
 // Shell generic over handlers and config
@@ -162,8 +163,8 @@ where
 struct BareMetalHandlers;
 
 impl<C: ShellConfig> CommandHandlers<C> for BareMetalHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
-        match name {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+        match id {
             "reboot" => reboot_fn::<C>(args),
             "status" => status_fn::<C>(args),
             _ => Err(CliError::CommandNotFound),
@@ -184,18 +185,18 @@ loop {
 struct EmbassyHandlers;
 
 impl<C: ShellConfig> CommandHandlers<C> for EmbassyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
-        match name {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+        match id {
             "reboot" => reboot_fn::<C>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
-        match name {
-            "http-get" => http_get_async::<C>(args).await,    // Natural async!
-            "wifi-connect" => wifi_connect_async::<C>(args).await,
+    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+        match id {
+            "http_get" => http_get_async::<C>(args).await,    // Natural async!
+            "wifi_connect" => wifi_connect_async::<C>(args).await,
             _ => Err(CliError::CommandNotFound),
         }
     }

@@ -1,6 +1,6 @@
 //! Command handler trait for executing commands.
 //!
-//! The `CommandHandlers` trait maps command names to execution functions,
+//! The `CommandHandlers` trait maps command IDs to execution functions,
 //! implementing the execution side of the metadata/execution separation pattern.
 //!
 //! See [DESIGN.md](../../docs/DESIGN.md) section 1 for complete pattern explanation.
@@ -12,13 +12,16 @@ use crate::response::Response;
 /// Command execution handler trait.
 ///
 /// Generic over `C: ShellConfig` to match Response buffer sizes.
-/// Implementations map command names to execution functions.
+/// Implementations map command IDs to execution functions.
 ///
 /// # Pattern
 ///
 /// Commands use metadata/execution separation:
-/// - `CommandMeta` stores const metadata (name, args, access level)
+/// - `CommandMeta` stores const metadata (id, name, args, access level)
 /// - `CommandHandlers` provides execution logic (this trait)
+///
+/// The handler dispatches on the unique command ID, not the display name.
+/// This allows multiple commands with the same name in different directories.
 ///
 /// # Example
 ///
@@ -26,44 +29,44 @@ use crate::response::Response;
 /// struct MyHandlers;
 ///
 /// impl CommandHandlers<DefaultConfig> for MyHandlers {
-///     fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-///         match name {
-///             "reboot" => reboot_fn(args),
-///             "status" => status_fn(args),
+///     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+///         match id {
+///             "system_reboot" => reboot_fn(args),
+///             "system_status" => status_fn(args),
 ///             _ => Err(CliError::CommandNotFound),
 ///         }
 ///     }
 /// }
 /// ```
 pub trait CommandHandlers<C: ShellConfig> {
-    /// Execute synchronous command by name.
+    /// Execute synchronous command by unique ID.
     ///
     /// # Arguments
     ///
-    /// - `name`: Command name (already validated by Shell)
+    /// - `id`: Unique command identifier from `CommandMeta.id`
     /// - `args`: Command arguments (already validated by Shell)
     ///
     /// # Returns
     ///
     /// - `Ok(Response)`: Command executed successfully
-    /// - `Err(CliError::CommandNotFound)`: Command name not recognized
+    /// - `Err(CliError::CommandNotFound)`: Command ID not recognized
     /// - `Err(CliError)`: Other execution error
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
-    /// Execute asynchronous command by name (requires `async` feature).
+    /// Execute asynchronous command by unique ID (requires `async` feature).
     ///
     /// # Arguments
     ///
-    /// - `name`: Command name (already validated by Shell)
+    /// - `id`: Unique command identifier from `CommandMeta.id`
     /// - `args`: Command arguments (already validated by Shell)
     ///
     /// # Returns
     ///
     /// - `Ok(Response)`: Command executed successfully
-    /// - `Err(CliError::CommandNotFound)`: Command name not recognized
+    /// - `Err(CliError::CommandNotFound)`: Command ID not recognized
     /// - `Err(CliError)`: Other execution error
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError>;
+    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 }
 
 #[cfg(test)]
@@ -77,10 +80,10 @@ mod tests {
     impl CommandHandlers<DefaultConfig> for TestHandlers {
         fn execute_sync(
             &self,
-            name: &str,
+            id: &str,
             _args: &[&str],
         ) -> Result<Response<DefaultConfig>, CliError> {
-            match name {
+            match id {
                 "test" => Ok(Response::success("OK")),
                 _ => Err(CliError::CommandNotFound),
             }
@@ -89,10 +92,10 @@ mod tests {
         #[cfg(feature = "async")]
         async fn execute_async(
             &self,
-            name: &str,
+            id: &str,
             _args: &[&str],
         ) -> Result<Response<DefaultConfig>, CliError> {
-            match name {
+            match id {
                 "async-test" => Ok(Response::success("Async OK")),
                 _ => Err(CliError::CommandNotFound),
             }

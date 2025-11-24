@@ -30,10 +30,20 @@ pub enum CommandKind {
 /// via the `CommandHandlers` trait. This enables both sync and async commands while
 /// maintaining const-initialization.
 ///
+/// The `id` field uniquely identifies the command for handler dispatch, allowing
+/// multiple commands with the same display name in different directories.
+///
 /// See [DESIGN.md](../../docs/DESIGN.md) section 1 for complete pattern explanation.
 #[derive(Debug, Clone)]
 pub struct CommandMeta<L: AccessLevel> {
-    /// Command name
+    /// Unique identifier for handler dispatch
+    ///
+    /// This ID must be unique across the entire command tree. The handler uses this
+    /// to dispatch to the correct implementation. Convention: use path-like IDs
+    /// (e.g., "system_reboot", "network_reboot") to avoid collisions.
+    pub id: &'static str,
+
+    /// Command name (display name, can duplicate across directories)
     pub name: &'static str,
 
     /// Command description (shown in ls and help)
@@ -157,6 +167,7 @@ mod tests {
     #[test]
     fn test_node_type_checking() {
         const CMD: CommandMeta<TestAccessLevel> = CommandMeta {
+            id: "test",
             name: "test",
             description: "Test command",
             access_level: TestAccessLevel::User,

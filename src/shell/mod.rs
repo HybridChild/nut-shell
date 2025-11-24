@@ -757,8 +757,8 @@ where
                 // Dispatch to command handlers
                 match cmd_meta.kind {
                     CommandKind::Sync => {
-                        // Execute synchronous tree command
-                        self.handlers.execute_sync(cmd_meta.name, args)
+                        // Execute synchronous tree command (dispatch by unique ID)
+                        self.handlers.execute_sync(cmd_meta.id, args)
                     }
                     #[cfg(feature = "async")]
                     CommandKind::Async => {
@@ -1161,7 +1161,7 @@ mod tests {
     impl CommandHandlers<DefaultConfig> for MockHandlers {
         fn execute_sync(
             &self,
-            _name: &str,
+            _id: &str,
             _args: &[&str],
         ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
             Err(crate::error::CliError::CommandNotFound)
@@ -1170,7 +1170,7 @@ mod tests {
         #[cfg(feature = "async")]
         async fn execute_async(
             &self,
-            _name: &str,
+            _id: &str,
             _args: &[&str],
         ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
             Err(crate::error::CliError::CommandNotFound)
@@ -1179,6 +1179,7 @@ mod tests {
 
     // Test commands
     const CMD_TEST: CommandMeta<MockLevel> = CommandMeta {
+        id: "test-cmd",
         name: "test-cmd",
         description: "Test command",
         access_level: MockLevel::User,
@@ -1188,6 +1189,7 @@ mod tests {
     };
 
     const CMD_REBOOT: CommandMeta<MockLevel> = CommandMeta {
+        id: "reboot",
         name: "reboot",
         description: "Reboot the system",
         access_level: MockLevel::User,
@@ -1197,6 +1199,7 @@ mod tests {
     };
 
     const CMD_STATUS: CommandMeta<MockLevel> = CommandMeta {
+        id: "status",
         name: "status",
         description: "Show status",
         access_level: MockLevel::User,
@@ -1206,6 +1209,7 @@ mod tests {
     };
 
     const CMD_LED: CommandMeta<MockLevel> = CommandMeta {
+        id: "led",
         name: "led",
         description: "Control LED",
         access_level: MockLevel::User,
@@ -1215,6 +1219,7 @@ mod tests {
     };
 
     const CMD_NETWORK_STATUS: CommandMeta<MockLevel> = CommandMeta {
+        id: "network_status",
         name: "status",
         description: "Network status",
         access_level: MockLevel::User,

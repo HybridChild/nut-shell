@@ -69,6 +69,7 @@ impl CommandHandlers<DefaultConfig> for MyHandlers {
 
 // Define command tree
 const HELLO_CMD: CommandMeta<MyAccessLevel> = CommandMeta {
+    id: "hello",
     name: "hello",
     description: "Print hello world",
     access_level: MyAccessLevel::User,
@@ -653,6 +654,7 @@ async fn http_get_async<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, Cl
 
 // Mark as async in metadata
 const HTTP_GET: CommandMeta<MyAccessLevel> = CommandMeta {
+    id: "http_get",
     name: "http-get",
     description: "Fetch URL via HTTP",
     access_level: MyAccessLevel::User,
@@ -1073,8 +1075,8 @@ struct MyHandlers<'a> {
 }
 
 impl<'a, C: ShellConfig> CommandHandlers<C> for MyHandlers<'a> {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
-        match name {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+        match id {
             "status" => {
                 let info = self.system_state.get_status();
                 Ok(Response::success(&info))
@@ -1098,14 +1100,14 @@ const FLASH_WRITE: CommandMeta<Level> = CommandMeta {
 
 // Handler with natural async/await
 impl<C: ShellConfig> CommandHandlers<C> for MyHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         Err(CliError::CommandNotFound)
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
-        match name {
-            "flash-write" => {
+    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+        match id {
+            "flash_write" => {
                 for i in 0..100 {
                     write_flash_page(i).await;
                     embassy_time::Timer::after_millis(10).await;
@@ -1138,9 +1140,9 @@ io.flush().await?;
 **Use async commands for long operations:**
 ```rust
 // Good - non-blocking
-async fn execute_async<C: ShellConfig>(&self, name: &str, args: &[&str]) -> Result<Response<C>, CliError> {
-    match name {
-        "long-op" => {
+async fn execute_async<C: ShellConfig>(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
+    match id {
+        "long_op" => {
             for _ in 0..1000 {
                 do_work().await;
             }

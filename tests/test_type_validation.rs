@@ -73,6 +73,7 @@ fn test_all_types_instantiate_with_default_config() {
 
     // CommandMeta is const-initializable
     const TEST_CMD: CommandMeta<MockAccessLevel> = CommandMeta {
+        id: "test",
         name: "test",
         description: "Test command",
         access_level: MockAccessLevel::User,
@@ -80,6 +81,7 @@ fn test_all_types_instantiate_with_default_config() {
         min_args: 0,
         max_args: 1,
     };
+    assert_eq!(TEST_CMD.id, "test");
     assert_eq!(TEST_CMD.name, "test");
     assert_eq!(TEST_CMD.kind, CommandKind::Sync);
 
@@ -305,18 +307,18 @@ fn test_command_not_found_error() {
 fn test_handlers_with_different_commands() {
     let handlers = MockHandlers;
 
-    // Test reboot command
+    // Test reboot command (ID: "reboot")
     let result = handlers.execute_sync("reboot", &[]);
     assert!(result.is_ok());
     assert_eq!(result.unwrap().message.as_str(), "Rebooting...");
 
-    // Test status command
+    // Test status command (ID: "status")
     let result = handlers.execute_sync("status", &[]);
     assert!(result.is_ok());
     assert_eq!(result.unwrap().message.as_str(), "System OK");
 
-    // Test led command with argument
-    let result = handlers.execute_sync("led", &["on"]);
+    // Test led command with argument (ID: "hw_led")
+    let result = handlers.execute_sync("hw_led", &["on"]);
     assert!(result.is_ok());
     assert_eq!(result.unwrap().message.as_str(), "LED: on");
 }
@@ -385,6 +387,7 @@ fn test_const_initialization() {
     // Verify that CommandMeta and Directory can be const-initialized
 
     const CMD: CommandMeta<MockAccessLevel> = CommandMeta {
+        id: "const_test",
         name: "const_test",
         description: "Test const init",
         access_level: MockAccessLevel::User,
@@ -393,6 +396,7 @@ fn test_const_initialization() {
         max_args: 0,
     };
 
+    assert_eq!(CMD.id, "const_test");
     assert_eq!(CMD.name, "const_test");
     assert_eq!(CMD.kind, CommandKind::Sync);
 

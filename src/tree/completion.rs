@@ -274,6 +274,7 @@ mod tests {
 
     // Test fixtures
     const CMD_STATUS: CommandMeta<TestLevel> = CommandMeta {
+        id: "status",
         name: "status",
         description: "Show status",
         access_level: TestLevel::User,
@@ -283,6 +284,7 @@ mod tests {
     };
 
     const CMD_START: CommandMeta<TestLevel> = CommandMeta {
+        id: "start",
         name: "start",
         description: "Start service",
         access_level: TestLevel::User,
@@ -292,6 +294,7 @@ mod tests {
     };
 
     const CMD_STOP: CommandMeta<TestLevel> = CommandMeta {
+        id: "stop",
         name: "stop",
         description: "Stop service",
         access_level: TestLevel::User,
@@ -301,6 +304,7 @@ mod tests {
     };
 
     const CMD_REBOOT: CommandMeta<TestLevel> = CommandMeta {
+        id: "reboot",
         name: "reboot",
         description: "Reboot system",
         access_level: TestLevel::Admin,

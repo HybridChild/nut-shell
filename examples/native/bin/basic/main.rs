@@ -70,6 +70,7 @@ impl AccessLevel for ExampleAccessLevel {
 
 // System commands
 const CMD_REBOOT: CommandMeta<ExampleAccessLevel> = CommandMeta {
+    id: "system_reboot",
     name: "reboot",
     description: "Reboot the system (simulated)",
     access_level: ExampleAccessLevel::Admin,
@@ -79,6 +80,7 @@ const CMD_REBOOT: CommandMeta<ExampleAccessLevel> = CommandMeta {
 };
 
 const CMD_STATUS: CommandMeta<ExampleAccessLevel> = CommandMeta {
+    id: "system_status",
     name: "status",
     description: "Show system status",
     access_level: ExampleAccessLevel::User,
@@ -88,6 +90,7 @@ const CMD_STATUS: CommandMeta<ExampleAccessLevel> = CommandMeta {
 };
 
 const CMD_VERSION: CommandMeta<ExampleAccessLevel> = CommandMeta {
+    id: "system_version",
     name: "version",
     description: "Show version information",
     access_level: ExampleAccessLevel::Guest,
@@ -108,6 +111,7 @@ const SYSTEM_DIR: Directory<ExampleAccessLevel> = Directory {
 
 // Config commands
 const CMD_CONFIG_GET: CommandMeta<ExampleAccessLevel> = CommandMeta {
+    id: "config_get",
     name: "get",
     description: "Get configuration value",
     access_level: ExampleAccessLevel::User,
@@ -116,7 +120,18 @@ const CMD_CONFIG_GET: CommandMeta<ExampleAccessLevel> = CommandMeta {
     max_args: 1,
 };
 
+const CMD_MAKE_COFFEE: CommandMeta<ExampleAccessLevel> = CommandMeta {
+    id: "coffee_make",
+    name: "make",
+    description: "Brew coffee",
+    access_level: ExampleAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
 const CMD_CONFIG_SET: CommandMeta<ExampleAccessLevel> = CommandMeta {
+    id: "config_set",
     name: "set",
     description: "Set configuration value",
     access_level: ExampleAccessLevel::Admin,
@@ -134,8 +149,17 @@ const CONFIG_DIR: Directory<ExampleAccessLevel> = Directory {
     access_level: ExampleAccessLevel::User,
 };
 
+const COFFEE_DIR: Directory<ExampleAccessLevel> = Directory {
+    name: "coffee",
+    children: &[
+        Node::Command(&CMD_MAKE_COFFEE),
+    ],
+    access_level: ExampleAccessLevel::User,
+};
+
 // Root-level commands
 const CMD_ECHO: CommandMeta<ExampleAccessLevel> = CommandMeta {
+    id: "echo",
     name: "echo",
     description: "Echo arguments back",
     access_level: ExampleAccessLevel::Guest,
@@ -145,6 +169,7 @@ const CMD_ECHO: CommandMeta<ExampleAccessLevel> = CommandMeta {
 };
 
 const CMD_UPTIME: CommandMeta<ExampleAccessLevel> = CommandMeta {
+    id: "uptime",
     name: "uptime",
     description: "Show system uptime (simulated)",
     access_level: ExampleAccessLevel::Guest,
@@ -159,6 +184,7 @@ const ROOT: Directory<ExampleAccessLevel> = Directory {
     children: &[
         Node::Directory(&SYSTEM_DIR),
         Node::Directory(&CONFIG_DIR),
+        Node::Directory(&COFFEE_DIR),
         Node::Command(&CMD_ECHO),
         Node::Command(&CMD_UPTIME),
     ],
@@ -172,10 +198,11 @@ const ROOT: Directory<ExampleAccessLevel> = Directory {
 struct ExampleHandlers;
 
 impl CommandHandlers<DefaultConfig> for ExampleHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match name {
-            "reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!")),
-            "status" => {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+        match id {
+            "coffee_make" => Ok(Response::success("Brewing coffee...")),
+            "system_reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!")),
+            "system_status" => {
                 let mut msg = heapless::String::<256>::new();
                 write!(msg, "System Status:\r\n").ok();
                 write!(msg, "  CPU Usage: 23%\r\n").ok();
@@ -183,16 +210,16 @@ impl CommandHandlers<DefaultConfig> for ExampleHandlers {
                 write!(msg, "  Uptime: 42 hours").ok();
                 Ok(Response::success(&msg))
             }
-            "version" => Ok(Response::success(
+            "system_version" => Ok(Response::success(
                 "nut-shell v0.1.0\r\nRust embedded CLI framework",
             )),
-            "get" => {
+            "config_get" => {
                 let key = args[0];
                 let mut msg = heapless::String::<256>::new();
                 write!(msg, "Config[{}] = <simulated value>", key).ok();
                 Ok(Response::success(&msg))
             }
-            "set" => {
+            "config_set" => {
                 let key = args[0];
                 let value = args[1];
                 let mut msg = heapless::String::<256>::new();
@@ -221,16 +248,16 @@ impl CommandHandlers<DefaultConfig> for ExampleHandlers {
     #[cfg(feature = "async")]
     async fn execute_async(
         &self,
-        name: &str,
+        id: &str,
         _args: &[&str],
     ) -> Result<Response<DefaultConfig>, CliError> {
         // This example doesn't use async commands
-        // Return error for any command name
+        // Return error for any command ID
         let mut msg = heapless::String::<256>::new();
         write!(
             msg,
             "Async command '{}' not supported in this example",
-            name
+            id
         )
         .ok();
         Err(CliError::Other(msg))

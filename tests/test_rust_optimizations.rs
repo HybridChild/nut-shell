@@ -83,6 +83,7 @@ fn test_phantom_data_types_are_zero_size() {
 #[test]
 fn test_command_meta_is_const_initializable() {
     const _CMD: CommandMeta<MockAccessLevel> = CommandMeta {
+        id: "test",
         name: "test",
         description: "Test command",
         access_level: MockAccessLevel::Guest,
@@ -108,6 +109,7 @@ fn test_directory_is_const_initializable() {
 #[test]
 fn test_nested_tree_is_const_initializable() {
     const CMD1: CommandMeta<MockAccessLevel> = CommandMeta {
+        id: "cmd1",
         name: "cmd1",
         description: "Command 1",
         access_level: MockAccessLevel::Guest,
@@ -117,6 +119,7 @@ fn test_nested_tree_is_const_initializable() {
     };
 
     const CMD2: CommandMeta<MockAccessLevel> = CommandMeta {
+        id: "cmd2",
         name: "cmd2",
         description: "Command 2",
         access_level: MockAccessLevel::User,
@@ -205,20 +208,20 @@ fn test_command_meta_size_is_reasonable() {
     // CommandMeta should be small since it only contains static references
     let size = core::mem::size_of::<CommandMeta<MockAccessLevel>>();
 
-    // Expected: 2 pointers (name, description) + access_level + kind + 2 usizes
-    // On 64-bit: 2*8 + 1 + 1 + 2*8 = ~34 bytes (with padding to 8-byte alignment = ~56 bytes)
-    // On 32-bit: 2*4 + 1 + 1 + 2*4 = ~18 bytes (with padding to 4-byte alignment = ~24 bytes)
+    // Expected: 3 pointers (id, name, description) + access_level + kind + 2 usizes
+    // On 64-bit: 3*8 + 1 + 1 + 2*8 = ~42 bytes (with padding to 8-byte alignment = ~72 bytes)
+    // On 32-bit: 3*4 + 1 + 1 + 2*4 = ~22 bytes (with padding to 4-byte alignment = ~40 bytes)
 
     #[cfg(target_pointer_width = "64")]
     assert!(
-        size <= 64,
+        size <= 80,
         "CommandMeta size should be reasonable on 64-bit (got {} bytes)",
         size
     );
 
     #[cfg(target_pointer_width = "32")]
     assert!(
-        size <= 32,
+        size <= 48,
         "CommandMeta size should be reasonable on 32-bit (got {} bytes)",
         size
     );
@@ -260,6 +263,7 @@ fn test_tree_has_static_lifetime() {
 #[test]
 fn test_command_meta_has_static_lifetime() {
     const CMD: CommandMeta<MockAccessLevel> = CommandMeta {
+        id: "test",
         name: "test",
         description: "Test",
         access_level: MockAccessLevel::Guest,

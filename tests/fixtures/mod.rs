@@ -159,6 +159,7 @@ impl AccessLevel for MockAccessLevel {
 
 /// Test command: help
 pub const CMD_HELP: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "help",
     name: "help",
     description: "Show help",
     access_level: MockAccessLevel::Guest,
@@ -169,6 +170,7 @@ pub const CMD_HELP: CommandMeta<MockAccessLevel> = CommandMeta {
 
 /// Test command: echo
 pub const CMD_ECHO: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "echo",
     name: "echo",
     description: "Echo arguments",
     access_level: MockAccessLevel::Guest,
@@ -179,6 +181,7 @@ pub const CMD_ECHO: CommandMeta<MockAccessLevel> = CommandMeta {
 
 /// Test command: reboot (requires admin)
 pub const CMD_REBOOT: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "reboot",
     name: "reboot",
     description: "Reboot system",
     access_level: MockAccessLevel::Admin,
@@ -192,6 +195,7 @@ pub const CMD_REBOOT: CommandMeta<MockAccessLevel> = CommandMeta {
 // ============================================================================
 
 pub const CMD_TEST_PREFIX_NEWLINE: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "test-prefix-newline",
     name: "test-prefix-newline",
     description: "Test prefix newline formatting",
     access_level: MockAccessLevel::Guest,
@@ -201,6 +205,7 @@ pub const CMD_TEST_PREFIX_NEWLINE: CommandMeta<MockAccessLevel> = CommandMeta {
 };
 
 pub const CMD_TEST_INDENTED: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "test-indented",
     name: "test-indented",
     description: "Test indented formatting",
     access_level: MockAccessLevel::Guest,
@@ -210,6 +215,7 @@ pub const CMD_TEST_INDENTED: CommandMeta<MockAccessLevel> = CommandMeta {
 };
 
 pub const CMD_TEST_INLINE: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "test-inline",
     name: "test-inline",
     description: "Test inline formatting",
     access_level: MockAccessLevel::Guest,
@@ -219,6 +225,7 @@ pub const CMD_TEST_INLINE: CommandMeta<MockAccessLevel> = CommandMeta {
 };
 
 pub const CMD_TEST_NO_POSTFIX: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "test-no-postfix",
     name: "test-no-postfix",
     description: "Test without postfix newline",
     access_level: MockAccessLevel::Guest,
@@ -228,6 +235,7 @@ pub const CMD_TEST_NO_POSTFIX: CommandMeta<MockAccessLevel> = CommandMeta {
 };
 
 pub const CMD_TEST_NO_PROMPT: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "test-no-prompt",
     name: "test-no-prompt",
     description: "Test without prompt",
     access_level: MockAccessLevel::Guest,
@@ -237,6 +245,7 @@ pub const CMD_TEST_NO_PROMPT: CommandMeta<MockAccessLevel> = CommandMeta {
 };
 
 pub const CMD_TEST_COMBINED: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "test-combined",
     name: "test-combined",
     description: "Test combined formatting flags",
     access_level: MockAccessLevel::Guest,
@@ -247,6 +256,7 @@ pub const CMD_TEST_COMBINED: CommandMeta<MockAccessLevel> = CommandMeta {
 
 /// Test command: status (in system/ directory)
 pub const CMD_STATUS: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "status",
     name: "status",
     description: "Show system status",
     access_level: MockAccessLevel::User,
@@ -258,6 +268,7 @@ pub const CMD_STATUS: CommandMeta<MockAccessLevel> = CommandMeta {
 /// Test command: async-wait (async command for testing)
 #[cfg(feature = "async")]
 pub const CMD_ASYNC_WAIT: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "async-wait",
     name: "async-wait",
     description: "Async test command",
     access_level: MockAccessLevel::User,
@@ -299,6 +310,7 @@ pub const DIR_SYSTEM: Directory<MockAccessLevel> = Directory {
 
 /// Test command: network status
 pub const CMD_NET_STATUS: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "net_status",
     name: "status",
     description: "Show network status",
     access_level: MockAccessLevel::User,
@@ -309,6 +321,7 @@ pub const CMD_NET_STATUS: CommandMeta<MockAccessLevel> = CommandMeta {
 
 /// Test command: network config
 pub const CMD_NET_CONFIG: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "net_config",
     name: "config",
     description: "Configure network settings",
     access_level: MockAccessLevel::Admin,
@@ -319,6 +332,7 @@ pub const CMD_NET_CONFIG: CommandMeta<MockAccessLevel> = CommandMeta {
 
 /// Test command: network ping
 pub const CMD_NET_PING: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "net_ping",
     name: "ping",
     description: "Ping remote host",
     access_level: MockAccessLevel::User,
@@ -344,6 +358,7 @@ pub const DIR_NETWORK: Directory<MockAccessLevel> = Directory {
 
 /// Test command: LED control
 pub const CMD_HW_LED: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "hw_led",
     name: "led",
     description: "Control LED state",
     access_level: MockAccessLevel::User,
@@ -354,6 +369,7 @@ pub const CMD_HW_LED: CommandMeta<MockAccessLevel> = CommandMeta {
 
 /// Test command: temperature sensor
 pub const CMD_HW_TEMP: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "hw_temp",
     name: "temperature",
     description: "Read temperature sensor",
     access_level: MockAccessLevel::User,
@@ -375,6 +391,7 @@ pub const DIR_HARDWARE: Directory<MockAccessLevel> = Directory {
 
 /// Test command: memory dump
 pub const CMD_DEBUG_MEM: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "debug_mem",
     name: "memory",
     description: "Dump memory contents",
     access_level: MockAccessLevel::Admin,
@@ -385,6 +402,7 @@ pub const CMD_DEBUG_MEM: CommandMeta<MockAccessLevel> = CommandMeta {
 
 /// Test command: register read
 pub const CMD_DEBUG_REG: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "debug_reg",
     name: "registers",
     description: "Read hardware registers",
     access_level: MockAccessLevel::Admin,
@@ -456,14 +474,14 @@ pub const TEST_TREE: Directory<MockAccessLevel> = Directory {
 
 /// Mock command handlers for testing the metadata/execution separation pattern.
 ///
-/// Implements the execution side of the pattern, mapping command names to functions.
+/// Implements the execution side of the pattern, mapping command IDs to functions.
 /// This validates that CommandMeta (const metadata) and CommandHandlers (runtime execution)
 /// work together correctly.
 pub struct MockHandlers;
 
 impl CommandHandlers<DefaultConfig> for MockHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match name {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+        match id {
             // Root commands
             "help" => Ok(Response::success("Help text here")),
             "echo" => {
@@ -480,14 +498,15 @@ impl CommandHandlers<DefaultConfig> for MockHandlers {
             "status" => Ok(Response::success("System OK")),
 
             // Network commands (system/network/)
-            "config" => {
+            "net_status" => Ok(Response::success("Network OK")),
+            "net_config" => {
                 let params = args.join(" ");
                 Ok(Response::success(&format!(
                     "Network configured: {}",
                     params
                 )))
             }
-            "ping" => {
+            "net_ping" => {
                 let host = args.get(0).unwrap_or(&"localhost");
                 let count = args.get(1).unwrap_or(&"4");
                 Ok(Response::success(&format!(
@@ -497,14 +516,14 @@ impl CommandHandlers<DefaultConfig> for MockHandlers {
             }
 
             // Hardware commands (system/hardware/)
-            "led" => {
+            "hw_led" => {
                 let state = args.get(0).unwrap_or(&"off");
                 Ok(Response::success(&format!("LED: {}", state)))
             }
-            "temperature" => Ok(Response::success("Temperature: 23.5°C")),
+            "hw_temp" => Ok(Response::success("Temperature: 23.5°C")),
 
             // Debug commands
-            "memory" => {
+            "debug_mem" => {
                 if args.is_empty() {
                     Ok(Response::success("Memory dump (full)"))
                 } else {
@@ -512,7 +531,7 @@ impl CommandHandlers<DefaultConfig> for MockHandlers {
                     Ok(Response::success(&format!("Memory at {}", addr)))
                 }
             }
-            "registers" => {
+            "debug_reg" => {
                 let reg = args.get(0).unwrap_or(&"0x00");
                 Ok(Response::success(&format!("Register {}: 0x1234", reg)))
             }
@@ -539,10 +558,10 @@ impl CommandHandlers<DefaultConfig> for MockHandlers {
     #[cfg(feature = "async")]
     async fn execute_async(
         &self,
-        name: &str,
+        id: &str,
         args: &[&str],
     ) -> Result<Response<DefaultConfig>, CliError> {
-        match name {
+        match id {
             "async-wait" => {
                 // Simulate async operation
                 let duration = args

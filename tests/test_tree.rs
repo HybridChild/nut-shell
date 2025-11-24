@@ -24,6 +24,7 @@ use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 fn test_const_command_meta() {
     // Validates that CommandMeta is const-initializable
     const TEST_CMD: CommandMeta<MockAccessLevel> = CommandMeta {
+        id: "test",
         name: "test",
         description: "Test command",
         access_level: MockAccessLevel::User,
@@ -32,6 +33,7 @@ fn test_const_command_meta() {
         max_args: 5,
     };
 
+    assert_eq!(TEST_CMD.id, "test");
     assert_eq!(TEST_CMD.name, "test");
     assert_eq!(TEST_CMD.description, "Test command");
     assert_eq!(TEST_CMD.access_level, MockAccessLevel::User);
@@ -44,6 +46,7 @@ fn test_const_command_meta() {
 fn test_const_directory() {
     // Validates that Directory is const-initializable
     const CMD: CommandMeta<MockAccessLevel> = CommandMeta {
+        id: "cmd",
         name: "cmd",
         description: "Test",
         access_level: MockAccessLevel::Guest,
@@ -314,6 +317,7 @@ fn test_directory_find_child() {
 fn test_generic_access_level_integration() {
     // Validates that AccessLevel generic parameter works throughout the system
     const CMD: CommandMeta<MockAccessLevel> = CommandMeta {
+        id: "test",
         name: "test",
         description: "Test",
         access_level: MockAccessLevel::Admin,

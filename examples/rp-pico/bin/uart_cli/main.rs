@@ -99,6 +99,7 @@ impl AccessLevel for PicoAccessLevel {
 // =============================================================================
 
 const CMD_LED: CommandMeta<PicoAccessLevel> = CommandMeta {
+    id: "led",
     name: "led",
     description: "Toggle onboard LED",
     access_level: PicoAccessLevel::User,
@@ -108,6 +109,7 @@ const CMD_LED: CommandMeta<PicoAccessLevel> = CommandMeta {
 };
 
 const CMD_INFO: CommandMeta<PicoAccessLevel> = CommandMeta {
+    id: "system_info",
     name: "info",
     description: "Show device information",
     access_level: PicoAccessLevel::User,
@@ -117,6 +119,7 @@ const CMD_INFO: CommandMeta<PicoAccessLevel> = CommandMeta {
 };
 
 const CMD_REBOOT: CommandMeta<PicoAccessLevel> = CommandMeta {
+    id: "system_reboot",
     name: "reboot",
     description: "Reboot the device",
     access_level: PicoAccessLevel::Admin,
@@ -144,8 +147,8 @@ const ROOT: Directory<PicoAccessLevel> = Directory {
 struct PicoHandlers;
 
 impl CommandHandlers<DefaultConfig> for PicoHandlers {
-    fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match name {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+        match id {
             "led" => {
                 let state = args[0];
                 match state {
@@ -166,7 +169,7 @@ impl CommandHandlers<DefaultConfig> for PicoHandlers {
                     }
                 }
             }
-            "info" => {
+            "system_info" => {
                 let mut msg = heapless::String::<256>::new();
                 write!(msg, "Device: Raspberry Pi Pico\r\n").ok();
                 write!(msg, "Chip: RP2040\r\n").ok();
@@ -174,7 +177,7 @@ impl CommandHandlers<DefaultConfig> for PicoHandlers {
                 write!(msg, "UART: GP0(TX)/GP1(RX) @ 115200").ok();
                 Ok(Response::success(&msg))
             }
-            "reboot" => {
+            "system_reboot" => {
                 // In a real implementation, trigger watchdog reset
                 Ok(Response::success(
                     "Rebooting...\r\n(Not implemented in example)",
