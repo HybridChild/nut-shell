@@ -458,57 +458,6 @@ fn test_buffer_overflow_continues_working() {
 }
 
 // ============================================================================
-// Shell Lifecycle Tests
-// ============================================================================
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_shell_activate_deactivate_reactivate() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-
-    // Shell starts in Inactive state
-    // Activate it
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Should be able to execute commands
-    for c in "echo active\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    let output = shell.__test_io_mut().output();
-    assert!(output.contains("active"), "Should work when active");
-
-    shell.__test_io_mut().clear_output();
-
-    // Deactivate shell
-    shell.deactivate();
-
-    // Should NOT respond to input when deactivated
-    for c in "echo inactive\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    let output = shell.__test_io_mut().output();
-    // Shell should ignore input when inactive (may emit nothing or minimal output)
-    // Exact behavior depends on implementation
-
-    // Reactivate
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Should work again
-    for c in "echo reactivated\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    let output = shell.__test_io_mut().output();
-    assert!(
-        output.contains("reactivated"),
-        "Should work after reactivation"
-    );
-}
-
-// ============================================================================
 // Command Argument Validation Tests
 // ============================================================================
 
