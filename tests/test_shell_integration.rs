@@ -554,29 +554,219 @@ fn test_command_too_many_args() {
 // ============================================================================
 // Access Level Enforcement Tests
 // ============================================================================
+//
+// NOTE: Access control works by hiding inaccessible nodes (security feature).
+// When a user tries to access a command/directory they don't have permission for,
+// the system returns "Command not found" rather than "access denied" to prevent
+// information disclosure about the system structure.
+
+// Helper function to create test credential provider
+#[cfg(feature = "authentication")]
+fn create_test_provider() -> (
+    nut_shell::auth::ConstCredentialProvider<
+        fixtures::MockAccessLevel,
+        nut_shell::auth::password::Sha256Hasher,
+        2,
+    >,
+    nut_shell::auth::password::Sha256Hasher,
+) {
+    use fixtures::MockAccessLevel;
+    use nut_shell::auth::{password::Sha256Hasher, PasswordHasher, User, ConstCredentialProvider};
+
+    let hasher = Sha256Hasher::new();
+
+    let guest_salt = [1u8; 16];
+    let guest_hash = hasher.hash("guest123", &guest_salt);
+
+    let admin_salt = [2u8; 16];
+    let admin_hash = hasher.hash("admin123", &admin_salt);
+
+    let users = [
+        User::new("guest", MockAccessLevel::Guest, guest_hash, guest_salt).unwrap(),
+        User::new("admin", MockAccessLevel::Admin, admin_hash, admin_salt).unwrap(),
+    ];
+
+    (ConstCredentialProvider::new(users, hasher), hasher)
+}
 
 #[test]
 #[cfg(feature = "authentication")]
-fn test_access_level_enforcement() {
-    use fixtures::MockAccessLevel;
-    use nut_shell::auth::{ConstCredentialProvider, User, password::Sha256Hasher};
-
-    // Create test users with different access levels
-    let hash = [0u8; 32];
-    let salt = [0u8; 16];
-    let users = [
-        User::new("guest", MockAccessLevel::Guest, hash, salt).unwrap(),
-        User::new("admin", MockAccessLevel::Admin, hash, salt).unwrap(),
-    ];
-
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
+fn test_guest_can_execute_guest_level_commands() {
+    let (provider, _hasher) = create_test_provider();
     let io = MockIo::new();
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
 
-    // Note: This test requires authentication logic to actually enforce access levels
-    // The current implementation should check user.access_level >= command.access_level
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Login as guest
+    for c in "guest:guest123\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    shell.__test_io_mut().clear_output();
+
+    // Guest should be able to execute Guest-level commands
+    for c in "echo hello\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("hello"),
+        "Guest should be able to execute Guest-level commands: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(feature = "authentication")]
+fn test_guest_cannot_execute_admin_commands() {
+    let (provider, _hasher) = create_test_provider();
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Login as guest
+    for c in "guest:guest123\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    shell.__test_io_mut().clear_output();
+
+    // Guest should NOT be able to execute Admin commands
+    for c in "system/reboot\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("Command not found") || output.contains("Invalid path"),
+        "Guest should not be able to execute Admin commands: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(feature = "authentication")]
+fn test_guest_cannot_access_admin_directories() {
+    let (provider, _hasher) = create_test_provider();
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Login as guest
+    for c in "guest:guest123\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    shell.__test_io_mut().clear_output();
+
+    // Guest should NOT be able to access Admin directories
+    for c in "debug/memory\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("Command not found") || output.contains("Invalid path"),
+        "Guest should not be able to access Admin directories: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(feature = "authentication")]
+fn test_admin_can_execute_admin_commands() {
+    let (provider, _hasher) = create_test_provider();
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Login as admin
+    for c in "admin:admin123\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    shell.__test_io_mut().clear_output();
+
+    // Admin should be able to execute Admin commands
+    for c in "system/reboot\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("Reboot"),
+        "Admin should be able to execute Admin commands: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(feature = "authentication")]
+fn test_admin_can_access_admin_directories() {
+    let (provider, _hasher) = create_test_provider();
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Login as admin
+    for c in "admin:admin123\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    shell.__test_io_mut().clear_output();
+
+    // Admin should be able to access Admin directories
+    for c in "debug/memory\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("Memory"),
+        "Admin should be able to access Admin directories: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(feature = "authentication")]
+fn test_admin_can_execute_guest_level_commands() {
+    let (provider, _hasher) = create_test_provider();
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Login as admin
+    for c in "admin:admin123\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    shell.__test_io_mut().clear_output();
+
+    // Admin should also be able to execute lower-level commands
+    for c in "echo hello\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("hello"),
+        "Admin should be able to execute Guest-level commands: {}",
+        output
+    );
 }
 
 // ============================================================================
