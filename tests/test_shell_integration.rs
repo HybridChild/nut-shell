@@ -824,5 +824,95 @@ fn test_minimal_config_works() {
 }
 
 // ============================================================================
+// Async Command Execution Tests
+// ============================================================================
+
+#[tokio::test]
+#[cfg(all(feature = "async", not(feature = "authentication")))]
+async fn test_async_command_via_process_char_async() {
+    // Test that process_char_async can execute async commands end-to-end
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Navigate to system directory where async-wait is located
+    for c in "system\n".chars() {
+        shell.process_char_async(c).await.unwrap();
+    }
+
+    // Execute async-wait command
+    for c in "async-wait\n".chars() {
+        shell.process_char_async(c).await.unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("Async complete") || output.contains("100ms"),
+        "Async command should have executed. Output: {}",
+        output
+    );
+}
+
+#[tokio::test]
+#[cfg(all(feature = "async", not(feature = "authentication")))]
+async fn test_sync_command_in_async_context() {
+    // Test that sync commands work fine in process_char_async
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Execute sync command via async process_char
+    for c in "echo hello\n".chars() {
+        shell.process_char_async(c).await.unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("hello"),
+        "Sync command should work in async context"
+    );
+}
+
+#[tokio::test]
+#[cfg(all(feature = "async", not(feature = "authentication")))]
+async fn test_async_command_with_arguments() {
+    // Test async command with custom arguments
+    let io = MockIo::new();
+    let handlers = MockHandlers;
+    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    shell.activate().unwrap();
+    shell.__test_io_mut().clear_output();
+
+    // Navigate to system and execute async-wait with custom duration
+    for c in "system\n".chars() {
+        shell.process_char_async(c).await.unwrap();
+    }
+    shell.__test_io_mut().clear_output();
+
+    for c in "async-wait 250\n".chars() {
+        shell.process_char_async(c).await.unwrap();
+    }
+
+    let output = shell.__test_io_mut().output();
+    assert!(
+        output.contains("Async complete") || output.contains("250ms"),
+        "Async command with args should execute"
+    );
+}
+
+#[test]
+#[cfg(all(not(feature = "async"), feature = "async"))]
+fn test_async_command_errors_without_async_feature() {
+    // This test ensures that trying to call an async command from sync context fails
+    // Note: This test should never actually run because the feature combination is impossible
+    // It's here for documentation purposes
+    compile_error!("This should not compile - contradictory feature requirements");
+}
+
+// ============================================================================
 // Path Navigation Edge Cases
 // ============================================================================

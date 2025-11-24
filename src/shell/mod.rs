@@ -356,6 +356,73 @@ where
         }
     }
 
+    /// Process a single character of input - async version.
+    ///
+    /// Main entry point for character-by-character processing in async contexts.
+    /// This version can execute both synchronous and asynchronous commands.
+    ///
+    /// Returns Ok(()) on success, Err on I/O error.
+    ///
+    /// # Usage
+    ///
+    /// ```rust,ignore
+    /// loop {
+    ///     if let Some(c) = io.get_char()? {
+    ///         shell.process_char_async(c).await?;
+    ///     }
+    /// }
+    /// ```
+    #[cfg(feature = "async")]
+    pub async fn process_char_async(&mut self, c: char) -> Result<(), IO::Error> {
+        // Decode character into logical event
+        let event = self.decoder.decode_char(c);
+
+        match event {
+            InputEvent::None => Ok(()), // Still accumulating sequence
+
+            InputEvent::Char(ch) => {
+                // Try to add to buffer
+                match self.input_buffer.push(ch) {
+                    Ok(_) => {
+                        // Successfully added - echo (with password masking if applicable)
+                        let echo_char = self.get_echo_char(ch);
+                        self.io.put_char(echo_char)?;
+                        Ok(())
+                    }
+                    Err(_) => {
+                        // Buffer full - beep and ignore
+                        self.io.put_char('\x07')?; // Bell character
+                        Ok(())
+                    }
+                }
+            }
+
+            InputEvent::Backspace => {
+                // Remove from buffer if not empty
+                if !self.input_buffer.is_empty() {
+                    self.input_buffer.pop();
+                    // Echo backspace sequence
+                    self.io.write_str("\x08 \x08")?;
+                }
+                Ok(())
+            }
+
+            InputEvent::DoubleEsc => {
+                // Clear buffer and redraw (Shell's interpretation of double-ESC)
+                self.input_buffer.clear();
+                self.clear_line_and_redraw()
+            }
+
+            InputEvent::Enter => self.handle_enter_async().await,
+
+            InputEvent::Tab => self.handle_tab(),
+
+            InputEvent::UpArrow => self.handle_history(HistoryDirection::Previous),
+
+            InputEvent::DownArrow => self.handle_history(HistoryDirection::Next),
+        }
+    }
+
     /// Poll for incoming characters and process them.
     ///
     /// This is a **convenience method** for simple polling loops where the Shell actively
@@ -576,6 +643,27 @@ where
         }
     }
 
+    /// Handle Enter key press - async version.
+    ///
+    /// Dispatches to appropriate handler based on current state.
+    #[cfg(feature = "async")]
+    async fn handle_enter_async(&mut self) -> Result<(), IO::Error> {
+        // Note: Newline after input is written by the handlers
+        // (conditionally based on Response.inline_message flag for commands)
+
+        let input = self.input_buffer.clone();
+        self.input_buffer.clear();
+
+        match self.state {
+            CliState::Inactive => Ok(()),
+
+            #[cfg(feature = "authentication")]
+            CliState::LoggedOut => self.handle_login_input(&input),
+
+            CliState::LoggedIn => self.handle_input_line_async(&input).await,
+        }
+    }
+
     /// Handle a valid login attempt.
     #[cfg(feature = "authentication")]
     fn handle_login_input(&mut self, input: &str) -> Result<(), IO::Error> {
@@ -703,6 +791,93 @@ where
         Ok(())
     }
 
+    /// Handle user input line when in LoggedIn state - async version.
+    ///
+    /// Processes three types of input:
+    /// 1. Global commands (?, ls, clear, logout)
+    /// 2. Tree navigation (paths resolving to directories)
+    /// 3. Tree commands (paths resolving to Node::Command - both sync and async)
+    #[cfg(feature = "async")]
+    async fn handle_input_line_async(&mut self, input: &str) -> Result<(), IO::Error> {
+        // Skip empty input
+        if input.trim().is_empty() {
+            self.io.write_str("\r\n")?;
+            self.generate_and_write_prompt()?;
+            return Ok(());
+        }
+
+        // Check for global commands first (non-tree operations)
+        // Global commands don't support inline mode
+        match input.trim() {
+            "?" => {
+                self.io.write_str("\r\n")?;
+                self.show_help()?;
+                self.generate_and_write_prompt()?;
+                return Ok(());
+            }
+            "ls" => {
+                self.io.write_str("\r\n")?;
+                self.show_ls()?;
+                self.generate_and_write_prompt()?;
+                return Ok(());
+            }
+            "clear" => {
+                // Clear screen - no newline needed before ANSI clear sequence
+                self.io.write_str("\x1b[2J\x1b[H")?; // ANSI clear screen
+                self.generate_and_write_prompt()?;
+                return Ok(());
+            }
+            #[cfg(feature = "authentication")]
+            "logout" => {
+                self.io.write_str("\r\n  ")?;
+                self.current_user = None;
+                self.state = CliState::LoggedOut;
+                self.current_path.clear();
+                self.io.write_str(C::MSG_LOGOUT)?;
+                self.io.write_str(C::MSG_LOGIN_PROMPT)?;
+                return Ok(());
+            }
+            _ => {}
+        }
+
+        // Handle tree operations (navigation or command execution) - async version
+        match self.execute_tree_path_async(input).await {
+            Ok(response) => {
+                // Add newline after input UNLESS response wants inline mode
+                if !response.inline_message {
+                    self.io.write_str("\r\n")?;
+                }
+
+                // Write formatted response (implements all Response flags!)
+                self.write_formatted_response(&response)?;
+
+                // Add to history if not excluded
+                #[cfg(feature = "history")]
+                if !response.exclude_from_history {
+                    self.history.add(input);
+                }
+
+                // Show prompt if requested by response
+                if response.show_prompt {
+                    self.generate_and_write_prompt()?;
+                }
+            }
+            Err(e) => {
+                // Errors don't support inline mode - add newline
+                self.io.write_str("\r\n  ")?;
+
+                // Format and write error message using Display trait
+                self.io.write_str("Error: ")?;
+                let error_msg = Self::format_error(&e);
+                self.io.write_str(error_msg.as_str())?;
+                self.io.write_str("\r\n")?;
+                self.generate_and_write_prompt()?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Execute a tree path (navigation or command execution).
     ///
     /// Resolves the path and either:
@@ -765,6 +940,77 @@ where
                     CommandKind::Async => {
                         // Async tree command called from sync context
                         Err(CliError::AsyncNotSupported)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Execute a tree path (navigation or command execution) - async version.
+    ///
+    /// Resolves the path and either:
+    /// - Navigates to a directory (if path resolves to Node::Directory)
+    /// - Executes a tree command (if path resolves to Node::Command)
+    ///
+    /// This async version can execute both sync and async commands.
+    /// Sync commands are called directly, async commands are awaited.
+    ///
+    /// Note: "command" here refers specifically to Node::Command,
+    /// not generic user input.
+    #[cfg(feature = "async")]
+    async fn execute_tree_path_async(&mut self, input: &str) -> Result<Response<C>, CliError> {
+        // Parse path and arguments
+        // TODO: Use C::MAX_ARGS + 1 when const generics stabilize (command + args)
+        let parts: heapless::Vec<&str, 17> = input.split_whitespace().collect();
+        if parts.is_empty() {
+            return Err(CliError::CommandNotFound);
+        }
+
+        let path_str = parts[0];
+        let args = &parts[1..];
+
+        // Resolve path to node (None represents root directory)
+        let (target_node, new_path) = self.resolve_path(path_str)?;
+
+        // Case 1: Directory navigation
+        match target_node {
+            None | Some(Node::Directory(_)) => {
+                // Directory navigation - update path and return
+                self.current_path = new_path;
+                #[cfg(feature = "history")]
+                return Ok(Response::success("")
+                    .without_history()
+                    .without_postfix_newline());
+                #[cfg(not(feature = "history"))]
+                return Ok(Response::success("").without_postfix_newline());
+            }
+            Some(Node::Command(cmd_meta)) => {
+                // Case 2: Tree command execution
+                // Check access control - use InvalidPath for security (don't reveal access denied)
+                if let Some(user) = &self.current_user {
+                    if user.access_level < cmd_meta.access_level {
+                        return Err(CliError::InvalidPath);
+                    }
+                }
+
+                // Validate argument count
+                if args.len() < cmd_meta.min_args || args.len() > cmd_meta.max_args {
+                    return Err(CliError::InvalidArgumentCount {
+                        expected_min: cmd_meta.min_args,
+                        expected_max: cmd_meta.max_args,
+                        received: args.len(),
+                    });
+                }
+
+                // Dispatch to command handlers (handle both sync and async)
+                match cmd_meta.kind {
+                    CommandKind::Sync => {
+                        // Sync command in async context - call directly
+                        self.handlers.execute_sync(cmd_meta.id, args)
+                    }
+                    CommandKind::Async => {
+                        // Async command - await execution
+                        self.handlers.execute_async(cmd_meta.id, args).await
                     }
                 }
             }
