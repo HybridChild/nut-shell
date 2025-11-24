@@ -1108,10 +1108,10 @@ mod tests {
     use crate::auth::AccessLevel;
     use crate::config::DefaultConfig;
     use crate::io::CharIo;
-    use crate::tree::Directory;
+    use crate::tree::{CommandKind, CommandMeta, Directory, Node};
 
     // Mock access level
-    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
     enum MockLevel {
         User = 0,
     }
@@ -1177,10 +1177,83 @@ mod tests {
         }
     }
 
+    // Test commands
+    const CMD_TEST: CommandMeta<MockLevel> = CommandMeta {
+        name: "test-cmd",
+        description: "Test command",
+        access_level: MockLevel::User,
+        kind: CommandKind::Sync,
+        min_args: 0,
+        max_args: 0,
+    };
+
+    const CMD_REBOOT: CommandMeta<MockLevel> = CommandMeta {
+        name: "reboot",
+        description: "Reboot the system",
+        access_level: MockLevel::User,
+        kind: CommandKind::Sync,
+        min_args: 0,
+        max_args: 0,
+    };
+
+    const CMD_STATUS: CommandMeta<MockLevel> = CommandMeta {
+        name: "status",
+        description: "Show status",
+        access_level: MockLevel::User,
+        kind: CommandKind::Sync,
+        min_args: 0,
+        max_args: 0,
+    };
+
+    const CMD_LED: CommandMeta<MockLevel> = CommandMeta {
+        name: "led",
+        description: "Control LED",
+        access_level: MockLevel::User,
+        kind: CommandKind::Sync,
+        min_args: 1,
+        max_args: 1,
+    };
+
+    const CMD_NETWORK_STATUS: CommandMeta<MockLevel> = CommandMeta {
+        name: "status",
+        description: "Network status",
+        access_level: MockLevel::User,
+        kind: CommandKind::Sync,
+        min_args: 0,
+        max_args: 0,
+    };
+
+    // Test directories
+    const DIR_HARDWARE: Directory<MockLevel> = Directory {
+        name: "hardware",
+        children: &[Node::Command(&CMD_LED)],
+        access_level: MockLevel::User,
+    };
+
+    const DIR_NETWORK: Directory<MockLevel> = Directory {
+        name: "network",
+        children: &[Node::Command(&CMD_NETWORK_STATUS)],
+        access_level: MockLevel::User,
+    };
+
+    const DIR_SYSTEM: Directory<MockLevel> = Directory {
+        name: "system",
+        children: &[
+            Node::Command(&CMD_REBOOT),
+            Node::Command(&CMD_STATUS),
+            Node::Directory(&DIR_HARDWARE),
+            Node::Directory(&DIR_NETWORK),
+        ],
+        access_level: MockLevel::User,
+    };
+
     // Test tree
     const TEST_TREE: Directory<MockLevel> = Directory {
         name: "/",
-        children: &[],
+        children: &[
+            Node::Command(&CMD_TEST),
+            Node::Directory(&DIR_SYSTEM),
+        ],
         access_level: MockLevel::User,
     };
 
@@ -1430,4 +1503,191 @@ mod tests {
         // via integration tests, as it requires simulating full command execution.
         // This test verifies the flag is set correctly.
     }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_resolve_path_cannot_navigate_through_command() {
+        // Test that resolve_path returns InvalidPath when trying to navigate through a command
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        // Valid: Command as last segment should succeed
+        let result = shell.resolve_path("test-cmd");
+        assert!(result.is_ok(), "Should resolve path to command");
+        if let Ok((node, _)) = result {
+            assert!(node.is_some());
+            if let Some(Node::Command(cmd)) = node {
+                assert_eq!(cmd.name, "test-cmd");
+            } else {
+                panic!("Expected Command node");
+            }
+        }
+
+        // Invalid: Cannot navigate through command to another segment
+        let result = shell.resolve_path("test-cmd/invalid");
+        assert!(result.is_err(), "Should fail when navigating through command");
+        assert_eq!(
+            result.unwrap_err(),
+            CliError::InvalidPath,
+            "Should return InvalidPath when trying to navigate through command"
+        );
+
+        // Invalid: Multiple segments after command
+        let result = shell.resolve_path("test-cmd/extra/path");
+        assert!(result.is_err(), "Should fail with multiple segments after command");
+        assert_eq!(
+            result.unwrap_err(),
+            CliError::InvalidPath,
+            "Should return InvalidPath for multiple segments after command"
+        );
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_resolve_path_comprehensive() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        // Test 1: Root level command
+        let result = shell.resolve_path("test-cmd");
+        assert!(result.is_ok(), "Should resolve root-level command");
+        if let Ok((node, _)) = result {
+            assert!(node.is_some());
+            if let Some(Node::Command(cmd)) = node {
+                assert_eq!(cmd.name, "test-cmd");
+            }
+        }
+
+        // Test 2: First-level directory command (system/reboot)
+        let result = shell.resolve_path("system/reboot");
+        assert!(result.is_ok(), "Should resolve system/reboot");
+        if let Ok((node, _)) = result {
+            assert!(node.is_some());
+            if let Some(Node::Command(cmd)) = node {
+                assert_eq!(cmd.name, "reboot");
+            }
+        }
+
+        // Test 3: First-level directory command (system/status)
+        let result = shell.resolve_path("system/status");
+        assert!(result.is_ok(), "Should resolve system/status");
+        if let Ok((node, _)) = result {
+            assert!(node.is_some());
+            if let Some(Node::Command(cmd)) = node {
+                assert_eq!(cmd.name, "status");
+            }
+        }
+
+        // Test 4: Second-level nested command (system/network/status)
+        let result = shell.resolve_path("system/network/status");
+        assert!(result.is_ok(), "Should resolve system/network/status");
+        if let Ok((node, _)) = result {
+            assert!(node.is_some());
+            if let Some(Node::Command(cmd)) = node {
+                assert_eq!(cmd.name, "status");
+            }
+        }
+
+        // Test 5: Second-level nested command (system/hardware/led)
+        let result = shell.resolve_path("system/hardware/led");
+        assert!(result.is_ok(), "Should resolve system/hardware/led");
+        if let Ok((node, _)) = result {
+            assert!(node.is_some());
+            if let Some(Node::Command(cmd)) = node {
+                assert_eq!(cmd.name, "led");
+                assert_eq!(cmd.min_args, 1);
+                assert_eq!(cmd.max_args, 1);
+            }
+        }
+
+        // Test 6: Non-existent command at root
+        let result = shell.resolve_path("nonexistent");
+        assert!(result.is_err(), "Should fail for non-existent command");
+        assert_eq!(
+            result.unwrap_err(),
+            CliError::CommandNotFound,
+            "Should return CommandNotFound for non-existent command"
+        );
+
+        // Test 7: Invalid path with non-existent directory
+        let result = shell.resolve_path("invalid/path/command");
+        assert!(result.is_err(), "Should fail for invalid path");
+        // Could be CommandNotFound or InvalidPath depending on where it fails
+        assert!(
+            matches!(
+                result.unwrap_err(),
+                CliError::CommandNotFound | CliError::InvalidPath
+            ),
+            "Should return CommandNotFound or InvalidPath"
+        );
+
+        // Test 8: Resolve to directory (system)
+        let result = shell.resolve_path("system");
+        assert!(result.is_ok(), "Should resolve directory path");
+        if let Ok((node, _)) = result {
+            assert!(node.is_some());
+            if let Some(Node::Directory(dir)) = node {
+                assert_eq!(dir.name, "system");
+            }
+        }
+
+        // Test 9: Resolve nested directory (system/network)
+        let result = shell.resolve_path("system/network");
+        assert!(result.is_ok(), "Should resolve nested directory");
+        if let Ok((node, _)) = result {
+            assert!(node.is_some());
+            if let Some(Node::Directory(dir)) = node {
+                assert_eq!(dir.name, "network");
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_resolve_path_parent_directory() {
+        let io = MockIo::new();
+        let handlers = MockHandlers;
+        let shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
+            Shell::new(&TEST_TREE, handlers, io);
+
+        // Test 1: Navigate into directory then back up with ..
+        // First navigate to system/network/status
+        let result = shell.resolve_path("system/network/status");
+        assert!(result.is_ok(), "Should resolve system/network/status");
+        let (_, path) = result.unwrap();
+        // Path should have indices for system (0), network (2), and status (0)
+        // [0] = system (index 0 in children of root)
+        // [2] = network (index 2 in children of system)
+        assert_eq!(path.len(), 2, "Path should have 2 elements (system, network)");
+
+        // Test 2: Use .. to go back to system from system/network
+        let result = shell.resolve_path("system/network/..");
+        assert!(result.is_ok(), "Should resolve system/network/..");
+        if let Ok((node, path)) = result {
+            assert!(node.is_some());
+            if let Some(Node::Directory(dir)) = node {
+                assert_eq!(dir.name, "system", "Should be back at system directory");
+            }
+            assert_eq!(path.len(), 1, "Path should have 1 element");
+        }
+
+        // Test 3: Multiple .. to go back to root
+        let result = shell.resolve_path("system/network/../..");
+        assert!(result.is_ok(), "Should resolve system/network/../..");
+        if let Ok((_, path)) = result {
+            assert_eq!(path.len(), 0, "Path should be empty (at root)");
+        }
+
+        // Test 4: Go beyond root with .. (should stay at root)
+        let result = shell.resolve_path("..");
+        assert!(result.is_ok(), "Should handle .. at root");
+        if let Ok((_, path)) = result {
+            assert_eq!(path.len(), 0, "Path should stay at root");
+        }
+    }
 }
+

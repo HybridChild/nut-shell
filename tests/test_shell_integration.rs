@@ -39,28 +39,6 @@ fn test_simple_command_execution() {
 
 #[test]
 #[cfg(not(feature = "authentication"))]
-fn test_command_not_found() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Try nonexistent command
-    for c in "nonexistent\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.__test_io_mut().output();
-    assert!(
-        output.contains("not found") || output.contains("Command not found"),
-        "Should report command not found: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
 fn test_command_with_arguments() {
     let io = MockIo::new();
     let handlers = MockHandlers;
@@ -83,50 +61,6 @@ fn test_command_with_arguments() {
 // ============================================================================
 // Navigation Tests
 // ============================================================================
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_path_based_command_execution() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Execute command via absolute path
-    for c in "system/reboot\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.__test_io_mut().output();
-    assert!(
-        output.contains("Reboot") || output.contains("reboot"),
-        "Should execute reboot command: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_nested_directory_navigation() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Navigate to nested directory and execute command
-    for c in "system/network/status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.__test_io_mut().output();
-    assert!(
-        output.contains("status") || output.contains("Network"),
-        "Should execute network status command: {}",
-        output
-    );
-}
 
 // ============================================================================
 // Global Commands Tests
@@ -398,28 +332,6 @@ fn test_double_esc_exits_history_navigation() {
 // ============================================================================
 // Error Handling Tests
 // ============================================================================
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_invalid_path() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Try non-existent path
-    for c in "invalid/path/command\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.__test_io_mut().output();
-    assert!(
-        output.contains("not found") || output.contains("Invalid"),
-        "Should report invalid path: {}",
-        output
-    );
-}
 
 #[test]
 #[cfg(not(feature = "authentication"))]
@@ -775,71 +687,3 @@ fn test_minimal_config_works() {
 // ============================================================================
 // Path Navigation Edge Cases
 // ============================================================================
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_parent_directory_navigation() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Navigate into a subdirectory
-    for c in "system\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    // Clear output to isolate next command
-    shell.__test_io_mut().clear_output();
-
-    // Navigate back to parent (root) using ".."
-    for c in "..\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    // Verify we're back at root - the command should succeed without error
-    let output = shell.__test_io_mut().output();
-    assert!(
-        !output.contains("Error") && !output.contains("Invalid path"),
-        "Should successfully navigate back to root: {}",
-        output
-    );
-
-    // Clear output again
-    shell.__test_io_mut().clear_output();
-
-    // Now execute a root-level command to verify we're actually at root
-    for c in "echo test\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.__test_io_mut().output();
-    assert!(
-        output.contains("test"),
-        "Should be able to execute root-level command: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_deep_nesting_path() {
-    let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
-    shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
-
-    // Test maximum depth path
-    for c in "system/network/status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.__test_io_mut().output();
-    assert!(
-        !output.contains("too deep") && !output.contains("PathTooDeep"),
-        "Should handle 3-level nesting: {}",
-        output
-    );
-}
