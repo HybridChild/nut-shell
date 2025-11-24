@@ -52,22 +52,22 @@ pub trait ShellConfig {
     // Message constants for user-visible strings
     // All stored in ROM, zero runtime cost
 
-    /// Welcome message shown on activation (default: "Welcome to nut-shell!\r\n")
+    /// Welcome message shown on activation
     const MSG_WELCOME: &'static str;
 
-    /// Login prompt (default: "Login (username:password): ")
+    /// Login prompt
     const MSG_LOGIN_PROMPT: &'static str;
 
-    /// Login success message (default: "Login successful!\r\n")
+    /// Login success message
     const MSG_LOGIN_SUCCESS: &'static str;
 
-    /// Login failed message (default: "Login failed. Try again.\r\n")
+    /// Login failed message
     const MSG_LOGIN_FAILED: &'static str;
 
-    /// Logout message (default: "Logged out.\r\n")
+    /// Logout message
     const MSG_LOGOUT: &'static str;
 
-    /// Invalid login format message (default: "Invalid format. Use username:password\r\n")
+    /// Invalid login format message
     const MSG_INVALID_LOGIN_FORMAT: &'static str;
 }
 
@@ -92,8 +92,8 @@ impl ShellConfig for DefaultConfig {
     const HISTORY_SIZE: usize = 10;
 
     const MSG_WELCOME: &'static str = "Welcome to nut-shell!\r\n";
-    const MSG_LOGIN_PROMPT: &'static str = "Login. Type <username>:<password>: ";
-    const MSG_LOGIN_SUCCESS: &'static str = "Login succesful! Type '?' for help.\r\n";
+    const MSG_LOGIN_PROMPT: &'static str = "Login> ";
+    const MSG_LOGIN_SUCCESS: &'static str = "Logged in. Type '?' for help.\r\n";
     const MSG_LOGIN_FAILED: &'static str = "Login failed. Try again.\r\n";
     const MSG_LOGOUT: &'static str = "Logged out.\r\n";
     const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use <username>:<password>\r\n";
@@ -120,7 +120,7 @@ impl ShellConfig for MinimalConfig {
     const HISTORY_SIZE: usize = 5;
 
     const MSG_WELCOME: &'static str = "Welcome!\r\n";
-    const MSG_LOGIN_PROMPT: &'static str = "Login: ";
+    const MSG_LOGIN_PROMPT: &'static str = "Login> ";
     const MSG_LOGIN_SUCCESS: &'static str = "Logged in.\r\n";
     const MSG_LOGIN_FAILED: &'static str = "Login failed.\r\n";
     const MSG_LOGOUT: &'static str = "Logged out.\r\n";

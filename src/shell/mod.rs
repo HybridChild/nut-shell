@@ -565,7 +565,7 @@ where
     #[cfg(feature = "authentication")]
     fn handle_login_input(&mut self, input: &str) -> Result<(), IO::Error> {
         // Login doesn't support inline mode - always add newline
-        self.io.write_str("\r\n")?;
+        self.io.write_str("\r\n  ")?;
 
         if input.contains(':') {
             // Format: username:password
@@ -639,7 +639,7 @@ where
             }
             #[cfg(feature = "authentication")]
             "logout" => {
-                self.io.write_str("\r\n")?;
+                self.io.write_str("\r\n  ")?;
                 self.current_user = None;
                 self.state = CliState::LoggedOut;
                 self.current_path.clear();
