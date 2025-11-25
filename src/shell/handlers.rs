@@ -65,7 +65,17 @@ pub trait CommandHandlers<C: ShellConfig> {
     /// - `Ok(Response)`: Command executed successfully
     /// - `Err(CliError::CommandNotFound)`: Command ID not recognized
     /// - `Err(CliError)`: Other execution error
+    ///
+    /// # Implementation Note
+    ///
+    /// This uses `async fn` in trait without Send bounds to support both:
+    /// - Single-threaded embedded executors (Embassy) where Send isn't required
+    /// - Multi-threaded native executors (Tokio) where implementations can be Send
+    ///
+    /// Users needing Send bounds for multi-threaded spawning can verify this
+    /// at the call site.
     #[cfg(feature = "async")]
+    #[allow(async_fn_in_trait)]
     async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 }
 
