@@ -31,8 +31,8 @@ name = "basic"
 path = "bin/basic/main.rs"
 
 [[bin]]
-name = "async_example"
-path = "bin/async_example/main.rs"
+name = "async"
+path = "bin/async/main.rs"
 required-features = ["async"]
 
 [profile.release]

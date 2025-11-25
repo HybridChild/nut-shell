@@ -3,6 +3,7 @@
 Examples demonstrating **nut-shell** CLI framework on native platforms (Linux, macOS, Windows).
 
 - **[basic](#basic)** - Complete interactive command-line interface demonstrating all features including authentication, command navigation, history, and tab completion.
+- **[async](#async)** - Async command execution using Tokio runtime, demonstrating how to integrate async operations into your CLI.
 
 ## Building and Running
 
@@ -16,13 +17,21 @@ Examples demonstrating **nut-shell** CLI framework on native platforms (Linux, m
 From the `examples/native` directory:
 
 ```bash
+# Build basic example
 cargo build --release --bin basic
+
+# Build async example
+cargo build --release --bin async --features async
 ```
 
 ### Run
 
 ```bash
+# Run basic example
 cargo run --release --bin basic
+
+# Run async example
+cargo run --release --bin async --features async
 ```
 
 ## Examples
@@ -176,6 +185,120 @@ System uptime: 42 hours, 13 minutes
 admin@/>
 ```
 
+### async
+
+An async example demonstrating how to use nut-shell with asynchronous command execution using the Tokio runtime.
+
+**Features:**
+- Tokio async runtime integration
+- Async command execution with `process_char_async()`
+- Mix of sync and async commands in the same shell
+- Async delays, simulated HTTP fetches, and computations
+- Full authentication, history, and completion support
+
+**Commands Available:**
+
+```
+/
+├── system/
+│   ├── reboot   - Reboot the system (Admin)
+│   └── info     - Show system information (Guest)
+├── async/
+│   ├── delay <seconds>  - Async delay for N seconds (Guest)
+│   ├── fetch <url>      - Simulate async HTTP fetch (User)
+│   └── compute          - Simulate async computation (User)
+└── echo [args...]       - Echo arguments back (Guest)
+
+Global:
+  ?      - Show help
+  ls     - List directory contents
+  clear  - Clear screen
+  logout - End session (returns to login)
+```
+
+**Authentication:**
+
+When built with authentication feature (default):
+- **admin:admin123** (Admin access)
+- **user:user123** (User access)
+- **guest:guest123** (Guest access)
+
+**What you'll learn:**
+- How to use `process_char_async()` for async command execution
+- How to mix sync and async commands in the same shell
+- How to implement async commands with `CommandKind::Async`
+- How to integrate Tokio runtime with nut-shell
+- Async command patterns for I/O operations and delays
+
+**Async Command Implementation:**
+
+Commands are marked as `CommandKind::Async` and implemented in the `execute_async()` trait method:
+
+```rust
+const CMD_DELAY: CommandMeta<ExampleAccessLevel> = CommandMeta {
+    id: "async_delay",
+    name: "delay",
+    description: "Async delay for N seconds",
+    kind: CommandKind::Async,  // Mark as async
+    min_args: 1,
+    max_args: 1,
+    // ... other fields
+};
+
+impl CommandHandlers<DefaultConfig> for AsyncHandlers {
+    async fn execute_async(&self, id: &str, args: &[&str])
+        -> Result<Response<DefaultConfig>, CliError>
+    {
+        match id {
+            "async_delay" => {
+                let seconds = args[0].parse::<u64>()?;
+                sleep(Duration::from_secs(seconds)).await;
+                Ok(Response::success("Delay completed"))
+            }
+            // ... other async commands
+        }
+    }
+}
+```
+
+**Run:**
+
+```bash
+cargo run --release --bin async --features async,authentication,completion,history
+```
+
+**Expected Output:**
+
+```
+nut-shell Async Example
+=======================
+This example demonstrates async command execution using Tokio.
+
+Authentication enabled. Available credentials:
+  admin:admin123  (Admin access)
+  user:user123    (User access)
+  guest:guest123  (Guest access)
+
+Try these async commands in the 'async' directory:
+  cd async
+  delay 3       - Async delay for 3 seconds
+  fetch http://example.com - Simulated async HTTP fetch
+  compute       - Simulated async computation
+
+Type '?' for help, 'logout' to exit (with auth), or Ctrl+C to quit.
+
+Login (username:password): user:user123
+user@/> cd async
+user@/async> delay 3
+Delayed for 3 second(s)
+user@/async> fetch http://example.com
+Fetching 'http://example.com'...
+Response: 200 OK
+Content-Length: 1234
+Fetch completed successfully!
+user@/async>
+```
+
 ## Building with Different Feature Combinations
 
 The native examples support flexible feature configurations:
@@ -183,10 +306,15 @@ The native examples support flexible feature configurations:
 ### All Features (Default)
 
 ```bash
+# Basic example
 cargo run --release --bin basic
+
+# Async example
+cargo run --release --bin async --features async
 ```
 
-Features enabled: authentication, completion, history
+Basic features enabled: authentication, completion, history
+Async features enabled: async, authentication, completion, history
 
 ### Without Authentication
 

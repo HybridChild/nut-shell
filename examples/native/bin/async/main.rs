@@ -1,16 +1,12 @@
-//! Basic example demonstrating nut-shell usage on native platform
+//! Native async example demonstrating nut-shell with Tokio runtime
 //!
-//! This example creates a simple CLI with command tree navigation,
-//! and various commands demonstrating different features.
+//! This example showcases async command execution using Tokio as the async runtime.
+//! It demonstrates how to use `process_char_async()` and implement async commands
+//! that can perform I/O operations, delays, and other async work.
 //!
-//! To run with all features (authentication, completion, history):
+//! To run:
 //! ```bash
-//! cargo run --example basic --features authentication,completion,history
-//! ```
-//!
-//! To run without authentication:
-//! ```bash
-//! cargo run --example basic --features completion,history
+//! cargo run --bin async --features async,authentication,completion,history
 //! ```
 //!
 //! Default credentials (when authentication enabled):
@@ -21,7 +17,7 @@
 mod handlers;
 mod tree;
 
-use handlers::ExampleHandlers;
+use handlers::AsyncHandlers;
 use native_examples::{ExampleAccessLevel, RawModeGuard, StdioCharIo};
 #[cfg(feature = "authentication")]
 use native_examples::ExampleCredentialProvider;
@@ -29,9 +25,12 @@ use nut_shell::{config::DefaultConfig, shell::Shell};
 use std::io::{self as stdio, Read};
 use tree::ROOT;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("nut-shell Basic Example");
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("nut-shell Async Example");
     println!("=======================\n");
+    println!("This example demonstrates async command execution using Tokio.");
+    println!();
 
     #[cfg(feature = "authentication")]
     {
@@ -48,63 +47,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!();
     }
 
+    println!("Try these async commands in the 'async' directory:");
+    println!("  cd async");
+    println!("  delay 3       - Async delay for 3 seconds");
+    println!("  fetch http://example.com - Simulated async HTTP fetch");
+    println!("  compute       - Simulated async computation");
+    println!();
     println!("Type '?' for help, 'logout' to exit (with auth), or Ctrl+C to quit.\n");
 
-    // Enable raw terminal mode to resemble embedded target behavior:
-    // - No local echo (shell controls all echoing for password masking)
-    // - No line buffering (process characters immediately)
-    // - No special key processing by terminal (Tab, arrows passed to shell)
+    // Enable raw terminal mode
     let _raw_mode_guard = RawModeGuard::new()?;
 
     // Create I/O
     let io = StdioCharIo::new();
 
     // Create handlers
-    let handlers = ExampleHandlers;
+    let handlers = AsyncHandlers;
 
     // Create shell (different constructors based on authentication feature)
     #[cfg(feature = "authentication")]
     let provider = ExampleCredentialProvider::new();
     #[cfg(feature = "authentication")]
-    let mut shell: Shell<ExampleAccessLevel, StdioCharIo, ExampleHandlers, DefaultConfig> =
+    let mut shell: Shell<ExampleAccessLevel, StdioCharIo, AsyncHandlers, DefaultConfig> =
         Shell::new(&ROOT, handlers, &provider, io);
 
     #[cfg(not(feature = "authentication"))]
-    let mut shell: Shell<ExampleAccessLevel, StdioCharIo, ExampleHandlers, DefaultConfig> =
+    let mut shell: Shell<ExampleAccessLevel, StdioCharIo, AsyncHandlers, DefaultConfig> =
         Shell::new(&ROOT, handlers, io);
 
     // Activate shell (shows welcome message and prompt)
     shell.activate()?;
 
-    // Main loop - read characters and feed to shell
-    // This pattern resembles embedded target usage:
-    // - Embedded: Poll UART RX buffer for characters
-    // - Native: Poll stdin for characters
-    // - Both: Feed characters to shell.process_char() one at a time
-    // - Shell controls all output (including echo and password masking)
+    // Main loop - read characters and feed to shell using async processing
     let stdin = stdio::stdin();
     let mut stdin_handle = stdin.lock();
 
     loop {
-        // Read one character at a time (like polling UART on embedded target)
+        // Read one character at a time
         let mut buf = [0u8; 1];
         match stdin_handle.read(&mut buf) {
             Ok(0) => break, // EOF (Ctrl+D on Unix)
             Ok(_) => {
-                // In raw mode, Ctrl+C becomes character 0x03 instead of sending SIGINT.
-                // For this native example, we detect it and exit gracefully.
-                // On embedded targets, you might:
-                // - Ignore Ctrl+C entirely (no concept of "interrupt")
-                // - Use it as a special command (e.g., abort current operation)
-                // - Implement different exit mechanisms (reset button, watchdog, etc.)
+                // Handle Ctrl+C gracefully
                 if buf[0] == 0x03 {
-                    println!("\r\n"); // Move to new line before exit
+                    println!("\r\n");
                     break;
                 }
 
                 let c = buf[0] as char;
-                // Feed character to shell (shell controls echoing)
-                shell.process_char(c)?;
+
+                // Process character asynchronously
+                // This allows async commands to run without blocking the shell
+                shell.process_char_async(c).await.ok();
             }
             Err(e) => {
                 // Restore terminal before printing error
