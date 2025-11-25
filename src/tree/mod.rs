@@ -27,7 +27,7 @@ pub enum CommandKind {
 /// Command metadata (const-initializable, no execution logic).
 ///
 /// Stores only metadata about the command. Execution logic is provided separately
-/// via the `CommandHandlers` trait. This enables both sync and async commands while
+/// via the `CommandHandler` trait. This enables both sync and async commands while
 /// maintaining const-initialization.
 ///
 /// The `id` field uniquely identifies the command for handler dispatch, allowing

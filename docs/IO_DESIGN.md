@@ -144,7 +144,7 @@ impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,
     IO: CharIo,
-    H: CommandHandlers<C>,
+    H: CommandHandler<C>,
     C: ShellConfig,
 {
     pub fn process_char(&mut self, c: char) -> Result<(), IO::Error> {

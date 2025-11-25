@@ -64,7 +64,7 @@ use nut_shell::{
     config::DefaultConfig,
     io::CharIo,
     response::Response,
-    shell::{Shell, handlers::CommandHandlers},
+    shell::{Shell, handlers::CommandHandler},
     tree::{CommandKind, CommandMeta, Directory, Node},
 };
 
@@ -158,7 +158,7 @@ enum LedCommand {
     Off,
 }
 
-impl CommandHandlers<DefaultConfig> for PicoHandlers {
+impl CommandHandler<DefaultConfig> for PicoHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
             "led" => {

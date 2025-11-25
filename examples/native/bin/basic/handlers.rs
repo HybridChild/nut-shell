@@ -2,12 +2,12 @@
 
 use core::fmt::Write;
 use nut_shell::{
-    config::DefaultConfig, response::Response, shell::handlers::CommandHandlers, CliError,
+    config::DefaultConfig, response::Response, shell::handlers::CommandHandler, CliError,
 };
 
 pub struct ExampleHandlers;
 
-impl CommandHandlers<DefaultConfig> for ExampleHandlers {
+impl CommandHandler<DefaultConfig> for ExampleHandlers {
     fn execute_sync(
         &self,
         id: &str,

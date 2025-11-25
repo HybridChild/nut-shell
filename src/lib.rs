@@ -14,7 +14,7 @@
 //! ## Quick Start
 //!
 //! ```rust,ignore
-//! use nut_shell::{Shell, Directory, Node, CommandMeta, CommandHandlers, Response, DefaultConfig};
+//! use nut_shell::{Shell, Directory, Node, CommandMeta, CommandHandler, Response, DefaultConfig};
 //!
 //! // 1. Define command tree (const, lives in ROM)
 //! const ROOT: Directory<MyAccessLevel> = Directory {
@@ -25,7 +25,7 @@
 //!
 //! // 2. Implement command handlers
 //! struct MyHandlers;
-//! impl CommandHandlers<DefaultConfig> for MyHandlers {
+//! impl CommandHandler<DefaultConfig> for MyHandlers {
 //!     fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
 //!         // Command implementation
 //!     }
@@ -121,7 +121,7 @@ pub use auth::{AccessLevel, User};
 pub use response::Response;
 
 // Shell types (Phase 6+)
-pub use shell::handlers::CommandHandlers;
+pub use shell::handlers::CommandHandler;
 pub use shell::{CliState, HistoryDirection, Request, Shell};
 
 // Optional feature re-exports (authentication-only types)

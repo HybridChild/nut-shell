@@ -22,7 +22,7 @@ use nut_shell::auth::{AccessLevel, User};
 use nut_shell::config::{DefaultConfig, MinimalConfig, ShellConfig};
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
-use nut_shell::shell::handlers::CommandHandlers;
+use nut_shell::shell::handlers::CommandHandler;
 use nut_shell::shell::{CliState, HistoryDirection, Request};
 use nut_shell::tree::path::Path;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
@@ -116,7 +116,7 @@ fn test_all_types_instantiate_with_default_config() {
         assert_eq!(path.as_str(), "system/status");
     }
 
-    // CommandHandlers trait
+    // CommandHandler trait
     let handlers = MockHandlers;
     let result = handlers.execute_sync("echo", &["hello", "world"]);
     assert!(result.is_ok());

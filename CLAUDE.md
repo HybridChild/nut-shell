@@ -39,13 +39,13 @@ The library is now complete and production-ready. When contributing:
 
 ### Adding a New Command
 
-**Pattern:** Metadata/execution separation (CommandMeta + CommandHandlers trait)
+**Pattern:** Metadata/execution separation (CommandMeta + CommandHandler trait)
 
 **Steps:**
 1. Define command function: `fn cmd<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError>`
 2. Create const metadata: `CommandMeta { id, name, access_level, kind: Sync/Async, ... }`
 3. Add to tree: `Node::Command(&CMD)` in directory's children
-4. Implement handler: Map command ID to function in `CommandHandlers::execute_sync/async()`
+4. Implement handler: Map command ID to function in `CommandHandler::execute_sync/async()`
 
 **Key points:**
 - Unique `id` field for dispatch (allows duplicate display names in different dirs)
@@ -97,12 +97,12 @@ pub fn do_something() -> Result<Vec<&str, 32>> { Ok(Vec::new()) }  // No-op stub
 
 **See [docs/DESIGN.md](docs/DESIGN.md) "Feature Gating & Optional Features" for complete patterns, variations, and examples.**
 
-### Implementing CommandHandlers Trait
+### Implementing CommandHandler Trait
 
 Maps command IDs to functions. Generic over `ShellConfig` for buffer size matching.
 
 ```rust
-impl CommandHandlers<MyConfig> for MyHandlers {
+impl CommandHandler<MyConfig> for MyHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
             "reboot" => reboot_fn::<MyConfig>(args),
@@ -300,7 +300,7 @@ pub struct CommandMeta<L: AccessLevel> {
 }
 
 // Execution logic (user-implemented trait, generic over config)
-pub trait CommandHandlers<C: ShellConfig> {
+pub trait CommandHandler<C: ShellConfig> {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     #[cfg(feature = "async")]
@@ -310,7 +310,7 @@ pub trait CommandHandlers<C: ShellConfig> {
 // Shell is generic over handlers and config
 pub struct Shell<'tree, L, IO, H, C>
 where
-    H: CommandHandlers<C>,
+    H: CommandHandler<C>,
     C: ShellConfig,
 {
     handlers: H,
@@ -334,7 +334,7 @@ where
 pub struct Shell<'tree, L, IO, H, C> {
     current_user: Option<User<L>>,  // Always present (not feature-gated)
     state: CliState,                // Always present (not feature-gated)
-    handlers: H,                    // Generic over CommandHandlers<C>
+    handlers: H,                    // Generic over CommandHandler<C>
 
     #[cfg(feature = "authentication")]
     credential_provider: &'tree dyn CredentialProvider<L>,  // Only this field is conditional
@@ -410,7 +410,7 @@ enum Node<L: AccessLevel> {
 - **Zero-cost dispatch**: Pattern matching instead of vtable
 - **Const-friendly**: Can initialize at compile time
 - **ROM placement**: Entire tree lives in flash
-- **Metadata-only**: Execution logic separate (via CommandHandlers trait)
+- **Metadata-only**: Execution logic separate (via CommandHandler trait)
 
 ### Shell Generics
 ```rust
@@ -418,7 +418,7 @@ Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,    // User-defined access hierarchy
     IO: CharIo,        // Platform-specific I/O
-    H: CommandHandlers<C>, // Command execution (sync/async dispatch)
+    H: CommandHandler<C>, // Command execution (sync/async dispatch)
     C: ShellConfig,    // Buffer sizes and capacity limits
 ```
 - **Monomorphization**: Compiler generates specialized code per type
@@ -598,7 +598,7 @@ Use proper formatting when referring to code:
 - **`AccessLevel`** - Trait type (CamelCase) vs "access level" - concept (lowercase)
 - **`no_std`** - Feature name (with backticks, even in prose, not "no-std")
 - **`CommandMeta`** - Struct name (CamelCase)
-- **`CommandHandlers`** - Trait name (CamelCase)
+- **`CommandHandler`** - Trait name (CamelCase)
 
 ### Project Names
 - **"nut-shell"** - Project/library name (kebab-case)

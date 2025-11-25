@@ -26,7 +26,7 @@ This document provides practical examples, configuration guidance, and tutorials
 
 ```rust
 use nut_shell::{
-    Shell, CharIo, CommandHandlers, Response, CliError,
+    Shell, CharIo, CommandHandler, Response, CliError,
     AccessLevel, CommandMeta, CommandKind, Directory, Node, DefaultConfig
 };
 
@@ -57,7 +57,7 @@ impl AccessLevel for MyAccessLevel {
 // Define command handlers
 struct MyHandlers;
 
-impl CommandHandlers<DefaultConfig> for MyHandlers {
+impl CommandHandler<DefaultConfig> for MyHandlers {
     fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match name {
             "hello" => Ok(Response::success("Hello, World!")),
@@ -425,7 +425,7 @@ const HTTP_GET: CommandMeta<MyAccessLevel> = CommandMeta {
 };
 
 // Dispatch in handler
-impl CommandHandlers<DefaultConfig> for MyHandlers {
+impl CommandHandler<DefaultConfig> for MyHandlers {
     fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         // ... sync commands
         Err(CliError::CommandNotFound)
@@ -452,14 +452,14 @@ loop {
 ### Pattern: Stateful Handlers
 
 ```rust
-use nut_shell::{DefaultConfig, CommandHandlers, Response};
+use nut_shell::{DefaultConfig, CommandHandler, Response};
 
 struct MyHandlers<'a> {
     system_state: &'a SystemState,
     config: &'a Config,
 }
 
-impl<'a> CommandHandlers<DefaultConfig> for MyHandlers<'a> {
+impl<'a> CommandHandler<DefaultConfig> for MyHandlers<'a> {
     fn execute_sync(&self, name: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match name {
             "status" => {

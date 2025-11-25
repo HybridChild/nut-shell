@@ -1,6 +1,6 @@
 //! Command handler trait for executing commands.
 //!
-//! The `CommandHandlers` trait maps command IDs to execution functions,
+//! The `CommandHandler` trait maps command IDs to execution functions,
 //! implementing the execution side of the metadata/execution separation pattern.
 //!
 //! See [DESIGN.md](../../docs/DESIGN.md) section 1 for complete pattern explanation.
@@ -18,7 +18,7 @@ use crate::response::Response;
 ///
 /// Commands use metadata/execution separation:
 /// - `CommandMeta` stores const metadata (id, name, args, access level)
-/// - `CommandHandlers` provides execution logic (this trait)
+/// - `CommandHandler` provides execution logic (this trait)
 ///
 /// The handler dispatches on the unique command ID, not the display name.
 /// This allows multiple commands with the same name in different directories.
@@ -28,7 +28,7 @@ use crate::response::Response;
 /// ```rust,ignore
 /// struct MyHandlers;
 ///
-/// impl CommandHandlers<DefaultConfig> for MyHandlers {
+/// impl CommandHandler<DefaultConfig> for MyHandlers {
 ///     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
 ///         match id {
 ///             "system_reboot" => reboot_fn(args),
@@ -38,7 +38,7 @@ use crate::response::Response;
 ///     }
 /// }
 /// ```
-pub trait CommandHandlers<C: ShellConfig> {
+pub trait CommandHandler<C: ShellConfig> {
     /// Execute synchronous command by unique ID.
     ///
     /// # Arguments
@@ -87,7 +87,7 @@ mod tests {
     // Mock handler for testing
     struct TestHandlers;
 
-    impl CommandHandlers<DefaultConfig> for TestHandlers {
+    impl CommandHandler<DefaultConfig> for TestHandlers {
         fn execute_sync(
             &self,
             id: &str,

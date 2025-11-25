@@ -60,8 +60,8 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for rationale.
 const REBOOT: CommandMeta<Level> = CommandMeta { /* ... */ };
 const ROOT: Directory<Level> = Directory { /* ... */ };
 
-// 2. Implement CommandHandlers trait
-impl CommandHandlers<MyConfig> for MyHandlers {
+// 2. Implement CommandHandler trait
+impl CommandHandler<MyConfig> for MyHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id { "reboot" => reboot_fn::<MyConfig>(args), _ => Err(CliError::CommandNotFound) }
     }

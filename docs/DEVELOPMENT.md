@@ -235,7 +235,7 @@ nut-shell/
 │   │   └── completion.rs   # Tab completion (feature-gated)
 │   └── shell/              # Shell orchestration module
 │       ├── mod.rs          # Shell struct, core methods
-│       ├── handlers.rs     # CommandHandlers trait
+│       ├── handlers.rs     # CommandHandler trait
 │       ├── parser.rs       # InputParser, ParseEvent
 │       └── history.rs      # CommandHistory (feature-gated)
 ├── tests/

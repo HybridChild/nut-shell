@@ -245,7 +245,7 @@ const CMD_DELAY: CommandMeta<ExampleAccessLevel> = CommandMeta {
     // ... other fields
 };
 
-impl CommandHandlers<DefaultConfig> for AsyncHandlers {
+impl CommandHandler<DefaultConfig> for AsyncHandlers {
     async fn execute_async(&self, id: &str, args: &[&str])
         -> Result<Response<DefaultConfig>, CliError>
     {

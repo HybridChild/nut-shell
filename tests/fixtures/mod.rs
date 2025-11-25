@@ -13,7 +13,7 @@ use nut_shell::auth::AccessLevel;
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
-use nut_shell::shell::handlers::CommandHandlers;
+use nut_shell::shell::handlers::CommandHandler;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 use std::collections::VecDeque;
 
@@ -475,11 +475,11 @@ pub const TEST_TREE: Directory<MockAccessLevel> = Directory {
 /// Mock command handlers for testing the metadata/execution separation pattern.
 ///
 /// Implements the execution side of the pattern, mapping command IDs to functions.
-/// This validates that CommandMeta (const metadata) and CommandHandlers (runtime execution)
+/// This validates that CommandMeta (const metadata) and CommandHandler (runtime execution)
 /// work together correctly.
 pub struct MockHandlers;
 
-impl CommandHandlers<DefaultConfig> for MockHandlers {
+impl CommandHandler<DefaultConfig> for MockHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
             // Root commands

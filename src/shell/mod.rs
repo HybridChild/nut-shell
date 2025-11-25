@@ -19,7 +19,7 @@ pub mod history;
 
 // Re-export key types
 pub use decoder::{InputDecoder, InputEvent};
-pub use handlers::CommandHandlers;
+pub use handlers::CommandHandler;
 pub use history::CommandHistory;
 
 /// History navigation direction.
@@ -112,7 +112,7 @@ pub enum Request<C: ShellConfig> {
 /// - `'tree`: Lifetime of command tree (typically 'static)
 /// - `L`: AccessLevel implementation
 /// - `IO`: CharIo implementation
-/// - `H`: CommandHandlers implementation
+/// - `H`: CommandHandler implementation
 /// - `C`: ShellConfig implementation
 ///
 /// See [DESIGN.md](../../docs/DESIGN.md) for unified architecture pattern.
@@ -120,7 +120,7 @@ pub struct Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,
     IO: CharIo,
-    H: CommandHandlers<C>,
+    H: CommandHandler<C>,
     C: ShellConfig,
 {
     /// Command tree root
@@ -167,7 +167,7 @@ impl<'tree, L, IO, H, C> core::fmt::Debug for Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,
     IO: CharIo,
-    H: CommandHandlers<C>,
+    H: CommandHandler<C>,
     C: ShellConfig,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -199,7 +199,7 @@ impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,
     IO: CharIo,
-    H: CommandHandlers<C>,
+    H: CommandHandler<C>,
     C: ShellConfig,
 {
     /// Create new Shell with credential provider for when authentication enabled.
@@ -232,7 +232,7 @@ impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,
     IO: CharIo,
-    H: CommandHandlers<C>,
+    H: CommandHandler<C>,
     C: ShellConfig,
 {
     /// Create new Shell
@@ -262,7 +262,7 @@ impl<'tree, L, IO, H, C> Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,
     IO: CharIo,
-    H: CommandHandlers<C>,
+    H: CommandHandler<C>,
     C: ShellConfig,
 {
     /// Activate the shell (show welcome message and initial prompt).
@@ -1405,7 +1405,7 @@ mod tests {
 
     // Mock handlers
     struct MockHandlers;
-    impl CommandHandlers<DefaultConfig> for MockHandlers {
+    impl CommandHandler<DefaultConfig> for MockHandlers {
         fn execute_sync(
             &self,
             _id: &str,

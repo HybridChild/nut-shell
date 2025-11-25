@@ -13,7 +13,7 @@ use fixtures::{MockAccessLevel, MockHandlers, TEST_TREE};
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
-use nut_shell::shell::handlers::CommandHandlers;
+use nut_shell::shell::handlers::CommandHandler;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 
 // ============================================================================
@@ -82,10 +82,10 @@ fn test_const_tree_initialization() {
 
 #[test]
 fn test_handlers_implementation_exists() {
-    // Validates that MockHandlers implements CommandHandlers trait
+    // Validates that MockHandlers implements CommandHandler trait
     let handlers = MockHandlers;
 
-    // CommandHandlers is not dyn compatible due to async method,
+    // CommandHandler is not dyn compatible due to async method,
     // but we can verify the implementation exists
     let _result = handlers.execute_sync("help", &[]);
 }
@@ -239,7 +239,7 @@ fn test_async_trait_method_compiles() {
     let _handlers = MockHandlers;
 
     // If we got here, the async trait method compiled successfully
-    // (CommandHandlers is not dyn compatible due to async method, but that's expected)
+    // (CommandHandler is not dyn compatible due to async method, but that's expected)
 }
 
 // ============================================================================
@@ -551,7 +551,7 @@ fn test_tree_can_navigate_full_paths() {
 /// 1. ✅ CommandMeta is const-initializable (no function pointers)
 /// 2. ✅ Directory and Node types are const-initializable
 /// 3. ✅ TEST_TREE lives in ROM with zero runtime initialization
-/// 4. ✅ CommandHandlers trait compiles with both sync and async methods
+/// 4. ✅ CommandHandler trait compiles with both sync and async methods
 /// 5. ✅ MockHandlers proves metadata/execution separation pattern works
 /// 6. ✅ Sync commands execute correctly through handlers
 /// 7. ✅ Async commands compile and execute when feature enabled

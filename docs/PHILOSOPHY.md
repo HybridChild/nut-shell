@@ -23,7 +23,7 @@ These features define what a CLI is and are non-negotiable:
 
 **Why:** Without these, it's not a functional CLI. These are the minimal primitives.
 
-**Note:** The metadata/execution separation pattern enables natural async command support (via `process_char_async()` and `CommandHandlers` trait) without compromising const-initialization or adding heap dependencies.
+**Note:** The metadata/execution separation pattern enables natural async command support (via `process_char_async()` and `CommandHandler` trait) without compromising const-initialization or adding heap dependencies.
 
 ---
 

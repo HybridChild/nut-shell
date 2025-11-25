@@ -353,7 +353,7 @@ Authentication can be disabled via Cargo features for unsecured development envi
 
 1. **InvalidPath Error Hiding**: When access is denied, the system returns `CliError::InvalidPath` (same as non-existent paths) to prevent revealing the existence of restricted commands to unauthorized users.
 
-2. **Handler Dispatch Security**: Access control checks occur BEFORE dispatching to `CommandHandlers`. Handlers receive only pre-validated, accessible commands, centralizing security in Shell rather than distributing it across handler implementations.
+2. **Handler Dispatch Security**: Access control checks occur BEFORE dispatching to `CommandHandler`. Handlers receive only pre-validated, accessible commands, centralizing security in Shell rather than distributing it across handler implementations.
 
 3. **Build Configuration:**
    ```bash
@@ -385,7 +385,7 @@ See [DESIGN.md](DESIGN.md) for feature gating patterns and architectural details
 ### Access Control Enforcement
 - Check access level at every path segment during tree traversal
 - Return `CliError::InvalidPath` for both nonexistent and inaccessible nodes
-- Verify access before dispatching to CommandHandlers
+- Verify access before dispatching to CommandHandler
 
 ---
 

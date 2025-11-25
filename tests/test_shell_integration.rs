@@ -779,12 +779,12 @@ fn test_minimal_config_works() {
     use nut_shell::Response;
     use nut_shell::config::MinimalConfig;
     use nut_shell::error::CliError;
-    use nut_shell::shell::handlers::CommandHandlers;
+    use nut_shell::shell::handlers::CommandHandler;
 
     // Implement handlers for MinimalConfig
     struct MinimalHandlers;
 
-    impl CommandHandlers<MinimalConfig> for MinimalHandlers {
+    impl CommandHandler<MinimalConfig> for MinimalHandlers {
         fn execute_sync(
             &self,
             name: &str,

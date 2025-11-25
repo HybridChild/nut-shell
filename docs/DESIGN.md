@@ -47,7 +47,7 @@ Path-based syntax optimized for embedded systems with minimal parsing overhead (
 
 **Rationale**: Solves the async command type system problem while maintaining const-initialization:
 - Command metadata (`CommandMeta`) is const-initializable and stored in ROM
-- Execution logic provided via `CommandHandlers` trait (user-implemented)
+- Execution logic provided via `CommandHandler` trait (user-implemented)
 - Trait methods can be async without heap allocation
 - Zero-cost for sync-only builds via monomorphization
 - Single codebase supports both sync and async commands
@@ -66,7 +66,7 @@ pub struct CommandMeta<L: AccessLevel> {
 }
 
 // Execution logic (generic trait)
-pub trait CommandHandlers<C: ShellConfig> {
+pub trait CommandHandler<C: ShellConfig> {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     #[cfg(feature = "async")]
@@ -76,7 +76,7 @@ pub trait CommandHandlers<C: ShellConfig> {
 // Shell generic over handlers and config
 pub struct Shell<'tree, L, IO, H, C>
 where
-    H: CommandHandlers<C>,
+    H: CommandHandler<C>,
     C: ShellConfig,
 { ... }
 ```
@@ -93,7 +93,7 @@ where
 ```rust
 struct BareMetalHandlers;
 
-impl<C: ShellConfig> CommandHandlers<C> for BareMetalHandlers {
+impl<C: ShellConfig> CommandHandler<C> for BareMetalHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match id {
             "reboot" => reboot_fn::<C>(args),
@@ -115,7 +115,7 @@ loop {
 ```rust
 struct EmbassyHandlers;
 
-impl<C: ShellConfig> CommandHandlers<C> for EmbassyHandlers {
+impl<C: ShellConfig> CommandHandler<C> for EmbassyHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match id {
             "reboot" => reboot_fn::<C>(args),
@@ -172,7 +172,7 @@ async fn shell_task(usb: UsbDevice) {
   → Explicit dispatch is debuggable and type-safe
 
 ✅ **Additional generic parameters** - `Shell<'tree, L, IO, H, C>`
-  → H: CommandHandlers<C> for command execution
+  → H: CommandHandler<C> for command execution
   → C: ShellConfig for buffer sizes
   → Monomorphization means zero runtime cost
   → Cleaner than alternatives (async traits, heap allocation)
@@ -274,7 +274,7 @@ The ~200-300 byte increase for sync-only builds is acceptable given the improved
 The Rust implementation provides optional features that can be enabled or disabled at compile time to accommodate different deployment scenarios and resource constraints. This allows fine-grained control over code size, dependencies, and functionality.
 
 **Available Optional Features:**
-- **async**: Enable async command execution with `process_char_async()` and `CommandHandlers::execute_async()` (default: disabled, see [Section 1](#1-command-architecture-metadataexecution-separation-pattern) for complete architecture)
+- **async**: Enable async command execution with `process_char_async()` and `CommandHandler::execute_async()` (default: disabled, see [Section 1](#1-command-architecture-metadataexecution-separation-pattern) for complete architecture)
 - **authentication**: User login and access control system (default: enabled)
 - **completion**: Tab completion for commands and paths (default: enabled)
 - **history**: Command history navigation with arrow keys (default: enabled)
@@ -667,7 +667,7 @@ src/
 │   ├── mod.rs          # Shell + Request enum + CliState enum
 │   ├── parser.rs       # InputParser (escape sequences, line editing)
 │   ├── history.rs      # CommandHistory (circular buffer)
-│   └── handlers.rs     # CommandHandlers trait definition
+│   └── handlers.rs     # CommandHandler trait definition
 ├── tree/
 │   ├── mod.rs          # Node enum + Directory + CommandMeta structs
 │   ├── path.rs         # Path type + resolution methods
@@ -691,7 +691,7 @@ src/
 - **Path resolution**: Methods on existing types (tree navigation as core concern)
 - **Tree types**: Combined in tree/mod.rs (related const-init concerns)
 - **Command metadata**: `CommandMeta` in tree/mod.rs (metadata-only, const-init)
-- **Command execution**: `CommandHandlers` trait in shell/handlers.rs (user-implemented)
+- **Command execution**: `CommandHandler` trait in shell/handlers.rs (user-implemented)
 - **Authentication**: Trait-based system in auth/ module (optional, pluggable backends)
 - **Completion**: Free functions in tree/completion.rs (optional, stateless logic)
 
