@@ -48,6 +48,15 @@ path = "bin/embassy_uart_cli/main.rs"
 required-features = ["embassy"]
 
 [features]
+
+default = ["authentication", "completion", "history"]
+
+# Pass features through to nut-shell
+authentication = ["nut-shell/authentication"]
+completion = ["nut-shell/completion"]
+history = ["nut-shell/history"]
+async = ["nut-shell/async"]
+
 # Embassy async support (enables async feature in nut-shell and all embassy dependencies)
 embassy = [
     "nut-shell/async",
