@@ -49,6 +49,8 @@
 //! - `history` - Command history with up/down arrow navigation
 //! - `async` - Async command execution support
 //!
+//! The library also provides a `#[derive(AccessLevel)]` macro that's always available.
+//!
 //! ## no_std Support
 //!
 //! This library is `no_std` by default. Enable the `std` feature for testing only.
@@ -69,6 +71,9 @@ extern crate sha2;
 
 #[cfg(feature = "authentication")]
 extern crate subtle;
+
+// Re-export derive macro (always available)
+pub use nut_shell_macros::AccessLevel;
 
 // ============================================================================
 // Module Declarations

@@ -1,0 +1,18 @@
+[package]
+name = "nut-shell-macros"
+version = "0.1.0"
+edition = "2024"
+authors = ["Esben Dueholm Nørgaard"]
+license = "MIT OR Apache-2.0"
+description = "Procedural macros for nut-shell - a lightweight CLI library for embedded systems"
+repository = "https://github.com/HybridChild/nut-shell"
+keywords = ["embedded", "no-std", "cli", "macros"]
+categories = ["embedded", "no-std", "development-tools::procedural-macro-helpers"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0", features = ["full"] }
+quote = "1.0"
+proc-macro2 = "1.0"

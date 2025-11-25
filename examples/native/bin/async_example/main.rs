@@ -17,8 +17,7 @@
 use core::fmt::Write;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use nut_shell::{
-    CliError,
-    auth::AccessLevel,
+    AccessLevel, CliError,
     config::DefaultConfig,
     io::CharIo,
     response::Response,
@@ -35,30 +34,11 @@ use nut_shell::auth::{PasswordHasher, Sha256Hasher, User};
 // Access Level Definition
 // =============================================================================
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, AccessLevel)]
 pub enum AsyncAccessLevel {
     Guest = 0,
     User = 1,
     Admin = 2,
-}
-
-impl AccessLevel for AsyncAccessLevel {
-    fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "Guest" => Some(Self::Guest),
-            "User" => Some(Self::User),
-            "Admin" => Some(Self::Admin),
-            _ => None,
-        }
-    }
-
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::Guest => "Guest",
-            Self::User => "User",
-            Self::Admin => "Admin",
-        }
-    }
 }
 
 // =============================================================================

@@ -124,15 +124,25 @@ impl CommandHandlers<MyConfig> for MyHandlers {
 
 ### Implementing AccessLevel Trait
 
+**Use the derive macro** (always available):
+
 ```rust
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+use nut_shell::AccessLevel;
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, AccessLevel)]
 pub enum MyAccessLevel {
     Guest = 0,
     User = 1,
     Admin = 2,
 }
+```
 
-impl AccessLevel for MyAccessLevel {
+The macro automatically generates `from_str()` and `as_str()` implementations using variant names as strings.
+
+**Manual implementation** (if you prefer explicit control):
+
+```rust
+impl nut_shell::auth::AccessLevel for MyAccessLevel {
     fn from_str(s: &str) -> Option<Self> {
         match s {
             "Guest" => Some(Self::Guest),
@@ -151,6 +161,8 @@ impl AccessLevel for MyAccessLevel {
     }
 }
 ```
+
+**Note:** The derive macro is **zero-cost** - it generates identical code and has no runtime overhead. Proc-macro dependencies are build-time only with zero impact on binary size.
 
 ### Creating a New CharIo Implementation
 

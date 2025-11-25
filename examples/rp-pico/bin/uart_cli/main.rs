@@ -56,8 +56,7 @@ use rp2040_hal::{
 };
 
 use nut_shell::{
-    CliError,
-    auth::AccessLevel,
+    AccessLevel, CliError,
     config::DefaultConfig,
     io::CharIo,
     response::Response,
@@ -71,27 +70,10 @@ use nut_shell::auth::{PasswordHasher, Sha256Hasher, User};
 // Access Level Definition
 // =============================================================================
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, AccessLevel)]
 pub enum PicoAccessLevel {
     User = 0,
     Admin = 1,
-}
-
-impl AccessLevel for PicoAccessLevel {
-    fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "User" => Some(Self::User),
-            "Admin" => Some(Self::Admin),
-            _ => None,
-        }
-    }
-
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::User => "User",
-            Self::Admin => "Admin",
-        }
-    }
 }
 
 // =============================================================================
