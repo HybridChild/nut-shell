@@ -1,5 +1,15 @@
 //! Shared library code for RP2040 examples
 //!
-//! Currently empty - all example code is in bin/ directories.
+//! This module contains common implementations used across multiple
+//! RP2040 examples to reduce code duplication.
 
 #![no_std]
+
+pub mod access_level;
+#[cfg(feature = "authentication")]
+pub mod credentials;
+
+// Re-export commonly used types for convenience
+pub use access_level::PicoAccessLevel;
+#[cfg(feature = "authentication")]
+pub use credentials::PicoCredentialProvider;

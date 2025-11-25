@@ -43,7 +43,10 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Write;
+mod handlers;
+mod tree;
+
+use core::cell::RefCell;
 use embassy_executor::Spawner;
 use embassy_rp::{
     bind_interrupts,
@@ -60,15 +63,15 @@ use panic_halt as _;
 use static_cell::StaticCell;
 
 use nut_shell::{
-    AccessLevel, CliError,
     config::DefaultConfig,
     io::CharIo,
-    response::Response,
-    shell::{Shell, handlers::CommandHandler},
-    tree::{CommandKind, CommandMeta, Directory, Node},
+    shell::Shell,
 };
 
-use nut_shell::auth::{PasswordHasher, Sha256Hasher, User};
+use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider};
+
+use crate::handlers::{LedCommand, PicoHandlers};
+use crate::tree::ROOT;
 
 // Bind UART interrupt handler
 bind_interrupts!(struct Irqs {
@@ -76,237 +79,8 @@ bind_interrupts!(struct Irqs {
 });
 
 // =============================================================================
-// Access Level Definition
-// =============================================================================
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, AccessLevel)]
-pub enum PicoAccessLevel {
-    User = 0,
-    Admin = 1,
-}
-
-// =============================================================================
-// Command Tree Definition
-// =============================================================================
-
-const CMD_LED: CommandMeta<PicoAccessLevel> = CommandMeta {
-    id: "led",
-    name: "led",
-    description: "Toggle onboard LED",
-    access_level: PicoAccessLevel::User,
-    kind: CommandKind::Sync,
-    min_args: 1,
-    max_args: 1,
-};
-
-const CMD_INFO: CommandMeta<PicoAccessLevel> = CommandMeta {
-    id: "system_info",
-    name: "info",
-    description: "Show device information",
-    access_level: PicoAccessLevel::User,
-    kind: CommandKind::Sync,
-    min_args: 0,
-    max_args: 0,
-};
-
-const CMD_DELAY: CommandMeta<PicoAccessLevel> = CommandMeta {
-    id: "system_delay",
-    name: "delay",
-    description: "Async delay demonstration (seconds)",
-    access_level: PicoAccessLevel::User,
-    kind: CommandKind::Async,
-    min_args: 1,
-    max_args: 1,
-};
-
-const CMD_REBOOT: CommandMeta<PicoAccessLevel> = CommandMeta {
-    id: "system_reboot",
-    name: "reboot",
-    description: "Reboot the device",
-    access_level: PicoAccessLevel::Admin,
-    kind: CommandKind::Sync,
-    min_args: 0,
-    max_args: 0,
-};
-
-const SYSTEM_DIR: Directory<PicoAccessLevel> = Directory {
-    name: "system",
-    children: &[
-        Node::Command(&CMD_REBOOT),
-        Node::Command(&CMD_INFO),
-        Node::Command(&CMD_DELAY),
-    ],
-    access_level: PicoAccessLevel::User,
-};
-
-const ROOT: Directory<PicoAccessLevel> = Directory {
-    name: "/",
-    children: &[Node::Directory(&SYSTEM_DIR), Node::Command(&CMD_LED)],
-    access_level: PicoAccessLevel::User,
-};
-
-// =============================================================================
-// Command Handlers
-// =============================================================================
-
-struct PicoHandlers {
-    led_channel: &'static Channel<ThreadModeRawMutex, LedCommand, 1>,
-}
-
-enum LedCommand {
-    On,
-    Off,
-}
-
-impl CommandHandler<DefaultConfig> for PicoHandlers {
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
-            "led" => {
-                let state = args[0];
-                match state {
-                    "on" => {
-                        self.led_channel.try_send(LedCommand::On).ok();
-                        Ok(Response::success("LED turned on"))
-                    }
-                    "off" => {
-                        self.led_channel.try_send(LedCommand::Off).ok();
-                        Ok(Response::success("LED turned off"))
-                    }
-                    _ => {
-                        let mut expected = heapless::String::<32>::new();
-                        expected.push_str("on or off").ok();
-                        Err(CliError::InvalidArgumentFormat {
-                            arg_index: 0,
-                            expected,
-                        })
-                    }
-                }
-            }
-            "system_info" => {
-                let mut msg = heapless::String::<256>::new();
-                write!(msg, "Device: Raspberry Pi Pico\r\n").ok();
-                write!(msg, "Chip: RP2040\r\n").ok();
-                write!(msg, "Runtime: Embassy\r\n").ok();
-                write!(msg, "Firmware: nut-shell v0.1.0\r\n").ok();
-                write!(msg, "UART: GP0(TX)/GP1(RX) @ 115200").ok();
-                Ok(Response::success(&msg))
-            }
-            "system_reboot" => {
-                // In a real implementation, trigger watchdog reset
-                Ok(Response::success(
-                    "Rebooting...\r\n(Not implemented in example)",
-                ))
-            }
-            _ => Err(CliError::CommandNotFound),
-        }
-    }
-
-    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
-            "system_delay" => {
-                // Parse delay duration
-                let seconds = args[0].parse::<u64>().map_err(|_| {
-                    let mut expected = heapless::String::<32>::new();
-                    expected.push_str("positive integer").ok();
-                    CliError::InvalidArgumentFormat {
-                        arg_index: 0,
-                        expected,
-                    }
-                })?;
-
-                if seconds > 60 {
-                    let mut msg = heapless::String::<256>::new();
-                    write!(msg, "Maximum delay is 60 seconds").ok();
-                    return Err(CliError::CommandFailed(msg));
-                }
-
-                // Async delay using Embassy timer
-                Timer::after(Duration::from_secs(seconds)).await;
-
-                let mut msg = heapless::String::<64>::new();
-                write!(msg, "Delayed for {} second(s)", seconds).ok();
-                Ok(Response::success(&msg))
-            }
-            _ => Err(CliError::CommandNotFound),
-        }
-    }
-}
-
-// =============================================================================
-// Credential Provider
-// =============================================================================
-
-struct PicoCredentialProvider {
-    users: [User<PicoAccessLevel>; 2],
-    hasher: Sha256Hasher,
-}
-
-impl PicoCredentialProvider {
-    fn new() -> Self {
-        let hasher = Sha256Hasher;
-
-        // Create users with hashed passwords
-        let admin_salt: [u8; 16] = [1; 16];
-        let user_salt: [u8; 16] = [2; 16];
-
-        let admin_hash = hasher.hash("pico123", &admin_salt);
-        let user_hash = hasher.hash("pico456", &user_salt);
-
-        let mut admin_username = heapless::String::new();
-        admin_username.push_str("admin").unwrap();
-        let admin = User {
-            username: admin_username,
-            access_level: PicoAccessLevel::Admin,
-            password_hash: admin_hash,
-            salt: admin_salt,
-        };
-
-        let mut user_username = heapless::String::new();
-        user_username.push_str("user").unwrap();
-        let user = User {
-            username: user_username,
-            access_level: PicoAccessLevel::User,
-            password_hash: user_hash,
-            salt: user_salt,
-        };
-
-        Self {
-            users: [admin, user],
-            hasher,
-        }
-    }
-}
-
-impl nut_shell::auth::CredentialProvider<PicoAccessLevel> for PicoCredentialProvider {
-    type Error = ();
-
-    fn find_user(&self, username: &str) -> Result<Option<User<PicoAccessLevel>>, Self::Error> {
-        Ok(self
-            .users
-            .iter()
-            .find(|u| u.username.as_str() == username)
-            .cloned())
-    }
-
-    fn verify_password(&self, user: &User<PicoAccessLevel>, password: &str) -> bool {
-        self.hasher
-            .verify(password, &user.salt, &user.password_hash)
-    }
-
-    fn list_users(&self) -> Result<heapless::Vec<&str, 32>, Self::Error> {
-        let mut list = heapless::Vec::new();
-        for user in &self.users {
-            list.push(user.username.as_str()).ok();
-        }
-        Ok(list)
-    }
-}
-
-// =============================================================================
 // UART CharIo Implementation (Buffered for Embassy)
 // =============================================================================
-
-use core::cell::RefCell;
 
 /// Buffered UART I/O adapter for Embassy.
 ///
@@ -474,4 +248,3 @@ async fn main(spawner: Spawner) {
     spawner.spawn(led_task(led, led_channel)).unwrap();
     spawner.spawn(shell_task(tx, rx, led_channel)).unwrap();
 }
-
