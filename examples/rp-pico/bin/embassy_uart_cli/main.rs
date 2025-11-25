@@ -381,8 +381,8 @@ async fn led_task(
 /// Shell task with async command processing.
 #[embassy_executor::task]
 async fn shell_task(
-    mut tx: BufferedUartTx<'static, UART0>,
-    mut rx: BufferedUartRx<'static, UART0>,
+    mut tx: BufferedUartTx,
+    mut rx: BufferedUartRx,
     led_channel: &'static Channel<ThreadModeRawMutex, LedCommand, 1>,
 ) {
     // Create output buffer wrapped in RefCell for interior mutability
@@ -461,9 +461,9 @@ async fn main(spawner: Spawner) {
 
     let uart = BufferedUart::new(
         p.UART0,
+        p.PIN_0,  // tx_pin
+        p.PIN_1,  // rx_pin
         Irqs,
-        p.PIN_0,
-        p.PIN_1,
         tx_buf,
         rx_buf,
         uart::Config::default(),
