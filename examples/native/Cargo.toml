@@ -14,6 +14,9 @@ heapless = "0.9"
 # Terminal control for raw mode (native examples only)
 crossterm = "0.29"
 
+# Async runtime (for async example)
+tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros"] }
+
 [features]
 default = ["authentication", "completion", "history"]
 
@@ -26,6 +29,11 @@ async = ["nut-shell/async"]
 [[bin]]
 name = "basic"
 path = "bin/basic/main.rs"
+
+[[bin]]
+name = "async_example"
+path = "bin/async_example/main.rs"
+required-features = ["async"]
 
 [profile.release]
 debug = true
