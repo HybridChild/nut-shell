@@ -2,7 +2,8 @@
 
 Examples for Raspberry Pi Pico (RP2040) demonstrating **nut-shell** CLI framework on embedded hardware.
 
-- **[uart_cli](#uart_cli)** - Complete interactive command-line interface over UART with authentication, command navigation, and embedded-optimized features.
+- **[uart_cli](#uart_cli)** - Complete interactive command-line interface over UART with authentication, command navigation, and embedded-optimized features (synchronous/bare-metal).
+- **[embassy_uart_cli](#embassy_uart_cli)** - Embassy async runtime example with async command execution and buffered UART I/O (demonstrates async feature).
 
 ## Hardware Setup
 
@@ -192,6 +193,84 @@ UART: GP0(TX)/GP1(RX) @ 115200
 
 admin@/system>
 ```
+
+### embassy_uart_cli
+
+An Embassy-based async runtime example demonstrating nut-shell with async command execution.
+
+**Features:**
+- Embassy async executor for concurrent task execution
+- Async UART I/O with buffered output (deferred flush pattern)
+- Async command execution using `process_char_async()`
+- LED control via async channel communication
+- Async delay command demonstration
+- User authentication with password hashing (SHA-256)
+- Minimal memory footprint with static allocation
+
+**Commands Available:**
+
+```
+/
+├── system/
+│   ├── info    - Show device information (User)
+│   ├── delay <seconds> - Async delay demo (User) [ASYNC]
+│   └── reboot  - Reboot the device (Admin)
+└── led <on|off> - Toggle LED (User)
+
+Global:
+  ?      - Show help
+  ls     - List directory contents
+  clear  - Clear screen
+  logout - End session (returns to login)
+```
+
+**Authentication:**
+- **admin:pico123** (Admin access - full control)
+- **user:pico456** (User access - limited commands)
+
+**What you'll learn:**
+- How to integrate nut-shell with Embassy async runtime
+- Async I/O buffering patterns (deferred flush)
+- Async command execution with `process_char_async()`
+- Concurrent task spawning with Embassy executor
+- Inter-task communication using Embassy channels
+- RefCell pattern for shared buffer access
+
+**Memory Usage:**
+- Flash: ~26KB (with async + authentication)
+- RAM: ~5.7KB (including executor stack)
+- No heap allocation (pure `no_std`)
+
+**Build and Run:**
+
+```bash
+# Build with embassy feature
+cargo build --release --bin embassy_uart_cli --features embassy
+
+# Flash using probe-rs
+cargo run --release --bin embassy_uart_cli --features embassy
+
+# Or flash using UF2 bootloader
+elf2uf2-rs target/thumbv6m-none-eabi/release/embassy_uart_cli embassy_uart_cli.uf2
+cp embassy_uart_cli.uf2 /Volumes/RPI-RP2/
+```
+
+**Try the async delay command:**
+
+```
+Login (username:password): user:pico456
+user@/> cd system
+user@/system> delay 3
+[... waits 3 seconds ...]
+Delayed for 3 second(s)
+user@/system>
+```
+
+**Architecture Highlights:**
+
+- **Deferred Flush Pattern**: Output is buffered to memory during `process_char_async()`, then flushed to UART after processing completes (see `IO_DESIGN.md`)
+- **RefCell for Interior Mutability**: Shared buffer accessed through RefCell to enable both Shell and flush logic to access the same buffer
+- **Dual I/O References**: Two `BufferedUartCharIo` instances reference the same buffer - one owned by Shell, one for flushing
 
 ## Building Without Authentication
 

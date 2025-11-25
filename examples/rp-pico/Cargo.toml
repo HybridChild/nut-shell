@@ -6,6 +6,7 @@ authors = ["Esben Dueholm Nørgaard"]
 
 [dependencies]
 # Nut-shell library (parent crate)
+# Default features for uart_cli (synchronous, authentication)
 nut-shell = { path = "../..", default-features = false, features = ["authentication"] }
 
 # Cortex-M support
@@ -15,10 +16,19 @@ cortex-m-rt = "0.7.5"
 # Embedded HAL traits
 embedded-hal = "1.0.0"
 
-# RP2040-specific crates
+# RP2040-specific crates (for uart_cli example)
 rp2040-hal = { version = "0.11.0", features = ["rt", "critical-section-impl"] }
 rp2040-boot2 = "0.3"
 rp-pico = "0.9.0"
+
+# Embassy async runtime (for embassy_uart_cli example)
+embassy-executor = { version = "0.6.1", features = ["arch-cortex-m", "executor-thread", "integrated-timers"] }
+embassy-time = { version = "0.3.2" }
+embassy-rp = { version = "0.2.0", features = ["time-driver", "critical-section-impl"] }
+embassy-sync = "0.6.0"
+embedded-io-async = "0.6.1"
+static_cell = "2.1.0"
+portable-atomic = { version = "1.0", features = ["critical-section"] }
 
 # Utilities
 panic-halt = "1.0.0"
@@ -31,6 +41,15 @@ heapless = "0.9"
 [[bin]]
 name = "uart_cli"
 path = "bin/uart_cli/main.rs"
+
+[[bin]]
+name = "embassy_uart_cli"
+path = "bin/embassy_uart_cli/main.rs"
+required-features = ["embassy"]
+
+[features]
+# Embassy async support (enables async feature in nut-shell)
+embassy = ["nut-shell/async"]
 
 [profile.release]
 debug = true
