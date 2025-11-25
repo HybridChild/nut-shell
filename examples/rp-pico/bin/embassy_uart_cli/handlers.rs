@@ -8,6 +8,7 @@ use heapless;
 use nut_shell::{
     config::DefaultConfig, response::Response, shell::handlers::CommandHandler, CliError,
 };
+use rp_pico_examples::hw_commands;
 
 pub enum LedCommand {
     On,
@@ -61,6 +62,13 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
                     "Rebooting...\r\n(Not implemented in example)",
                 ))
             }
+            // Hardware status commands
+            "hw_temp" => hw_commands::cmd_temp::<DefaultConfig>(args),
+            "hw_chipid" => hw_commands::cmd_chipid::<DefaultConfig>(args),
+            "hw_clocks" => hw_commands::cmd_clocks::<DefaultConfig>(args),
+            "hw_core" => hw_commands::cmd_core::<DefaultConfig>(args),
+            "hw_bootreason" => hw_commands::cmd_bootreason::<DefaultConfig>(args),
+            "hw_gpio" => hw_commands::cmd_gpio::<DefaultConfig>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }

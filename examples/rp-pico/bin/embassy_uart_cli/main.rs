@@ -49,9 +49,10 @@ mod tree;
 use core::cell::RefCell;
 use embassy_executor::Spawner;
 use embassy_rp::{
+    adc::{Adc, Async as AdcAsync, Channel as AdcChannel, Config as AdcConfig, InterruptHandler as AdcInterruptHandler},
     bind_interrupts,
     gpio::{Level, Output},
-    peripherals::UART0,
+    peripherals::{ADC, ADC_TEMP_SENSOR, UART0},
     uart::{self, BufferedInterruptHandler, BufferedUart, BufferedUartRx, BufferedUartTx},
 };
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
@@ -68,14 +69,15 @@ use nut_shell::{
     shell::Shell,
 };
 
-use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider};
+use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider, hw_commands, init_chip_id};
 
 use crate::handlers::{LedCommand, PicoHandlers};
 use crate::tree::ROOT;
 
-// Bind UART interrupt handler
+// Bind interrupt handlers
 bind_interrupts!(struct Irqs {
     UART0_IRQ => BufferedInterruptHandler<UART0>;
+    ADC_IRQ_FIFO => AdcInterruptHandler;
 });
 
 // =============================================================================
@@ -152,6 +154,26 @@ async fn led_task(
     }
 }
 
+/// Hardware monitoring task - periodically updates hardware status cache.
+#[embassy_executor::task]
+async fn hardware_monitor(mut adc: Adc<'static, AdcAsync>, mut temp_channel: AdcChannel<'static>) {
+    loop {
+        // Read temperature sensor
+        let adc_value = adc.read(&mut temp_channel).await.unwrap();
+
+        // Convert ADC value to temperature (RP2040 formula)
+        // T = 27 - (ADC_voltage - 0.706) / 0.001721
+        // ADC_voltage = (adc_value * 3.3) / 4096
+        let adc_voltage = (adc_value as f32 * 3.3) / 4096.0;
+        let temp_celsius = 27.0 - (adc_voltage - 0.706) / 0.001721;
+
+        hw_commands::update_temperature(temp_celsius);
+
+        // Update every 500ms
+        Timer::after(Duration::from_millis(500)).await;
+    }
+}
+
 /// Shell task with async command processing.
 #[embassy_executor::task]
 async fn shell_task(
@@ -166,6 +188,8 @@ async fn shell_task(
     // Create buffered I/O (we'll create two references to the same buffer)
     let io = BufferedUartCharIo::new(output_buffer);
     let io_flush = BufferedUartCharIo::new(output_buffer); // Second reference for flushing
+
+    // Initialize hardware status cache (done in main, before spawning tasks)
 
     // Create handlers
     let handlers = PicoHandlers { led_channel };
@@ -220,6 +244,22 @@ async fn main(spawner: Spawner) {
     // Initialize peripherals
     let p = embassy_rp::init(Default::default());
 
+    // Initialize hardware status cache
+    init_chip_id();
+
+    // Initialize clock frequency cache
+    // Embassy RP2040 runs at 125MHz system clock by default
+    hw_commands::update_clocks(
+        125_000_000, // System clock
+        48_000_000,  // USB clock
+        125_000_000, // Peripheral clock
+        48_000_000,  // ADC clock
+    );
+
+    // Initialize ADC for temperature monitoring
+    let adc = Adc::new(p.ADC, Irqs, AdcConfig::default());
+    let temp_channel = AdcChannel::new_temp_sensor(p.ADC_TEMP_SENSOR);
+
     // Set up onboard LED (GP25)
     let led = Output::new(p.PIN_25, Level::Low);
 
@@ -246,5 +286,6 @@ async fn main(spawner: Spawner) {
 
     // Spawn tasks
     spawner.spawn(led_task(led, led_channel)).unwrap();
+    spawner.spawn(hardware_monitor(adc, temp_channel)).unwrap();
     spawner.spawn(shell_task(tx, rx, led_channel)).unwrap();
 }

@@ -8,8 +8,12 @@
 pub mod access_level;
 #[cfg(feature = "authentication")]
 pub mod credentials;
+pub mod hw_commands;
 
 // Re-export commonly used types for convenience
 pub use access_level::PicoAccessLevel;
 #[cfg(feature = "authentication")]
 pub use credentials::PicoCredentialProvider;
+
+// Re-export hardware command initialization
+pub use hw_commands::init_chip_id;

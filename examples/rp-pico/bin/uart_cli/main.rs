@@ -38,9 +38,14 @@
 mod handlers;
 mod tree;
 
+use core::cell::RefCell;
 use cortex_m::delay::Delay;
+use cortex_m::interrupt::Mutex;
 use cortex_m_rt::entry;
+use embedded_hal_0_2::adc::OneShot;
+use embedded_hal_0_2::digital::v2::OutputPin;
 use fugit::HertzU32;
+use nb;
 use panic_halt as _;
 
 // Link in the Boot ROM - required for RP2040
@@ -50,6 +55,7 @@ pub static BOOT2: [u8; 256] = rp2040_boot2::BOOT_LOADER_GENERIC_03H;
 
 use rp2040_hal::{
     Sio,
+    adc::Adc,
     clocks::{Clock, init_clocks_and_plls},
     gpio::{FunctionUart, Pin, PullDown},
     pac,
@@ -63,10 +69,40 @@ use nut_shell::{
     shell::Shell,
 };
 
-use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider};
+use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider, hw_commands, init_chip_id};
 
 use crate::handlers::PicoHandlers;
 use crate::tree::ROOT;
+
+// =============================================================================
+// Global LED State
+// =============================================================================
+
+type LedPin = Pin<
+    rp2040_hal::gpio::bank0::Gpio25,
+    rp2040_hal::gpio::FunctionSio<rp2040_hal::gpio::SioOutput>,
+    rp2040_hal::gpio::PullDown,
+>;
+
+/// Global LED pin protected by a Mutex for safe access from command handlers
+static LED_PIN: Mutex<RefCell<Option<LedPin>>> = Mutex::new(RefCell::new(None));
+
+/// Set the LED state (on = true, off = false)
+pub fn set_led(on: bool) {
+    cortex_m::interrupt::free(|cs| {
+        if let Some(led) = LED_PIN.borrow(cs).borrow_mut().as_mut() {
+            if on {
+                let _ = led.set_high();
+            } else {
+                let _ = led.set_low();
+            }
+        }
+    });
+
+    // Update GPIO cache to reflect current state
+    // Pin 25: output (1), value (0=low or 1=high), no pull (0)
+    hw_commands::update_gpio_state(25, 1, if on { 1 } else { 0 }, 0);
+}
 
 // =============================================================================
 // UART CharIo Implementation
@@ -156,6 +192,17 @@ fn main() -> ! {
         &mut pac.RESETS,
     );
 
+    // Configure onboard LED (GP25) as output
+    let led = pins.gpio25.into_push_pull_output();
+
+    // Store LED in global static
+    cortex_m::interrupt::free(|cs| {
+        LED_PIN.borrow(cs).replace(Some(led));
+    });
+
+    // Update GPIO cache for LED pin (pin 25: output, low, no pull)
+    hw_commands::update_gpio_state(25, 1, 0, 0);
+
     // Configure UART on GP0 (TX) and GP1 (RX)
     let uart_pins = (
         pins.gpio0.into_function::<FunctionUart>(),
@@ -177,6 +224,24 @@ fn main() -> ! {
     // Create CharIo wrapper
     let io = UartCharIo::new(uart);
 
+    // Initialize hardware status cache
+    init_chip_id();
+
+    // Initialize clock frequency cache
+    hw_commands::update_clocks(
+        clocks.system_clock.freq().to_Hz(),
+        clocks.usb_clock.freq().to_Hz(),
+        clocks.peripheral_clock.freq().to_Hz(),
+        clocks.adc_clock.freq().to_Hz(),
+    );
+
+    // Register LED control function
+    hw_commands::register_led_control(set_led);
+
+    // Initialize ADC for temperature readings
+    let mut adc = Adc::new(pac.ADC, &mut pac.RESETS);
+    let mut temp_sensor = adc.take_temp_sensor().unwrap();
+
     // Create handlers
     let handlers = PicoHandlers;
 
@@ -190,9 +255,31 @@ fn main() -> ! {
 
     // Main polling loop
     // The shell.poll() method checks for incoming UART characters and processes them
+    let mut ticks: u64 = 0;
+    let mut last_temp_update: u64 = 0;
+
     loop {
         // Poll for incoming characters and process them
         shell.poll().ok();
+
+        // Update temperature cache every 500ms (5000 ticks @ 100us per tick)
+        if ticks.wrapping_sub(last_temp_update) >= 5000 {
+            // Read temperature sensor (OneShot trait returns nb::Result)
+            let read_result: nb::Result<u16, _> = adc.read(&mut temp_sensor);
+            if let Ok(adc_value) = read_result {
+
+                // Convert ADC value to temperature (RP2040 formula)
+                // T = 27 - (ADC_voltage - 0.706) / 0.001721
+                // ADC_voltage = (adc_value * 3.3) / 4096
+                let adc_voltage = (adc_value as f32 * 3.3) / 4096.0;
+                let temp_celsius = 27.0 - (adc_voltage - 0.706) / 0.001721;
+
+                hw_commands::update_temperature(temp_celsius);
+                last_temp_update = ticks;
+            }
+        }
+
+        ticks = ticks.wrapping_add(1);
 
         // Small delay to prevent busy-waiting and reduce CPU usage
         delay.delay_us(100u32);
