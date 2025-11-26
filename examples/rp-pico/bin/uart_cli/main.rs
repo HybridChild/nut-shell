@@ -75,7 +75,7 @@ use crate::handlers::PicoHandlers;
 use crate::tree::ROOT;
 
 // =============================================================================
-// Global LED State
+// Global Hardware State
 // =============================================================================
 
 type LedPin = Pin<
@@ -84,8 +84,15 @@ type LedPin = Pin<
     rp2040_hal::gpio::PullDown,
 >;
 
+type TempSensor = rp2040_hal::adc::TempSense;
+type AdcType = Adc;
+
 /// Global LED pin protected by a Mutex for safe access from command handlers
 static LED_PIN: Mutex<RefCell<Option<LedPin>>> = Mutex::new(RefCell::new(None));
+
+/// Global ADC and temperature sensor for reading temperature
+static ADC: Mutex<RefCell<Option<AdcType>>> = Mutex::new(RefCell::new(None));
+static TEMP_SENSOR: Mutex<RefCell<Option<TempSensor>>> = Mutex::new(RefCell::new(None));
 
 /// Set the LED state (on = true, off = false)
 pub fn set_led(on: bool) {
@@ -98,10 +105,30 @@ pub fn set_led(on: bool) {
             }
         }
     });
+}
 
-    // Update GPIO cache to reflect current state
-    // Pin 25: output (1), value (0=low or 1=high), no pull (0)
-    hw_commands::update_gpio_state(25, 1, if on { 1 } else { 0 }, 0);
+/// Read the current temperature from the internal sensor
+pub fn read_temperature() -> f32 {
+    cortex_m::interrupt::free(|cs| {
+        let mut adc_ref = ADC.borrow(cs).borrow_mut();
+        let mut sensor_ref = TEMP_SENSOR.borrow(cs).borrow_mut();
+
+        if let (Some(adc), Some(sensor)) = (adc_ref.as_mut(), sensor_ref.as_mut()) {
+            // Read temperature sensor (OneShot trait returns nb::Result)
+            let read_result: nb::Result<u16, _> = adc.read(sensor);
+            if let Ok(adc_value) = read_result {
+                // Convert ADC value to temperature (RP2040 formula)
+                // T = 27 - (ADC_voltage - 0.706) / 0.001721
+                // ADC_voltage = (adc_value * 3.3) / 4096
+                let adc_voltage = (adc_value as f32 * 3.3) / 4096.0;
+                let temp_celsius = 27.0 - (adc_voltage - 0.706) / 0.001721;
+                return temp_celsius;
+            }
+        }
+
+        // Return a default value if reading fails
+        0.0
+    })
 }
 
 // =============================================================================
@@ -204,9 +231,6 @@ fn main() -> ! {
         LED_PIN.borrow(cs).replace(Some(led));
     });
 
-    // Update GPIO cache for LED pin (pin 25: output, low, no pull)
-    hw_commands::update_gpio_state(25, 1, 0, 0);
-
     // Configure UART on GP0 (TX) and GP1 (RX)
     let uart_pins = (
         pins.gpio0.into_function::<FunctionUart>(),
@@ -228,23 +252,22 @@ fn main() -> ! {
     // Create CharIo wrapper
     let io = UartCharIo::new(uart);
 
-    // Initialize hardware status cache
+    // Initialize hardware status
     init_chip_id();
-
-    // Initialize clock frequency cache
-    hw_commands::update_clocks(
-        clocks.system_clock.freq().to_Hz(),
-        clocks.usb_clock.freq().to_Hz(),
-        clocks.peripheral_clock.freq().to_Hz(),
-        clocks.adc_clock.freq().to_Hz(),
-    );
-
-    // Register LED control function
-    hw_commands::register_led_control(set_led);
 
     // Initialize ADC for temperature readings
     let mut adc = Adc::new(pac.ADC, &mut pac.RESETS);
-    let mut temp_sensor = adc.take_temp_sensor().unwrap();
+    let temp_sensor = adc.take_temp_sensor().unwrap();
+
+    // Store ADC and temperature sensor in global statics
+    cortex_m::interrupt::free(|cs| {
+        ADC.borrow(cs).replace(Some(adc));
+        TEMP_SENSOR.borrow(cs).replace(Some(temp_sensor));
+    });
+
+    // Register hardware access functions
+    hw_commands::register_led_control(set_led);
+    hw_commands::register_temp_sensor(read_temperature);
 
     // Create handlers
     let handlers = PicoHandlers;
@@ -259,31 +282,9 @@ fn main() -> ! {
 
     // Main polling loop
     // The shell.poll() method checks for incoming UART characters and processes them
-    let mut ticks: u64 = 0;
-    let mut last_temp_update: u64 = 0;
-
     loop {
         // Poll for incoming characters and process them
         shell.poll().ok();
-
-        // Update temperature cache every 500ms (5000 ticks @ 100us per tick)
-        if ticks.wrapping_sub(last_temp_update) >= 5000 {
-            // Read temperature sensor (OneShot trait returns nb::Result)
-            let read_result: nb::Result<u16, _> = adc.read(&mut temp_sensor);
-            if let Ok(adc_value) = read_result {
-
-                // Convert ADC value to temperature (RP2040 formula)
-                // T = 27 - (ADC_voltage - 0.706) / 0.001721
-                // ADC_voltage = (adc_value * 3.3) / 4096
-                let adc_voltage = (adc_value as f32 * 3.3) / 4096.0;
-                let temp_celsius = 27.0 - (adc_voltage - 0.706) / 0.001721;
-
-                hw_commands::update_temperature(temp_celsius);
-                last_temp_update = ticks;
-            }
-        }
-
-        ticks = ticks.wrapping_add(1);
 
         // Small delay to prevent busy-waiting and reduce CPU usage
         delay.delay_us(100u32);

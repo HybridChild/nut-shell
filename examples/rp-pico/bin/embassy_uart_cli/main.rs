@@ -52,7 +52,7 @@ use embassy_rp::{
     adc::{Adc, Async as AdcAsync, Channel as AdcChannel, Config as AdcConfig, InterruptHandler as AdcInterruptHandler},
     bind_interrupts,
     gpio::{Level, Output},
-    peripherals::{ADC, ADC_TEMP_SENSOR, UART0},
+    peripherals::UART0,
     uart::{self, BufferedInterruptHandler, BufferedUart, BufferedUartRx, BufferedUartTx},
 };
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
@@ -79,6 +79,29 @@ bind_interrupts!(struct Irqs {
     UART0_IRQ => BufferedInterruptHandler<UART0>;
     ADC_IRQ_FIFO => AdcInterruptHandler;
 });
+
+// =============================================================================
+// Global Hardware State
+// =============================================================================
+
+use core::sync::atomic::{AtomicU32, Ordering};
+
+/// Cached temperature value (updated by background task, read by command)
+static CACHED_TEMPERATURE: AtomicU32 = AtomicU32::new(0);
+
+/// Read the current temperature from the internal sensor
+///
+/// Returns the last temperature reading from the background monitor task.
+/// Temperature is updated every 500ms by the temperature_monitor task.
+fn read_temperature() -> f32 {
+    let bits = CACHED_TEMPERATURE.load(Ordering::Relaxed);
+    f32::from_bits(bits)
+}
+
+/// Update the cached temperature value (called from temperature_monitor task)
+fn set_temperature(temp: f32) {
+    CACHED_TEMPERATURE.store(temp.to_bits(), Ordering::Relaxed);
+}
 
 // =============================================================================
 // UART CharIo Implementation (Buffered for Embassy)
@@ -154,9 +177,12 @@ async fn led_task(
     }
 }
 
-/// Hardware monitoring task - periodically updates hardware status cache.
+/// Temperature monitoring task - periodically reads and caches temperature.
+///
+/// This background task reads the temperature sensor every 500ms and updates
+/// the cached value that's returned by the `temp` command via `read_temperature()`.
 #[embassy_executor::task]
-async fn hardware_monitor(mut adc: Adc<'static, AdcAsync>, mut temp_channel: AdcChannel<'static>) {
+async fn temperature_monitor(mut adc: Adc<'static, AdcAsync>, mut temp_channel: AdcChannel<'static>) {
     loop {
         // Read temperature sensor
         let adc_value = adc.read(&mut temp_channel).await.unwrap();
@@ -167,7 +193,8 @@ async fn hardware_monitor(mut adc: Adc<'static, AdcAsync>, mut temp_channel: Adc
         let adc_voltage = (adc_value as f32 * 3.3) / 4096.0;
         let temp_celsius = 27.0 - (adc_voltage - 0.706) / 0.001721;
 
-        hw_commands::update_temperature(temp_celsius);
+        // Update cached temperature
+        set_temperature(temp_celsius);
 
         // Update every 500ms
         Timer::after(Duration::from_millis(500)).await;
@@ -248,17 +275,11 @@ async fn main(spawner: Spawner) {
     // Initialize peripherals
     let p = embassy_rp::init(Default::default());
 
-    // Initialize hardware status cache
+    // Initialize hardware status
     init_chip_id();
 
-    // Initialize clock frequency cache
-    // Embassy RP2040 runs at 125MHz system clock by default
-    hw_commands::update_clocks(
-        125_000_000, // System clock
-        48_000_000,  // USB clock
-        125_000_000, // Peripheral clock
-        48_000_000,  // ADC clock
-    );
+    // Register temperature sensor read function
+    hw_commands::register_temp_sensor(read_temperature);
 
     // Initialize ADC for temperature monitoring
     let adc = Adc::new(p.ADC, Irqs, AdcConfig::default());
@@ -290,6 +311,6 @@ async fn main(spawner: Spawner) {
 
     // Spawn tasks
     spawner.spawn(led_task(led, led_channel)).unwrap();
-    spawner.spawn(hardware_monitor(adc, temp_channel)).unwrap();
+    spawner.spawn(temperature_monitor(adc, temp_channel)).unwrap();
     spawner.spawn(shell_task(tx, rx, led_channel)).unwrap();
 }

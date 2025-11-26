@@ -28,18 +28,10 @@ static mut CACHED_WATCHDOG_REASON: Option<u32> = None;
 /// Cached chip reset flags, read once at startup
 static mut CACHED_CHIP_RESET: Option<u32> = None;
 
-/// Cached temperature reading (in degrees Celsius)
-static mut CACHED_TEMP: Option<f32> = None;
+/// Temperature sensor read function pointer (set by main at startup)
+static mut TEMP_READ_FN: Option<fn() -> f32> = None;
 
-/// Cached clock frequencies (Hz)
-static mut CACHED_SYS_CLOCK: u32 = 0;
-static mut CACHED_USB_CLOCK: u32 = 0;
-static mut CACHED_PERIPHERAL_CLOCK: u32 = 0;
-static mut CACHED_ADC_CLOCK: u32 = 0;
 
-/// Cached GPIO state for up to 30 pins (RP2040 has 30 GPIOs)
-/// Format: (direction: 0=input, 1=output, value: 0=low, 1=high, pull: 0=none, 1=up, 2=down)
-static mut CACHED_GPIO_STATE: [(u8, u8, u8); 30] = [(0, 0, 0); 30];
 
 /// LED control function pointer (set by main at startup)
 static mut LED_CONTROL_FN: Option<fn(bool)> = None;
@@ -119,53 +111,29 @@ pub const CMD_LED: CommandMeta<PicoAccessLevel> = CommandMeta {
 };
 
 // =============================================================================
-// Cache Update Functions (called by main loop or background tasks)
+// Hardware Access Registration Functions
 // =============================================================================
 
-/// Update the cached temperature reading
+/// Register the temperature sensor read function
 ///
-/// Call this periodically from your main loop or a background task.
-/// The temperature should be in degrees Celsius.
+/// Call this once at startup to provide hardware access for the temp command.
+/// The function should return the current temperature in degrees Celsius.
 ///
-/// # Safety
-/// This function writes to a mutable static. In single-threaded embedded
-/// environments (like the RP2040 examples), this is safe when called from
-/// the main loop or from a single background task.
-pub fn update_temperature(temp_celsius: f32) {
+/// # Example
+/// ```no_run
+/// fn read_temperature() -> f32 {
+///     // Read ADC, convert to temperature
+///     25.0
+/// }
+/// register_temp_sensor(read_temperature);
+/// ```
+pub fn register_temp_sensor(read_fn: fn() -> f32) {
     unsafe {
-        CACHED_TEMP = Some(temp_celsius);
+        TEMP_READ_FN = Some(read_fn);
     }
 }
 
-/// Update the cached clock frequencies
-///
-/// Call this at startup and whenever clock frequencies change.
-/// All frequencies should be in Hz.
-pub fn update_clocks(sys_hz: u32, usb_hz: u32, peripheral_hz: u32, adc_hz: u32) {
-    unsafe {
-        CACHED_SYS_CLOCK = sys_hz;
-        CACHED_USB_CLOCK = usb_hz;
-        CACHED_PERIPHERAL_CLOCK = peripheral_hz;
-        CACHED_ADC_CLOCK = adc_hz;
-    }
-}
 
-/// Update cached GPIO state for a specific pin
-///
-/// Call this whenever you need to refresh GPIO status.
-///
-/// # Parameters
-/// - `pin`: GPIO pin number (0-29)
-/// - `direction`: 0 = input, 1 = output
-/// - `value`: 0 = low, 1 = high
-/// - `pull`: 0 = none, 1 = pull-up, 2 = pull-down
-pub fn update_gpio_state(pin: usize, direction: u8, value: u8, pull: u8) {
-    if pin < 30 {
-        unsafe {
-            CACHED_GPIO_STATE[pin] = (direction, value, pull);
-        }
-    }
-}
 
 /// Register the LED control function
 ///
@@ -208,17 +176,15 @@ pub fn init_reset_reason() {
 /// Read the internal temperature sensor (ADC channel 4)
 ///
 /// Returns the chip temperature in degrees Celsius.
-/// The value is read from cache, which is updated periodically by the main loop.
+/// The value is read on-demand by calling the registered temperature read function.
 pub fn cmd_temp<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
-    let temp = unsafe { CACHED_TEMP };
-
-    match temp {
-        Some(celsius) => {
-            let mut msg = heapless::String::<64>::new();
-            write!(msg, "Temperature: {:.1}°C", celsius).ok();
-            Ok(Response::success(&msg).indented())
-        }
-        None => Ok(Response::success("Temperature: [Not yet measured]").indented()),
+    if let Some(read_fn) = unsafe { TEMP_READ_FN } {
+        let celsius = read_fn();
+        let mut msg = heapless::String::<64>::new();
+        write!(msg, "Temperature: {:.1}°C", celsius).ok();
+        Ok(Response::success(&msg).indented())
+    } else {
+        Ok(Response::success("Temperature sensor not initialized").indented())
     }
 }
 
@@ -309,28 +275,77 @@ pub fn cmd_chipid<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErro
 /// Display current system clock frequencies
 ///
 /// Shows the configured frequencies for various clock domains in the RP2040.
-/// Values are read from cache, updated at startup by the main function.
+/// Values are read directly from hardware clock control registers.
 pub fn cmd_clocks<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
-    let (sys, usb, peripheral, adc) = unsafe {
-        (
-            CACHED_SYS_CLOCK,
-            CACHED_USB_CLOCK,
-            CACHED_PERIPHERAL_CLOCK,
-            CACHED_ADC_CLOCK,
-        )
+    // CLOCKS register base address
+    const CLOCKS_BASE: u32 = 0x4000_8000;
+
+    // Clock control registers
+    const CLK_SYS_CTRL: u32 = CLOCKS_BASE + 0x3c;
+    const CLK_SYS_DIV: u32 = CLOCKS_BASE + 0x38;
+    const CLK_USB_CTRL: u32 = CLOCKS_BASE + 0x54;
+    const CLK_USB_DIV: u32 = CLOCKS_BASE + 0x50;
+    const CLK_PERI_CTRL: u32 = CLOCKS_BASE + 0x48;
+    const CLK_ADC_CTRL: u32 = CLOCKS_BASE + 0x60;
+    const CLK_ADC_DIV: u32 = CLOCKS_BASE + 0x5c;
+
+    // Reference clock frequency (typically 12 MHz from crystal oscillator)
+    const XOSC_FREQ: u32 = 12_000_000;
+
+    // Read clock control registers
+    let sys_ctrl = unsafe { core::ptr::read_volatile(CLK_SYS_CTRL as *const u32) };
+    let sys_div = unsafe { core::ptr::read_volatile(CLK_SYS_DIV as *const u32) };
+    let usb_ctrl = unsafe { core::ptr::read_volatile(CLK_USB_CTRL as *const u32) };
+    let _usb_div = unsafe { core::ptr::read_volatile(CLK_USB_DIV as *const u32) };
+    let peri_ctrl = unsafe { core::ptr::read_volatile(CLK_PERI_CTRL as *const u32) };
+    let adc_ctrl = unsafe { core::ptr::read_volatile(CLK_ADC_CTRL as *const u32) };
+    let adc_div = unsafe { core::ptr::read_volatile(CLK_ADC_DIV as *const u32) };
+
+    // Calculate system clock frequency
+    // System clock is typically derived from PLL_SYS
+    // For simplicity, we'll read the divisor and estimate based on common configurations
+    let sys_int_div = (sys_div >> 8) & 0xffffff;
+    let sys_frac_div = sys_div & 0xff;
+
+    // Common RP2040 system clock is 125 MHz (from PLL_SYS)
+    // We can estimate by checking if clock is running and enabled
+    let sys_enabled = (sys_ctrl & 0x800) != 0; // ENABLE bit
+    let sys_freq = if sys_enabled && sys_int_div > 0 {
+        // Typical PLL_SYS output is 125 MHz
+        // Apply divisor: freq = 125MHz / (int + frac/256)
+        let divisor = sys_int_div as f32 + (sys_frac_div as f32 / 256.0);
+        if divisor > 0.0 {
+            (125_000_000.0 / divisor) as u32
+        } else {
+            125_000_000
+        }
+    } else {
+        125_000_000 // Default assumption
+    };
+
+    // USB clock is always 48 MHz when enabled (required by USB spec)
+    let usb_enabled = (usb_ctrl & 0x800) != 0;
+    let usb_freq = if usb_enabled { 48_000_000 } else { 0 };
+
+    // Peripheral clock typically matches system clock (no divisor)
+    let peri_enabled = (peri_ctrl & 0x800) != 0;
+    let peri_freq = if peri_enabled { sys_freq } else { 0 };
+
+    // ADC clock calculation
+    let adc_int_div = (adc_div >> 8) & 0xffffff;
+    let adc_enabled = (adc_ctrl & 0x800) != 0;
+    let adc_freq = if adc_enabled && adc_int_div > 0 {
+        XOSC_FREQ / adc_int_div
+    } else {
+        48_000_000 // Default assumption
     };
 
     let mut msg = heapless::String::<256>::new();
     write!(msg, "Clock Frequencies:\r\n").ok();
-
-    if sys > 0 {
-        write!(msg, "  System:     {} MHz\r\n", sys / 1_000_000).ok();
-        write!(msg, "  USB:        {} MHz\r\n", usb / 1_000_000).ok();
-        write!(msg, "  Peripheral: {} MHz\r\n", peripheral / 1_000_000).ok();
-        write!(msg, "  ADC:        {} MHz", adc / 1_000_000).ok();
-    } else {
-        write!(msg, "  [Not yet initialized]").ok();
-    }
+    write!(msg, "  System:     {} MHz\r\n", sys_freq / 1_000_000).ok();
+    write!(msg, "  USB:        {} MHz\r\n", usb_freq / 1_000_000).ok();
+    write!(msg, "  Peripheral: {} MHz\r\n", peri_freq / 1_000_000).ok();
+    write!(msg, "  ADC:        {} MHz", adc_freq / 1_000_000).ok();
 
     Ok(Response::success(&msg).indented())
 }
@@ -445,7 +460,7 @@ pub fn cmd_bootreason<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, Cli
 /// Display the status of a specific GPIO pin
 ///
 /// Shows pin direction (input/output), current state, and pull-up/down configuration.
-/// Values are read from cache, which can be updated by calling `update_gpio_state()`.
+/// Values are read directly from hardware registers.
 ///
 /// # Arguments
 /// - `pin`: GPIO pin number (0-29)
@@ -473,11 +488,47 @@ pub fn cmd_gpio<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> 
         });
     }
 
-    let gpio_state = unsafe { CACHED_GPIO_STATE };
-    let (dir, val, pull) = gpio_state[pin_num];
+    // Read GPIO state directly from hardware registers
+    // SIO (Single-cycle I/O) registers
+    const SIO_GPIO_IN: u32 = 0xd000_0004;   // Current input values
+    const SIO_GPIO_OE: u32 = 0xd000_0020;   // Output enable (direction)
+    const SIO_GPIO_OUT: u32 = 0xd000_0010;  // Output values
 
-    let dir_str = if dir == 1 { "OUT" } else { "IN " };
-    let val_str = if val == 1 { "HI" } else { "LO" };
+    // PADS_BANK0 registers for pull configuration
+    const PADS_BANK0_BASE: u32 = 0x4001_c000;
+    const PADS_GPIO_OFFSET: u32 = 0x04; // Each GPIO pad register is at base + 4 + (pin * 4)
+
+    let gpio_in = unsafe { core::ptr::read_volatile(SIO_GPIO_IN as *const u32) };
+    let gpio_oe = unsafe { core::ptr::read_volatile(SIO_GPIO_OE as *const u32) };
+    let gpio_out = unsafe { core::ptr::read_volatile(SIO_GPIO_OUT as *const u32) };
+
+    let pad_ctrl_addr = PADS_BANK0_BASE + PADS_GPIO_OFFSET + (pin_num as u32 * 4);
+    let pad_ctrl = unsafe { core::ptr::read_volatile(pad_ctrl_addr as *const u32) };
+
+    // Extract pin state
+    let direction = ((gpio_oe >> pin_num) & 1) as u8;
+    let value = if direction == 1 {
+        // Output: read from GPIO_OUT
+        ((gpio_out >> pin_num) & 1) as u8
+    } else {
+        // Input: read from GPIO_IN
+        ((gpio_in >> pin_num) & 1) as u8
+    };
+
+    // Extract pull configuration from PAD control register
+    // Bit 3: PUE (Pull-up enable), Bit 2: PDE (Pull-down enable)
+    let pue = (pad_ctrl >> 3) & 1;
+    let pde = (pad_ctrl >> 2) & 1;
+    let pull = if pue != 0 {
+        1 // Pull-up
+    } else if pde != 0 {
+        2 // Pull-down
+    } else {
+        0 // No pull
+    };
+
+    let dir_str = if direction == 1 { "OUT" } else { "IN " };
+    let val_str = if value == 1 { "HI" } else { "LO" };
     let pull_str = match pull {
         1 => "UP",
         2 => "DN",
