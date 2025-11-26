@@ -11,149 +11,30 @@
 #![no_main]
 
 mod handlers;
+mod hw_setup;
+mod hw_state;
+mod io;
 mod tree;
 
-use core::cell::RefCell;
-use cortex_m::delay::Delay;
-use cortex_m::interrupt::Mutex;
 use cortex_m_rt::entry;
-use embedded_hal_0_2::adc::OneShot;
-use embedded_hal_0_2::digital::v2::OutputPin;
-use fugit::HertzU32;
-use nb;
 use panic_halt as _;
+use rp2040_hal::pac;
 
 // Link in the Boot ROM - required for RP2040
 #[unsafe(link_section = ".boot2")]
 #[used]
 pub static BOOT2: [u8; 256] = rp2040_boot2::BOOT_LOADER_GENERIC_03H;
 
-use rp2040_hal::{
-    Sio,
-    adc::Adc,
-    clocks::{Clock, init_clocks_and_plls},
-    gpio::{FunctionUart, Pin, PullDown},
-    pac,
-    uart::{DataBits, StopBits, UartConfig, UartPeripheral},
-    watchdog::Watchdog,
-};
-
 use nut_shell::{
     config::DefaultConfig,
-    io::CharIo,
     shell::Shell,
 };
 
 use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider, hw_commands, init_boot_time, init_chip_id, init_reset_reason};
 
 use crate::handlers::PicoHandlers;
+use crate::io::UartCharIo;
 use crate::tree::ROOT;
-
-// =============================================================================
-// Global Hardware State
-// =============================================================================
-
-type LedPin = Pin<
-    rp2040_hal::gpio::bank0::Gpio25,
-    rp2040_hal::gpio::FunctionSio<rp2040_hal::gpio::SioOutput>,
-    rp2040_hal::gpio::PullDown,
->;
-
-type TempSensor = rp2040_hal::adc::TempSense;
-type AdcType = Adc;
-
-/// Global LED pin protected by a Mutex for safe access from command handlers
-static LED_PIN: Mutex<RefCell<Option<LedPin>>> = Mutex::new(RefCell::new(None));
-
-/// Global ADC and temperature sensor for reading temperature
-static ADC: Mutex<RefCell<Option<AdcType>>> = Mutex::new(RefCell::new(None));
-static TEMP_SENSOR: Mutex<RefCell<Option<TempSensor>>> = Mutex::new(RefCell::new(None));
-
-/// Set the LED state (on = true, off = false)
-pub fn set_led(on: bool) {
-    cortex_m::interrupt::free(|cs| {
-        if let Some(led) = LED_PIN.borrow(cs).borrow_mut().as_mut() {
-            if on {
-                let _ = led.set_high();
-            } else {
-                let _ = led.set_low();
-            }
-        }
-    });
-}
-
-/// Read the current temperature from the internal sensor
-pub fn read_temperature() -> f32 {
-    cortex_m::interrupt::free(|cs| {
-        let mut adc_ref = ADC.borrow(cs).borrow_mut();
-        let mut sensor_ref = TEMP_SENSOR.borrow(cs).borrow_mut();
-
-        if let (Some(adc), Some(sensor)) = (adc_ref.as_mut(), sensor_ref.as_mut()) {
-            // Read temperature sensor (OneShot trait returns nb::Result)
-            let read_result: nb::Result<u16, _> = adc.read(sensor);
-            if let Ok(adc_value) = read_result {
-                // Convert ADC value to temperature (RP2040 formula)
-                // T = 27 - (ADC_voltage - 0.706) / 0.001721
-                // ADC_voltage = (adc_value * 3.3) / 4096
-                let adc_voltage = (adc_value as f32 * 3.3) / 4096.0;
-                let temp_celsius = 27.0 - (adc_voltage - 0.706) / 0.001721;
-                return temp_celsius;
-            }
-        }
-
-        // Return a default value if reading fails
-        0.0
-    })
-}
-
-// =============================================================================
-// UART CharIo Implementation
-// =============================================================================
-
-type UartPins = (
-    Pin<rp2040_hal::gpio::bank0::Gpio0, FunctionUart, PullDown>,
-    Pin<rp2040_hal::gpio::bank0::Gpio1, FunctionUart, PullDown>,
-);
-type UartType = UartPeripheral<rp2040_hal::uart::Enabled, pac::UART0, UartPins>;
-
-struct UartCharIo {
-    uart: UartType,
-}
-
-impl UartCharIo {
-    fn new(uart: UartType) -> Self {
-        Self { uart }
-    }
-}
-
-impl CharIo for UartCharIo {
-    type Error = ();
-
-    fn get_char(&mut self) -> Result<Option<char>, Self::Error> {
-        // Non-blocking read
-        if self.uart.uart_is_readable() {
-            let mut buf = [0u8; 1];
-            match self.uart.read_raw(&mut buf) {
-                Ok(n) if n > 0 => Ok(Some(buf[0] as char)),
-                Ok(_) => Ok(None),
-                Err(_) => Ok(None),
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
-        // Blocking write for simplicity
-        self.uart.write_full_blocking(&[c as u8]);
-        Ok(())
-    }
-
-    fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.uart.write_full_blocking(s.as_bytes());
-        Ok(())
-    }
-}
 
 // =============================================================================
 // Main Entry Point
@@ -167,83 +48,22 @@ fn main() -> ! {
     init_boot_time();
 
     // Get peripheral access
-    let mut pac = pac::Peripherals::take().unwrap();
+    let pac = pac::Peripherals::take().unwrap();
     let core = pac::CorePeripherals::take().unwrap();
 
-    // Set up watchdog
-    let mut watchdog = Watchdog::new(pac.WATCHDOG);
-
-    // Configure clocks
-    let xosc_crystal_freq = 12_000_000; // 12 MHz crystal on Pico
-    let clocks = init_clocks_and_plls(
-        xosc_crystal_freq,
-        pac.XOSC,
-        pac.CLOCKS,
-        pac.PLL_SYS,
-        pac.PLL_USB,
-        &mut pac.RESETS,
-        &mut watchdog,
-    )
-    .ok()
-    .unwrap();
-
-    // Set up delay
-    let mut delay = Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
-
-    // Set up GPIO
-    let sio = Sio::new(pac.SIO);
-    let pins = rp2040_hal::gpio::Pins::new(
-        pac.IO_BANK0,
-        pac.PADS_BANK0,
-        sio.gpio_bank0,
-        &mut pac.RESETS,
-    );
-
-    // Configure onboard LED (GP25) as output
-    let led = pins.gpio25.into_push_pull_output();
-
-    // Store LED in global static
-    cortex_m::interrupt::free(|cs| {
-        LED_PIN.borrow(cs).replace(Some(led));
-    });
-
-    // Configure UART on GP0 (TX) and GP1 (RX)
-    let uart_pins = (
-        pins.gpio0.into_function::<FunctionUart>(),
-        pins.gpio1.into_function::<FunctionUart>(),
-    );
-
-    let uart = UartPeripheral::new(pac.UART0, uart_pins, &mut pac.RESETS)
-        .enable(
-            UartConfig::new(
-                HertzU32::from_raw(115200),
-                DataBits::Eight,
-                None,
-                StopBits::One,
-            ),
-            clocks.peripheral_clock.freq(),
-        )
-        .unwrap();
+    // Initialize all hardware (clocks, GPIO, UART, ADC, LED, temperature sensor)
+    let hw_config = hw_setup::init_hardware(pac, core);
+    let mut delay = hw_config.delay;
 
     // Create CharIo wrapper
-    let io = UartCharIo::new(uart);
+    let io = UartCharIo::new(hw_config.uart);
 
-    // Initialize hardware status
+    // Initialize hardware status (chip ID must be read after HAL initialization)
     init_chip_id();
 
-    // Initialize ADC for temperature readings
-    let mut adc = Adc::new(pac.ADC, &mut pac.RESETS);
-    let temp_sensor = adc.take_temp_sensor().unwrap();
-
-    // Store ADC and temperature sensor in global statics
-    cortex_m::interrupt::free(|cs| {
-        ADC.borrow(cs).replace(Some(adc));
-        TEMP_SENSOR.borrow(cs).replace(Some(temp_sensor));
-    });
-
     // Register hardware access functions
-    hw_commands::register_led_control(set_led);
-    hw_commands::register_temp_sensor(read_temperature);
+    hw_commands::register_led_control(hw_state::set_led);
+    hw_commands::register_temp_sensor(hw_state::read_temperature);
 
     // Create handlers
     let handlers = PicoHandlers;

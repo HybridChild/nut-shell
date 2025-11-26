@@ -19,6 +19,40 @@ pub struct PicoHandlers {
     pub led_channel: &'static Channel<ThreadModeRawMutex, LedCommand, 1>,
 }
 
+impl PicoHandlers {
+    fn system_info(&self) -> Result<Response<DefaultConfig>, CliError> {
+        let mut msg = heapless::String::<256>::new();
+        write!(msg, "Device: Raspberry Pi Pico\r\n").ok();
+        write!(msg, "Chip: RP2040\r\n").ok();
+        write!(msg, "Runtime: Embassy\r\n").ok();
+        write!(msg, "Firmware: nut-shell v0.1.0 - UART CLI Example\r\n").ok();
+        write!(msg, "UART: GP0(TX)/GP1(RX) @ 115200").ok();
+        Ok(Response::success(&msg).indented())
+    }
+
+    fn signal_led(&self, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+        let state = args[0];
+        match state {
+            "on" => {
+                self.led_channel.try_send(LedCommand::On).ok();
+                Ok(Response::success("LED turned on").indented())
+            }
+            "off" => {
+                self.led_channel.try_send(LedCommand::Off).ok();
+                Ok(Response::success("LED turned off").indented())
+            }
+            _ => {
+                let mut expected = heapless::String::<32>::new();
+                expected.push_str("on or off").ok();
+                Err(CliError::InvalidArgumentFormat {
+                    arg_index: 0,
+                    expected,
+                })
+            }
+        }
+    }
+}
+
 impl CommandHandler<DefaultConfig> for PicoHandlers {
     fn execute_sync(
         &self,
@@ -26,36 +60,7 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
         args: &[&str],
     ) -> Result<Response<DefaultConfig>, CliError> {
         match id {
-            "led" => {
-                let state = args[0];
-                match state {
-                    "on" => {
-                        self.led_channel.try_send(LedCommand::On).ok();
-                        Ok(Response::success("LED turned on").indented())
-                    }
-                    "off" => {
-                        self.led_channel.try_send(LedCommand::Off).ok();
-                        Ok(Response::success("LED turned off").indented())
-                    }
-                    _ => {
-                        let mut expected = heapless::String::<32>::new();
-                        expected.push_str("on or off").ok();
-                        Err(CliError::InvalidArgumentFormat {
-                            arg_index: 0,
-                            expected,
-                        })
-                    }
-                }
-            }
-            "system_info" => {
-                let mut msg = heapless::String::<256>::new();
-                write!(msg, "Device: Raspberry Pi Pico\r\n").ok();
-                write!(msg, "Chip: RP2040\r\n").ok();
-                write!(msg, "Runtime: Embassy\r\n").ok();
-                write!(msg, "Firmware: nut-shell v0.1.0\r\n").ok();
-                write!(msg, "UART: GP0(TX)/GP1(RX) @ 115200").ok();
-                Ok(Response::success(&msg).indented())
-            }
+            "system_info" => self.system_info(),
             // System diagnostic commands
             "system_uptime" => system_commands::cmd_uptime::<DefaultConfig>(args),
             "system_meminfo" => system_commands::cmd_meminfo::<DefaultConfig>(args),
@@ -69,6 +74,8 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
             "hw_core" => hw_commands::cmd_core::<DefaultConfig>(args),
             "hw_bootreason" => hw_commands::cmd_bootreason::<DefaultConfig>(args),
             "hw_gpio" => hw_commands::cmd_gpio::<DefaultConfig>(args),
+            // Hardware control commands
+            "led" => self.signal_led(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
