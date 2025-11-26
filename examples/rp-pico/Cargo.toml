@@ -6,8 +6,8 @@ authors = ["Esben Dueholm Nørgaard"]
 
 [dependencies]
 # Nut-shell library (parent crate)
-# Default features for basic example (synchronous, authentication)
-nut-shell = { path = "../..", default-features = false, features = ["authentication"] }
+# Default features for examples (synchronous, no authentication by default)
+nut-shell = { path = "../..", default-features = false }
 
 # Cortex-M support
 cortex-m = "0.7.7"
@@ -51,7 +51,7 @@ required-features = ["embassy"]
 
 [features]
 
-default = ["authentication", "completion", "history"]
+default = ["completion", "history"]
 
 # Pass features through to nut-shell
 authentication = ["nut-shell/authentication"]

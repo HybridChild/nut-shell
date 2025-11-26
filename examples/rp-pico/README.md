@@ -2,8 +2,8 @@
 
 Examples for Raspberry Pi Pico (RP2040) demonstrating **nut-shell** CLI framework on embedded hardware.
 
-- **[basic](#basic)** - Complete interactive command-line interface over UART with authentication, command navigation, and embedded-optimized features (synchronous/bare-metal).
-- **[embassy](#embassy)** - Embassy async runtime example with async command execution and buffered UART I/O (demonstrates async feature).
+- **[basic](#basic)** - Complete interactive command-line interface over UART with optional authentication, command navigation, and embedded-optimized features (synchronous/bare-metal).
+- **[embassy](#embassy)** - Embassy async runtime example with async command execution, buffered UART I/O, and optional authentication (demonstrates async feature).
 
 ## Hardware Setup
 
@@ -109,11 +109,11 @@ A complete interactive command-line interface demonstrating nut-shell on embedde
 
 **Features:**
 - UART communication at 115200 baud
-- User authentication with password hashing (SHA-256)
+- Optional user authentication with password hashing (SHA-256)
 - Hierarchical command tree navigation (`cd`, `..`)
-- Command execution with access control
+- Optional command execution with access control
 - Global commands (`?`, `ls`, `clear`, `logout`)
-- Interactive prompt showing current user and path
+- Interactive prompt showing current directory (and user when authenticated)
 - Minimal memory footprint (no heap allocation)
 
 **Commands Available:**
@@ -133,11 +133,13 @@ Global:
 
 **Authentication:**
 
-When built with authentication feature (default):
+When built with the `authentication` feature enabled:
 - **admin:pico123** (Admin access - full control)
 - **user:pico456** (User access - limited commands)
 
 Login format: `username:password` (no spaces)
+
+Without authentication, the CLI starts directly at the prompt.
 
 **What you'll learn:**
 - How to implement CharIo trait for UART
@@ -202,7 +204,7 @@ An Embassy-based async runtime example demonstrating nut-shell with async comman
 - Async command execution using `process_char_async()`
 - LED control via async channel communication
 - Async delay command demonstration
-- User authentication with password hashing (SHA-256)
+- Optional user authentication with password hashing (SHA-256)
 - Minimal memory footprint with static allocation
 
 **Commands Available:**
@@ -222,8 +224,12 @@ Global:
 ```
 
 **Authentication:**
+
+When built with the `authentication` feature enabled:
 - **admin:pico123** (Admin access - full control)
 - **user:pico456** (User access - limited commands)
+
+Without authentication, the CLI starts directly at the prompt.
 
 **What you'll learn:**
 - How to integrate nut-shell with Embassy async runtime
@@ -269,19 +275,88 @@ user@/system>
 - **RefCell for Interior Mutability**: Shared buffer accessed through RefCell to enable both Shell and flush logic to access the same buffer
 - **Dual I/O References**: Two `BufferedUartCharIo` instances reference the same buffer - one owned by Shell, one for flushing
 
-## Building Without Authentication
+## Building with Different Feature Combinations
 
-To build without the authentication feature (open access, no login):
+The examples support various feature combinations to customize functionality. The target (`thumbv6m-none-eabi`) is automatically configured in `.cargo/config.toml`.
+
+### Available Features
+
+- **`authentication`** - User authentication with password hashing (SHA-256)
+- **`completion`** - Tab completion for commands and directories
+- **`history`** - Command history with arrow key navigation
+- **`embassy`** - Embassy async runtime (required for embassy example)
+
+### Default Configuration
+
+By default, examples build with `completion` and `history` enabled, but **without** authentication:
 
 ```bash
-# Edit Cargo.toml and remove "authentication" from nut-shell features:
-nut-shell = { path = "../..", default-features = false }  # No features
-
-# Then build:
+# Basic example (default features)
 cargo build --release --bin basic
+
+# Embassy example (default features + async)
+cargo build --release --bin embassy --features embassy
 ```
 
-When authentication is disabled, the CLI starts directly at the prompt without requiring login.
+### With Authentication
+
+To enable user authentication and login:
+
+```bash
+# Basic example with authentication
+cargo build --release --bin basic --features authentication
+
+# Embassy example with authentication
+cargo build --release --bin embassy --features embassy,authentication
+
+# With all features enabled
+cargo build --release --bin basic --features authentication,completion,history
+```
+
+**Default credentials:**
+- `admin:pico123` (Admin access)
+- `user:pico456` (User access)
+
+### Without Any Optional Features
+
+Minimal build with only core functionality:
+
+```bash
+# Basic example (no optional features)
+cargo build --release --bin basic --no-default-features
+
+# Embassy example (only async, no other features)
+cargo build --release --bin embassy --no-default-features --features embassy
+```
+
+### Custom Feature Combinations
+
+Mix and match features as needed:
+
+```bash
+# Authentication + history, no completion
+cargo build --release --bin basic --no-default-features --features authentication,history
+
+# Completion only
+cargo build --release --bin basic --no-default-features --features completion
+
+# Embassy with all features
+cargo build --release --bin embassy --no-default-features --features embassy,authentication,completion,history
+```
+
+### Behavior Differences
+
+**With authentication enabled:**
+- Shows login prompt on startup
+- Requires `username:password` to access commands
+- Access control based on user level
+- `logout` command available
+
+**Without authentication:**
+- Starts directly at command prompt
+- No login required
+- All commands accessible
+- No `logout` command
 
 ## Troubleshooting
 

@@ -30,7 +30,10 @@ use nut_shell::{
     shell::Shell,
 };
 
-use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider, hw_commands, init_boot_time, init_chip_id, init_reset_reason};
+use rp_pico_examples::{PicoAccessLevel, hw_commands, init_boot_time, init_chip_id, init_reset_reason};
+
+#[cfg(feature = "authentication")]
+use rp_pico_examples::PicoCredentialProvider;
 
 use crate::handlers::PicoHandlers;
 use crate::io::UartCharIo;
@@ -68,10 +71,18 @@ fn main() -> ! {
     // Create handlers
     let handlers = PicoHandlers;
 
-    // Create shell with authentication
+    // Create credential provider (must live as long as shell)
+    #[cfg(feature = "authentication")]
     let provider = PicoCredentialProvider::new();
+
+    // Create shell (with or without authentication based on feature flag)
+    #[cfg(feature = "authentication")]
     let mut shell: Shell<PicoAccessLevel, UartCharIo, PicoHandlers, DefaultConfig> =
         Shell::new(&ROOT, handlers, &provider, io);
+
+    #[cfg(not(feature = "authentication"))]
+    let mut shell: Shell<PicoAccessLevel, UartCharIo, PicoHandlers, DefaultConfig> =
+        Shell::new(&ROOT, handlers, io);
 
     // Activate shell (show welcome and prompt)
     shell.activate().ok();
