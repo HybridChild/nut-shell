@@ -7,16 +7,6 @@ use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 // System Commands
 // =============================================================================
 
-pub const CMD_REBOOT: CommandMeta<PicoAccessLevel> = CommandMeta {
-    id: "system_reboot",
-    name: "reboot",
-    description: "Reboot the device",
-    access_level: PicoAccessLevel::Admin,
-    kind: CommandKind::Sync,
-    min_args: 0,
-    max_args: 0,
-};
-
 pub const CMD_INFO: CommandMeta<PicoAccessLevel> = CommandMeta {
     id: "system_info",
     name: "info",
@@ -29,7 +19,7 @@ pub const CMD_INFO: CommandMeta<PicoAccessLevel> = CommandMeta {
 
 const SYSTEM_DIR: Directory<PicoAccessLevel> = Directory {
     name: "system",
-    children: &[Node::Command(&CMD_REBOOT), Node::Command(&CMD_INFO)],
+    children: &[Node::Command(&CMD_INFO)],
     access_level: PicoAccessLevel::User,
 };
 

@@ -121,8 +121,7 @@ A complete interactive command-line interface demonstrating nut-shell on embedde
 ```
 /
 ├── system/
-│   ├── info    - Show device information (User)
-│   └── reboot  - Reboot the device (Admin)
+│   └── info    - Show device information (User)
 └── led <on|off> - Toggle LED (User)
 
 Global:
@@ -183,7 +182,6 @@ admin@/> cd system
 admin@/system> ls
 Commands:
   info           (User)       Show device information
-  reboot         (Admin)      Reboot the device
 
 admin@/system> info
 Device: Raspberry Pi Pico
@@ -213,8 +211,7 @@ An Embassy-based async runtime example demonstrating nut-shell with async comman
 /
 ├── system/
 │   ├── info    - Show device information (User)
-│   ├── delay <seconds> - Async delay demo (User) [ASYNC]
-│   └── reboot  - Reboot the device (Admin)
+│   └── delay <seconds> - Async delay demo (User) [ASYNC]
 └── led <on|off> - Toggle LED (User)
 
 Global:

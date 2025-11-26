@@ -56,12 +56,6 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
                 write!(msg, "UART: GP0(TX)/GP1(RX) @ 115200").ok();
                 Ok(Response::success(&msg))
             }
-            "system_reboot" => {
-                // In a real implementation, trigger watchdog reset
-                Ok(Response::success(
-                    "Rebooting...\r\n(Not implemented in example)",
-                ))
-            }
             // Hardware status commands
             "hw_temp" => hw_commands::cmd_temp::<DefaultConfig>(args),
             "hw_chipid" => hw_commands::cmd_chipid::<DefaultConfig>(args),
