@@ -5,7 +5,7 @@ use heapless;
 use nut_shell::{
     config::DefaultConfig, response::Response, shell::handlers::CommandHandler, CliError,
 };
-use rp_pico_examples::hw_commands;
+use rp_pico_examples::{hw_commands, system_commands};
 
 pub struct PicoHandlers;
 
@@ -26,6 +26,12 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
                 write!(msg, "UART: GP0(TX)/GP1(RX) @ 115200").ok();
                 Ok(Response::success(&msg).indented())
             }
+            // System diagnostic commands
+            "system_uptime" => system_commands::cmd_uptime::<DefaultConfig>(args),
+            "system_meminfo" => system_commands::cmd_meminfo::<DefaultConfig>(args),
+            "system_benchmark" => system_commands::cmd_benchmark::<DefaultConfig>(args),
+            "system_flash" => system_commands::cmd_flash::<DefaultConfig>(args),
+            "system_crash" => system_commands::cmd_crash::<DefaultConfig>(args),
             // Hardware status commands
             "hw_temp" => hw_commands::cmd_temp::<DefaultConfig>(args),
             "hw_chipid" => hw_commands::cmd_chipid::<DefaultConfig>(args),
@@ -35,5 +41,15 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
             "hw_gpio" => hw_commands::cmd_gpio::<DefaultConfig>(args),
             _ => Err(CliError::CommandNotFound),
         }
+    }
+
+    #[cfg(feature = "async")]
+    async fn execute_async(
+        &self,
+        _id: &str,
+        _args: &[&str],
+    ) -> Result<Response<DefaultConfig>, CliError> {
+        // uart_cli is synchronous-only, no async commands
+        Err(CliError::CommandNotFound)
     }
 }

@@ -61,7 +61,7 @@ async = ["nut-shell/async"]
 
 # Embassy async support (enables async feature in nut-shell and all embassy dependencies)
 embassy = [
-    "nut-shell/async",
+    "async",  # Enable local async feature
     "dep:embassy-executor",
     "dep:embassy-time",
     "dep:embassy-rp",

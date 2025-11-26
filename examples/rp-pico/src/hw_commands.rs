@@ -110,6 +110,7 @@ pub const CMD_LED: CommandMeta<PicoAccessLevel> = CommandMeta {
     max_args: 1,
 };
 
+
 // =============================================================================
 // Hardware Access Registration Functions
 // =============================================================================
@@ -145,13 +146,15 @@ pub fn register_led_control(control_fn: fn(bool)) {
     }
 }
 
-/// Cache reset reason registers at startup
+/// Cache reset reason registers and boot time at startup
 ///
 /// **IMPORTANT**: Call this FIRST in main(), before any HAL initialization
 /// or other code that might read these registers.
 ///
 /// The WATCHDOG REASON register auto-clears on read, so it must be read
 /// immediately at startup to capture the actual boot reason.
+///
+/// Also caches the current timer value to calculate uptime correctly.
 ///
 /// # Safety
 /// This function writes to mutable statics. Safe to call once from main()
@@ -581,3 +584,4 @@ pub fn cmd_led<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
         }
     }
 }
+

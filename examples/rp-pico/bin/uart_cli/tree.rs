@@ -1,6 +1,6 @@
 //! Command tree definition for the uart_cli example
 
-use rp_pico_examples::{PicoAccessLevel, hw_commands};
+use rp_pico_examples::{PicoAccessLevel, hw_commands, system_commands};
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 
 // =============================================================================
@@ -19,7 +19,14 @@ pub const CMD_INFO: CommandMeta<PicoAccessLevel> = CommandMeta {
 
 const SYSTEM_DIR: Directory<PicoAccessLevel> = Directory {
     name: "system",
-    children: &[Node::Command(&CMD_INFO)],
+    children: &[
+        Node::Command(&CMD_INFO),
+        Node::Command(&system_commands::CMD_UPTIME),
+        Node::Command(&system_commands::CMD_MEMINFO),
+        Node::Command(&system_commands::CMD_BENCHMARK),
+        Node::Command(&system_commands::CMD_FLASH),
+        Node::Command(&system_commands::CMD_CRASH),
+    ],
     access_level: PicoAccessLevel::User,
 };
 
