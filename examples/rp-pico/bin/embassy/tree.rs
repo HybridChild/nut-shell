@@ -4,6 +4,20 @@ use rp_pico_examples::{PicoAccessLevel, hw_commands, system_commands};
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 
 // =============================================================================
+// LED Control Command (Embassy channel-based)
+// =============================================================================
+
+pub const CMD_LED: CommandMeta<PicoAccessLevel> = CommandMeta {
+    id: "led",
+    name: "led",
+    description: "Control onboard LED (on/off)",
+    access_level: PicoAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 1,
+    max_args: 1,
+};
+
+// =============================================================================
 // System Commands
 // =============================================================================
 
@@ -31,7 +45,6 @@ const SYSTEM_DIR: Directory<PicoAccessLevel> = Directory {
     name: "system",
     children: &[
         Node::Command(&CMD_INFO),
-        Node::Command(&CMD_DELAY),
         Node::Command(&system_commands::CMD_UPTIME),
         Node::Command(&system_commands::CMD_MEMINFO),
         Node::Command(&system_commands::CMD_BENCHMARK),
@@ -62,7 +75,7 @@ const HARDWARE_GET_DIR: Directory<PicoAccessLevel> = Directory {
 // Hardware write/control commands
 const HARDWARE_SET_DIR: Directory<PicoAccessLevel> = Directory {
     name: "set",
-    children: &[Node::Command(&hw_commands::CMD_LED)],
+    children: &[Node::Command(&CMD_LED)],
     access_level: PicoAccessLevel::User,
 };
 
@@ -84,6 +97,7 @@ pub const ROOT: Directory<PicoAccessLevel> = Directory {
     children: &[
         Node::Directory(&SYSTEM_DIR),
         Node::Directory(&HARDWARE_DIR),
+        Node::Command(&CMD_DELAY),
     ],
     access_level: PicoAccessLevel::User,
 };

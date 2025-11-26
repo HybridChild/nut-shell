@@ -390,66 +390,62 @@ pub fn cmd_bootreason<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, Cli
 
     let mut msg = heapless::String::<256>::new();
     write!(msg, "Reset Diagnostics:\r\n").ok();
-    write!(msg, "\r\n").ok();
 
     // === WATCHDOG REASON (immediate cause) ===
-    write!(msg, "Watchdog Reason:\r\n").ok();
+    write!(msg, "  Watchdog Reason:    ").ok();
     match watchdog_reason {
         Some(reason) => {
             if reason & (1 << 1) != 0 {
-                write!(msg, "  [x] Watchdog Timeout\r\n").ok();
+                write!(msg, "[x] Watchdog Timeout\r\n").ok();
             }
             if reason & (1 << 0) != 0 {
-                write!(msg, "  [x] Forced Reset\r\n").ok();
+                write!(msg, "[x] Forced Reset\r\n").ok();
             }
             if reason == 0 {
-                write!(msg, "  [None - Normal boot]\r\n").ok();
+                write!(msg, "[None - Normal boot]\r\n").ok();
             }
         }
         None => {
-            write!(msg, "  [Not cached]\r\n").ok();
-            write!(msg, "  Call init_reset_reason() at startup\r\n").ok();
+            write!(msg, "[Not cached]\r\n").ok();
         }
     }
-    write!(msg, "\r\n").ok();
 
     // === CHIP_RESET (detailed source flags) ===
-    write!(msg, "Reset Source Flags:\r\n").ok();
+    write!(msg, "  Reset Source Flags: ").ok();
     match chip_reset {
         Some(flags) => {
             let mut found_flag = false;
 
             // Bit 24: PSM_RESTART_FLAG - Debugger recovered from boot lock-up
             if flags & (1 << 24) != 0 {
-                write!(msg, "  [x] PSM Restart (Boot Recovery)\r\n").ok();
+                write!(msg, "[x] PSM Restart (Boot Recovery)").ok();
                 found_flag = true;
             }
 
             // Bit 20: HAD_PSM_RESTART - Reset from debug port
             if flags & (1 << 20) != 0 {
-                write!(msg, "  [x] Debug Port Reset\r\n").ok();
+                write!(msg, "[x] Debug Port Reset").ok();
                 found_flag = true;
             }
 
             // Bit 16: HAD_RUN - Reset from RUN pin
             if flags & (1 << 16) != 0 {
-                write!(msg, "  [x] RUN Pin Reset\r\n").ok();
+                write!(msg, "[x] RUN Pin Reset").ok();
                 found_flag = true;
             }
 
             // Bit 8: HAD_POR - Power-on or brown-out reset
             if flags & (1 << 8) != 0 {
-                write!(msg, "  [x] Power-On Reset\r\n").ok();
+                write!(msg, "[x] Power-On Reset").ok();
                 found_flag = true;
             }
 
             if !found_flag {
-                write!(msg, "  [No flags set]").ok();
+                write!(msg, "[No flags set]").ok();
             }
         }
         None => {
-            write!(msg, "  [Not cached]\r\n").ok();
-            write!(msg, "  Call init_reset_reason() at startup").ok();
+            write!(msg, "[Not cached]").ok();
         }
     }
 

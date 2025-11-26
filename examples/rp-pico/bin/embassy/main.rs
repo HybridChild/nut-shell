@@ -8,32 +8,6 @@
 //! - UART RX: GP1
 //! - Baud rate: 115200
 //!
-//! # Building
-//! ```bash
-//! cd examples/rp-pico
-//! cargo build --release --bin embassy --features embassy
-//! ```
-//!
-//! # Flashing
-//! ```bash
-//! # Using picotool
-//! picotool load -x target/thumbv6m-none-eabi/release/embassy
-//!
-//! # Or using elf2uf2-rs
-//! elf2uf2-rs target/thumbv6m-none-eabi/release/embassy embassy.uf2
-//! # Then copy embassy.uf2 to the RPI-RP2 drive
-//! ```
-//!
-//! # Connecting
-//! Connect to the serial port at 115200 baud:
-//! ```bash
-//! # Linux
-//! screen /dev/ttyACM0 115200
-//!
-//! # macOS
-//! screen /dev/tty.usbmodem* 115200
-//! ```
-//!
 //! # Features
 //! - Embassy async runtime
 //! - Async command execution with `process_char_async()`

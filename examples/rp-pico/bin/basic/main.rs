@@ -6,31 +6,6 @@
 //! - UART TX: GP0
 //! - UART RX: GP1
 //! - Baud rate: 115200
-//!
-//! # Building
-//! ```bash
-//! cd examples/rp-pico
-//! cargo build --release --bin basic
-//! ```
-//!
-//! # Flashing
-//! ```bash
-//! # Using picotool
-//! picotool load -x target/thumbv6m-none-eabi/release/basic
-//!
-//! # Or using elf2uf2-rs
-//! elf2uf2-rs target/thumbv6m-none-eabi/release/basic basic.uf2
-//! # Then copy basic.uf2 to the RPI-RP2 drive
-//! ```
-//!
-//! # Connecting
-//! Connect to the serial port at 115200 baud:
-//! ```bash
-//! # Linux
-//! screen /dev/ttyACM0 115200
-//!
-//! # macOS
-//! screen /dev/tty.usbmodem* 115200
 
 #![no_std]
 #![no_main]

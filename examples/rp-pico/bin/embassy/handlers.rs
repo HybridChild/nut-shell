@@ -31,11 +31,11 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
                 match state {
                     "on" => {
                         self.led_channel.try_send(LedCommand::On).ok();
-                        Ok(Response::success("LED turned on"))
+                        Ok(Response::success("LED turned on").indented())
                     }
                     "off" => {
                         self.led_channel.try_send(LedCommand::Off).ok();
-                        Ok(Response::success("LED turned off"))
+                        Ok(Response::success("LED turned off").indented())
                     }
                     _ => {
                         let mut expected = heapless::String::<32>::new();
@@ -54,7 +54,7 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
                 write!(msg, "Runtime: Embassy\r\n").ok();
                 write!(msg, "Firmware: nut-shell v0.1.0\r\n").ok();
                 write!(msg, "UART: GP0(TX)/GP1(RX) @ 115200").ok();
-                Ok(Response::success(&msg))
+                Ok(Response::success(&msg).indented())
             }
             // System diagnostic commands
             "system_uptime" => system_commands::cmd_uptime::<DefaultConfig>(args),
@@ -101,7 +101,7 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
 
                 let mut msg = heapless::String::<64>::new();
                 write!(msg, "Delayed for {} second(s)", seconds).ok();
-                Ok(Response::success(&msg))
+                Ok(Response::success(&msg).indented().indented())
             }
             _ => Err(CliError::CommandNotFound),
         }
