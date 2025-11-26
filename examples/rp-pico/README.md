@@ -2,8 +2,8 @@
 
 Examples for Raspberry Pi Pico (RP2040) demonstrating **nut-shell** CLI framework on embedded hardware.
 
-- **[uart_cli](#uart_cli)** - Complete interactive command-line interface over UART with authentication, command navigation, and embedded-optimized features (synchronous/bare-metal).
-- **[embassy_uart_cli](#embassy_uart_cli)** - Embassy async runtime example with async command execution and buffered UART I/O (demonstrates async feature).
+- **[basic](#basic)** - Complete interactive command-line interface over UART with authentication, command navigation, and embedded-optimized features (synchronous/bare-metal).
+- **[embassy](#embassy)** - Embassy async runtime example with async command execution and buffered UART I/O (demonstrates async feature).
 
 ## Hardware Setup
 
@@ -103,7 +103,7 @@ screen /dev/tty.usbserial-* 115200
 
 ## Examples
 
-### uart_cli
+### basic
 
 A complete interactive command-line interface demonstrating nut-shell on embedded hardware.
 
@@ -154,7 +154,7 @@ Login format: `username:password` (no spaces)
 **Run:**
 
 ```bash
-cargo run --release --bin uart_cli
+cargo run --release --bin basic
 ```
 
 **Expected Output:**
@@ -192,7 +192,7 @@ UART: GP0(TX)/GP1(RX) @ 115200
 admin@/system>
 ```
 
-### embassy_uart_cli
+### embassy
 
 An Embassy-based async runtime example demonstrating nut-shell with async command execution.
 
@@ -242,14 +242,14 @@ Global:
 
 ```bash
 # Build with embassy feature
-cargo build --release --bin embassy_uart_cli --features embassy
+cargo build --release --bin embassy --features embassy
 
 # Flash using probe-rs
-cargo run --release --bin embassy_uart_cli --features embassy
+cargo run --release --bin embassy --features embassy
 
 # Or flash using UF2 bootloader
-elf2uf2-rs target/thumbv6m-none-eabi/release/embassy_uart_cli embassy_uart_cli.uf2
-cp embassy_uart_cli.uf2 /Volumes/RPI-RP2/
+elf2uf2-rs target/thumbv6m-none-eabi/release/embassy embassy.uf2
+cp embassy.uf2 /Volumes/RPI-RP2/
 ```
 
 **Try the async delay command:**
@@ -278,7 +278,7 @@ To build without the authentication feature (open access, no login):
 nut-shell = { path = "../..", default-features = false }  # No features
 
 # Then build:
-cargo build --release --bin uart_cli
+cargo build --release --bin basic
 ```
 
 When authentication is disabled, the CLI starts directly at the prompt without requiring login.

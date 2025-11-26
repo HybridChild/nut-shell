@@ -1,4 +1,4 @@
-//! Command tree definition for the uart_cli example
+//! Command tree definition for the embassy example
 
 use rp_pico_examples::{PicoAccessLevel, hw_commands, system_commands};
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
@@ -17,10 +17,21 @@ pub const CMD_INFO: CommandMeta<PicoAccessLevel> = CommandMeta {
     max_args: 0,
 };
 
+pub const CMD_DELAY: CommandMeta<PicoAccessLevel> = CommandMeta {
+    id: "system_delay",
+    name: "delay",
+    description: "Async delay demonstration (seconds)",
+    access_level: PicoAccessLevel::User,
+    kind: CommandKind::Async,
+    min_args: 1,
+    max_args: 1,
+};
+
 const SYSTEM_DIR: Directory<PicoAccessLevel> = Directory {
     name: "system",
     children: &[
         Node::Command(&CMD_INFO),
+        Node::Command(&CMD_DELAY),
         Node::Command(&system_commands::CMD_UPTIME),
         Node::Command(&system_commands::CMD_MEMINFO),
         Node::Command(&system_commands::CMD_BENCHMARK),

@@ -1,4 +1,4 @@
-//! Command handlers for the embassy_uart_cli example
+//! Command handlers for the embassy example
 
 use core::fmt::Write;
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;

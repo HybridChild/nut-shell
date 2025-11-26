@@ -10,17 +10,17 @@
 //! # Building
 //! ```bash
 //! cd examples/rp-pico
-//! cargo build --release --bin uart_cli
+//! cargo build --release --bin basic
 //! ```
 //!
 //! # Flashing
 //! ```bash
 //! # Using picotool
-//! picotool load -x target/thumbv6m-none-eabi/release/uart_cli
+//! picotool load -x target/thumbv6m-none-eabi/release/basic
 //!
 //! # Or using elf2uf2-rs
-//! elf2uf2-rs target/thumbv6m-none-eabi/release/uart_cli uart_cli.uf2
-//! # Then copy uart_cli.uf2 to the RPI-RP2 drive
+//! elf2uf2-rs target/thumbv6m-none-eabi/release/basic basic.uf2
+//! # Then copy basic.uf2 to the RPI-RP2 drive
 //! ```
 //!
 //! # Connecting

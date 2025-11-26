@@ -11,17 +11,17 @@
 //! # Building
 //! ```bash
 //! cd examples/rp-pico
-//! cargo build --release --bin embassy_uart_cli
+//! cargo build --release --bin embassy --features embassy
 //! ```
 //!
 //! # Flashing
 //! ```bash
 //! # Using picotool
-//! picotool load -x target/thumbv6m-none-eabi/release/embassy_uart_cli
+//! picotool load -x target/thumbv6m-none-eabi/release/embassy
 //!
 //! # Or using elf2uf2-rs
-//! elf2uf2-rs target/thumbv6m-none-eabi/release/embassy_uart_cli embassy_uart_cli.uf2
-//! # Then copy embassy_uart_cli.uf2 to the RPI-RP2 drive
+//! elf2uf2-rs target/thumbv6m-none-eabi/release/embassy embassy.uf2
+//! # Then copy embassy.uf2 to the RPI-RP2 drive
 //! ```
 //!
 //! # Connecting

@@ -1,4 +1,4 @@
-//! Command handlers for the uart_cli example
+//! Command handlers for the basic example
 
 use core::fmt::Write;
 use heapless;
@@ -49,7 +49,7 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
         _id: &str,
         _args: &[&str],
     ) -> Result<Response<DefaultConfig>, CliError> {
-        // uart_cli is synchronous-only, no async commands
+        // basic example is synchronous-only, no async commands
         Err(CliError::CommandNotFound)
     }
 }
