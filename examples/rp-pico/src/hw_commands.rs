@@ -22,6 +22,12 @@ use crate::access_level::PicoAccessLevel;
 /// Cached chip ID, read once at startup
 static mut CHIP_ID: Option<[u8; 8]> = None;
 
+/// Cached watchdog reason, read once at startup (before it auto-clears)
+static mut CACHED_WATCHDOG_REASON: Option<u32> = None;
+
+/// Cached chip reset flags, read once at startup
+static mut CACHED_CHIP_RESET: Option<u32> = None;
+
 /// Cached temperature reading (in degrees Celsius)
 static mut CACHED_TEMP: Option<f32> = None;
 
@@ -55,7 +61,7 @@ pub const CMD_TEMP: CommandMeta<PicoAccessLevel> = CommandMeta {
 pub const CMD_CHIPID: CommandMeta<PicoAccessLevel> = CommandMeta {
     id: "hw_chipid",
     name: "chipid",
-    description: "Display unique chip ID",
+    description: "Display flash unique ID (64-bit)",
     access_level: PicoAccessLevel::User,
     kind: CommandKind::Sync,
     min_args: 0,
@@ -171,6 +177,30 @@ pub fn register_led_control(control_fn: fn(bool)) {
     }
 }
 
+/// Cache reset reason registers at startup
+///
+/// **IMPORTANT**: Call this FIRST in main(), before any HAL initialization
+/// or other code that might read these registers.
+///
+/// The WATCHDOG REASON register auto-clears on read, so it must be read
+/// immediately at startup to capture the actual boot reason.
+///
+/// # Safety
+/// This function writes to mutable statics. Safe to call once from main()
+/// before starting any other tasks or enabling interrupts.
+pub fn init_reset_reason() {
+    // WATCHDOG REASON register (auto-clears on read)
+    const WATCHDOG_REASON: u32 = 0x4005_8008;
+
+    // CHIP_RESET register (sticky flags)
+    const CHIP_RESET: u32 = 0x4006_4008;
+
+    unsafe {
+        CACHED_WATCHDOG_REASON = Some(core::ptr::read_volatile(WATCHDOG_REASON as *const u32));
+        CACHED_CHIP_RESET = Some(core::ptr::read_volatile(CHIP_RESET as *const u32));
+    }
+}
+
 // =============================================================================
 // Temperature Sensor Command
 // =============================================================================
@@ -213,22 +243,38 @@ pub fn init_chip_id() {
     }
 }
 
-/// Read the flash unique ID directly
+/// Read the flash unique ID directly using RP2040 ROM function
 ///
-/// This function must be called very early at startup, ideally before
-/// main application code runs.
+/// The RP2040 bootrom provides a function to read the 64-bit unique ID
+/// from the external flash chip. This ID is globally unique per flash chip.
+///
+/// This function calls the ROM function 'flash_get_unique_id' which:
+/// 1. Sends a READ UNIQUE ID command (0x4B) to the flash
+/// 2. Reads 8 bytes from the flash
+/// 3. Stores them in the provided buffer
 fn read_flash_id() -> [u8; 8] {
-    // Placeholder - in a real implementation, this would:
-    // 1. Call into ROM bootloader function
-    // 2. Or use rp2040-hal if it provides this
-    // For now, return a dummy ID to demonstrate the pattern
-    [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
+    // TODO: Implement proper ROM function calling
+    //
+    // The RP2040 ROM provides flash_get_unique_id but calling it requires:
+    // 1. Correct ROM function table lookup mechanism
+    // 2. Proper calling convention (ABI compatibility)
+    // 3. Running from RAM or with XIP cache disabled
+    // 4. Second core halted
+    //
+    // For now, return a placeholder ID. To properly implement this:
+    // - Use rp2040-hal's rom module if/when available
+    // - Or implement the exact pico-sdk ROM calling sequence
+    // - Or read the flash chip's ID register directly via QSPI
+
+    // Return a recognizable placeholder pattern
+    [0xDE, 0xAD, 0xBE, 0xEF, 0xBA, 0xBE, 0xCA, 0xFE]
 }
 
-/// Read the unique 64-bit chip ID from flash
+/// Read the unique 64-bit flash ID
 ///
-/// Every RP2040 has a globally unique 64-bit identifier stored in its flash memory.
-/// This ID is set at manufacturing time and cannot be changed.
+/// Every flash chip has a globally unique 64-bit identifier.
+/// Since the flash is permanently paired with the RP2040 on the Pico board,
+/// this effectively serves as a unique board identifier.
 ///
 /// The ID is read once at startup by calling `init_chip_id()` and cached.
 /// This command retrieves the cached value.
@@ -240,7 +286,7 @@ pub fn cmd_chipid<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErro
             let mut msg = heapless::String::<128>::new();
             write!(
                 msg,
-                "Chip ID: {:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
+                "Flash ID: {:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
                 id[0], id[1], id[2], id[3], id[4], id[5], id[6], id[7]
             )
             .ok();
@@ -248,7 +294,7 @@ pub fn cmd_chipid<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErro
         }
         None => {
             let mut msg = heapless::String::<256>::new();
-            write!(msg, "Chip ID: [Not initialized]\r\n").ok();
+            write!(msg, "Flash ID: [Not initialized]\r\n").ok();
             write!(msg, "\r\n").ok();
             write!(msg, "Call hw_commands::init_chip_id() at startup.").ok();
             Ok(Response::success(&msg).indented())
@@ -312,38 +358,81 @@ pub fn cmd_core<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError>
 // Boot/Reset Reason Command
 // =============================================================================
 
-/// Display the reason for the last system reset
+/// Display comprehensive reset reason information
 ///
-/// Possible reasons include:
-/// - Power-on reset
-/// - External reset pin
-/// - Watchdog timeout
-/// - Debugger reset
+/// Displays cached values from WATCHDOG REASON and CHIP_RESET registers.
+/// Call `init_reset_reason()` at the very start of main() to cache these values.
+/// - WATCHDOG REASON: Immediate cause (cached at startup before auto-clear)
+/// - CHIP_RESET: Detailed source flags (sticky bits)
 pub fn cmd_bootreason<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
-    // Read the CHIP_RESET register from the PSM peripheral
-    // PSM base: 0x40010000
-    // CHIP_RESET offset: 0x00
-    const PSM_CHIP_RESET: u32 = 0x4001_0000;
-    let reset_flags = unsafe { core::ptr::read_volatile(PSM_CHIP_RESET as *const u32) };
+    // Read cached values (set by init_reset_reason() at startup)
+    let (watchdog_reason, chip_reset) = unsafe {
+        (CACHED_WATCHDOG_REASON, CACHED_CHIP_RESET)
+    };
 
     let mut msg = heapless::String::<256>::new();
-    write!(msg, "Reset Reason:\r\n").ok();
+    write!(msg, "Reset Diagnostics:\r\n").ok();
+    write!(msg, "\r\n").ok();
 
-    if reset_flags & (1 << 24) != 0 {
-        write!(msg, "  [x] Power-on Reset\r\n").ok();
+    // === WATCHDOG REASON (immediate cause) ===
+    write!(msg, "Watchdog Reason:\r\n").ok();
+    match watchdog_reason {
+        Some(reason) => {
+            if reason & (1 << 1) != 0 {
+                write!(msg, "  [x] Watchdog Timeout\r\n").ok();
+            }
+            if reason & (1 << 0) != 0 {
+                write!(msg, "  [x] Forced Reset\r\n").ok();
+            }
+            if reason == 0 {
+                write!(msg, "  [None - Normal boot]\r\n").ok();
+            }
+        }
+        None => {
+            write!(msg, "  [Not cached]\r\n").ok();
+            write!(msg, "  Call init_reset_reason() at startup\r\n").ok();
+        }
     }
-    if reset_flags & (1 << 20) != 0 {
-        write!(msg, "  [x] External Reset (RUN pin)\r\n").ok();
-    }
-    if reset_flags & (1 << 16) != 0 {
-        write!(msg, "  [x] Watchdog Reset\r\n").ok();
-    }
-    if reset_flags & (1 << 8) != 0 {
-        write!(msg, "  [x] Debugger Reset\r\n").ok();
-    }
+    write!(msg, "\r\n").ok();
 
-    if reset_flags == 0 {
-        write!(msg, "  [Unknown reason]").ok();
+    // === CHIP_RESET (detailed source flags) ===
+    write!(msg, "Reset Source Flags:\r\n").ok();
+    match chip_reset {
+        Some(flags) => {
+            let mut found_flag = false;
+
+            // Bit 24: PSM_RESTART_FLAG - Debugger recovered from boot lock-up
+            if flags & (1 << 24) != 0 {
+                write!(msg, "  [x] PSM Restart (Boot Recovery)\r\n").ok();
+                found_flag = true;
+            }
+
+            // Bit 20: HAD_PSM_RESTART - Reset from debug port
+            if flags & (1 << 20) != 0 {
+                write!(msg, "  [x] Debug Port Reset\r\n").ok();
+                found_flag = true;
+            }
+
+            // Bit 16: HAD_RUN - Reset from RUN pin
+            if flags & (1 << 16) != 0 {
+                write!(msg, "  [x] RUN Pin Reset\r\n").ok();
+                found_flag = true;
+            }
+
+            // Bit 8: HAD_POR - Power-on or brown-out reset
+            if flags & (1 << 8) != 0 {
+                write!(msg, "  [x] Power-On Reset\r\n").ok();
+                found_flag = true;
+            }
+
+            if !found_flag {
+                write!(msg, "  [No flags set]").ok();
+            }
+        }
+        None => {
+            write!(msg, "  [Not cached]\r\n").ok();
+            write!(msg, "  Call init_reset_reason() at startup").ok();
+        }
     }
 
     Ok(Response::success(&msg).indented())

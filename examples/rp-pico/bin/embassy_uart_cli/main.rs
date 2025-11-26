@@ -69,7 +69,7 @@ use nut_shell::{
     shell::Shell,
 };
 
-use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider, hw_commands, init_chip_id};
+use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider, hw_commands, init_chip_id, init_reset_reason};
 
 use crate::handlers::{LedCommand, PicoHandlers};
 use crate::tree::ROOT;
@@ -241,6 +241,10 @@ async fn shell_task(
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
+    // Cache reset reason FIRST, before any HAL initialization
+    // The WATCHDOG REASON register auto-clears on first read
+    init_reset_reason();
+
     // Initialize peripherals
     let p = embassy_rp::init(Default::default());
 

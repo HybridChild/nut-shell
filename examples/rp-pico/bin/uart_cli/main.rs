@@ -69,7 +69,7 @@ use nut_shell::{
     shell::Shell,
 };
 
-use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider, hw_commands, init_chip_id};
+use rp_pico_examples::{PicoAccessLevel, PicoCredentialProvider, hw_commands, init_chip_id, init_reset_reason};
 
 use crate::handlers::PicoHandlers;
 use crate::tree::ROOT;
@@ -159,6 +159,10 @@ impl CharIo for UartCharIo {
 
 #[entry]
 fn main() -> ! {
+    // Cache reset reason FIRST, before any HAL initialization
+    // The WATCHDOG REASON register auto-clears on first read
+    init_reset_reason();
+
     // Get peripheral access
     let mut pac = pac::Peripherals::take().unwrap();
     let core = pac::CorePeripherals::take().unwrap();

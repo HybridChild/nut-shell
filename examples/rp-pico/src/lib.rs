@@ -16,4 +16,4 @@ pub use access_level::PicoAccessLevel;
 pub use credentials::PicoCredentialProvider;
 
 // Re-export hardware command initialization
-pub use hw_commands::init_chip_id;
+pub use hw_commands::{init_chip_id, init_reset_reason};
