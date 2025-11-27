@@ -1,0 +1,137 @@
+#![no_std]
+#![no_main]
+
+use core::fmt::Write;
+use nut_shell::tree::{Directory, Node};
+use nut_shell::{CharIo, CliError, CommandHandler, Response, Shell, ShellConfig};
+use panic_halt as _;
+
+// Minimal access level for testing
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, nut_shell::AccessLevel)]
+pub enum Level {
+    User = 0,
+}
+
+// Minimal CharIo implementation - measures only struct size
+pub struct MinimalIo;
+
+impl CharIo for MinimalIo {
+    type Error = ();
+
+    fn get_char(&mut self) -> Result<Option<char>, Self::Error> {
+        Ok(None)
+    }
+
+    fn put_char(&mut self, _c: char) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+impl Write for MinimalIo {
+    fn write_str(&mut self, _s: &str) -> core::fmt::Result {
+        Ok(())
+    }
+}
+
+// Minimal configuration - use small buffers to measure base overhead
+struct MinConfig;
+
+impl ShellConfig for MinConfig {
+    const MAX_INPUT: usize = 64;
+    const MAX_PATH_DEPTH: usize = 4;
+    const MAX_ARGS: usize = 8;
+    const MAX_PROMPT: usize = 32;
+    const MAX_RESPONSE: usize = 128;
+    const HISTORY_SIZE: usize = 0; // Disabled unless history feature enabled
+
+    const MSG_WELCOME: &'static str = "nut-shell\r\n";
+    const MSG_LOGIN_PROMPT: &'static str = "login: ";
+    const MSG_LOGIN_SUCCESS: &'static str = "ok\r\n";
+    const MSG_LOGIN_FAILED: &'static str = "fail\r\n";
+    const MSG_LOGOUT: &'static str = "bye\r\n";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "invalid\r\n";
+}
+
+// Empty directory tree - measures ONLY nut-shell overhead
+const ROOT: Directory<Level> = Directory {
+    name: "",
+    children: &[],
+    access_level: Level::User,
+};
+
+// Minimal command handler
+struct MinHandlers;
+
+impl CommandHandler<MinConfig> for MinHandlers {
+    fn execute_sync(
+        &self,
+        _id: &str,
+        _args: &[&str],
+    ) -> Result<Response<MinConfig>, CliError> {
+        Err(CliError::CommandNotFound)
+    }
+
+    #[cfg(feature = "async")]
+    async fn execute_async(
+        &self,
+        _id: &str,
+        _args: &[&str],
+    ) -> Result<Response<MinConfig>, CliError> {
+        Err(CliError::CommandNotFound)
+    }
+}
+
+// Minimal credential provider for authentication feature
+#[cfg(feature = "authentication")]
+struct MinCredentials;
+
+#[cfg(feature = "authentication")]
+impl nut_shell::auth::CredentialProvider<Level> for MinCredentials {
+    type Error = ();
+
+    fn find_user(&self, _username: &str) -> Result<Option<nut_shell::auth::User<Level>>, Self::Error> {
+        Ok(None)
+    }
+
+    fn verify_password(&self, _user: &nut_shell::auth::User<Level>, _password: &str) -> bool {
+        false
+    }
+
+    fn list_users(&self) -> Result<heapless::Vec<&str, 32>, Self::Error> {
+        Ok(heapless::Vec::new())
+    }
+}
+
+// Entry point
+#[cortex_m_rt::entry]
+fn main() -> ! {
+    let io = MinimalIo;
+    let handlers = MinHandlers;
+
+    #[cfg(feature = "authentication")]
+    let credentials = MinCredentials;
+
+    #[cfg(feature = "authentication")]
+    let mut shell = Shell::new(&ROOT, handlers, &credentials, io);
+
+    #[cfg(not(feature = "authentication"))]
+    let mut shell = Shell::new(&ROOT, handlers, io);
+
+    // Activate shell to ensure all code paths are included
+    let _ = shell.activate();
+
+    // Process one character to ensure process_char code is included
+    let _ = shell.process_char('?');
+
+    loop {
+        cortex_m::asm::nop();
+    }
+}
+
+// Required: exception handler
+#[cortex_m_rt::exception]
+unsafe fn HardFault(_ef: &cortex_m_rt::ExceptionFrame) -> ! {
+    loop {
+        cortex_m::asm::nop();
+    }
+}

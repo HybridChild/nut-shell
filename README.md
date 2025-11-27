@@ -128,26 +128,48 @@ See [docs/IO_DESIGN.md](docs/IO_DESIGN.md) for implementation details.
 
 ## Memory Footprint
 
-### Flash (Code Size)
-| Configuration | Size |
-|---------------|------|
-| Minimal (no features) | ~3-4KB |
-| All features enabled | ~8-10KB |
-| Authentication only | ~5-6KB |
-| Interactive features (completion + history) | ~6-7KB |
+Typical sizes on ARMv6-M (Cortex-M0+, thumbv6m-none-eabi target):
 
-### RAM
+### Flash (Code Size)
+| Feature Set | .text + .rodata |
+|-------------|-----------------|
+| Minimal (no features) | ~3-4KB |
+| + authentication | ~5-6KB |
+| + completion + history | ~6-7KB |
+| All features enabled | ~8-10KB |
+
+### RAM (Runtime)
 | Component | Default | Configurable |
 |-----------|---------|--------------|
-| Input buffer | 128 bytes | `MAX_INPUT` const generic |
-| Path stack | 32 bytes | `MAX_PATH_DEPTH` const generic |
-| Command history (N=10) | ~1.3KB | `HISTORY_SIZE` const generic |
+| Input buffer | 128 bytes | `ShellConfig::MAX_INPUT` |
+| Path stack | 32 bytes | `ShellConfig::MAX_PATH_DEPTH` |
+| Command history (N=10) | ~1.3KB | `ShellConfig::HISTORY_SIZE` |
 | Command history (N=4) | ~0.5KB | RAM-constrained config |
 
 **Minimal configuration:** ~0.2KB RAM (no history, minimal buffers)
 **Default configuration:** ~1.5KB RAM (history enabled)
 
-See [docs/EXAMPLES.md](docs/EXAMPLES.md) for buffer sizing guidance and configuration examples.
+### Understanding Generic Type Sizes
+
+nut-shell is generic over user-provided types. Their sizes depend on YOUR implementation:
+
+- **`CharIo`** (I/O): Minimal UART wrapper (~0-16 bytes) or buffered I/O (~64-512 bytes)
+- **`CredentialProvider`** (auth): Static array or flash-backed storage (~4-32 bytes)
+- **`CommandHandler`**: Stateless (0 bytes) or stateful (size of your state)
+
+### Detailed Analysis
+
+For exact measurements and symbol-level analysis across all feature combinations:
+
+```bash
+cd size-analysis
+./analyze.sh
+cat report.md
+```
+
+The analysis uses a minimal reference binary with an empty directory tree to isolate the pure overhead of nut-shell itself. Your actual binary will be larger due to your command implementations, directory tree structure, and I/O adapters.
+
+See [size-analysis/README.md](size-analysis/README.md) for methodology and interpretation guide.
 
 ---
 

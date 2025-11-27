@@ -1,0 +1,120 @@
+name: Memory Footprint Analysis
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'size-analysis/**'
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  size-analysis:
+    name: Analyze Binary Size
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv6m-none-eabi
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: size-analysis/minimal/target
+          key: ${{ runner.os }}-cargo-build-size-${{ hashFiles('size-analysis/minimal/Cargo.lock') }}
+
+      - name: Install cargo-bloat
+        run: cargo install cargo-bloat --locked
+
+      - name: Install ARM GCC toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi
+
+      - name: Run size analysis
+        run: |
+          cd size-analysis
+          ./analyze.sh
+
+      - name: Upload size report
+        uses: actions/upload-artifact@v4
+        with:
+          name: size-analysis-report
+          path: size-analysis/report.md
+          retention-days: 90
+
+      - name: Comment PR with summary (on pull requests)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('size-analysis/report.md', 'utf8');
+
+            // Extract summary table from report
+            const summaryStart = report.indexOf('## Summary Table');
+            const summaryEnd = report.indexOf('\n---\n', summaryStart);
+            const summary = report.substring(summaryStart, summaryEnd);
+
+            const body = `## Memory Footprint Analysis
+
+            ${summary}
+
+            <details>
+            <summary>📊 View Full Report</summary>
+
+            [Download the complete analysis report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            </details>
+
+            > This is an informational report. Size increases may be justified for feature additions.`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Memory Footprint Analysis')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }

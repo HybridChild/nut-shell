@@ -1,0 +1,28 @@
+[package]
+name = "nut-shell-size-analysis"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nut-shell = { path = "../..", default-features = false }
+heapless = { version = "0.9.2", default-features = false }
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
+panic-halt = "1.0.0"
+
+[features]
+default = []
+authentication = ["nut-shell/authentication"]
+completion = ["nut-shell/completion"]
+history = ["nut-shell/history"]
+async = ["nut-shell/async"]
+
+[profile.release]
+opt-level = "z"     # Optimize for size
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Better optimization
+strip = false       # Keep symbols for analysis
+
+[[bin]]
+name = "minimal"
+path = "src/main.rs"
