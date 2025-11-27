@@ -58,11 +58,21 @@ const SYSTEM_DIR: Directory<PicoAccessLevel> = Directory {
 // Hardware Commands
 // =============================================================================
 
+pub const CMD_TEMP: CommandMeta<PicoAccessLevel> = CommandMeta {
+    id: "hw_temp",
+    name: "temp",
+    description: "Read internal temperature sensor",
+    access_level: PicoAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
 // Hardware read commands
 const HARDWARE_GET_DIR: Directory<PicoAccessLevel> = Directory {
     name: "get",
     children: &[
-        Node::Command(&hw_commands::CMD_TEMP),
+        Node::Command(&CMD_TEMP),
         Node::Command(&hw_commands::CMD_CHIPID),
         Node::Command(&hw_commands::CMD_CLOCKS),
         Node::Command(&hw_commands::CMD_CORE),

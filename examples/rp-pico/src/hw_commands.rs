@@ -28,27 +28,9 @@ static mut CACHED_WATCHDOG_REASON: Option<u32> = None;
 /// Cached chip reset flags, read once at startup
 static mut CACHED_CHIP_RESET: Option<u32> = None;
 
-/// Temperature sensor read function pointer (set by main at startup)
-static mut TEMP_READ_FN: Option<fn() -> f32> = None;
-
-
-
-/// LED control function pointer (set by main at startup)
-static mut LED_CONTROL_FN: Option<fn(bool)> = None;
-
 // =============================================================================
 // Command Metadata (for use in command trees)
 // =============================================================================
-
-pub const CMD_TEMP: CommandMeta<PicoAccessLevel> = CommandMeta {
-    id: "hw_temp",
-    name: "temp",
-    description: "Read internal temperature sensor",
-    access_level: PicoAccessLevel::User,
-    kind: CommandKind::Sync,
-    min_args: 0,
-    max_args: 0,
-};
 
 pub const CMD_CHIPID: CommandMeta<PicoAccessLevel> = CommandMeta {
     id: "hw_chipid",
@@ -100,51 +82,9 @@ pub const CMD_GPIO: CommandMeta<PicoAccessLevel> = CommandMeta {
     max_args: 1,
 };
 
-pub const CMD_LED: CommandMeta<PicoAccessLevel> = CommandMeta {
-    id: "hw_led",
-    name: "led",
-    description: "Control onboard LED (on/off)",
-    access_level: PicoAccessLevel::User,
-    kind: CommandKind::Sync,
-    min_args: 1,
-    max_args: 1,
-};
-
-
 // =============================================================================
 // Hardware Access Registration Functions
 // =============================================================================
-
-/// Register the temperature sensor read function
-///
-/// Call this once at startup to provide hardware access for the temp command.
-/// The function should return the current temperature in degrees Celsius.
-///
-/// # Example
-/// ```no_run
-/// fn read_temperature() -> f32 {
-///     // Read ADC, convert to temperature
-///     25.0
-/// }
-/// register_temp_sensor(read_temperature);
-/// ```
-pub fn register_temp_sensor(read_fn: fn() -> f32) {
-    unsafe {
-        TEMP_READ_FN = Some(read_fn);
-    }
-}
-
-
-
-/// Register the LED control function
-///
-/// Call this once at startup to provide hardware access for the LED command.
-/// The function should accept a boolean (true = on, false = off).
-pub fn register_led_control(control_fn: fn(bool)) {
-    unsafe {
-        LED_CONTROL_FN = Some(control_fn);
-    }
-}
 
 /// Cache reset reason registers and boot time at startup
 ///
@@ -169,25 +109,6 @@ pub fn init_reset_reason() {
     unsafe {
         CACHED_WATCHDOG_REASON = Some(core::ptr::read_volatile(WATCHDOG_REASON as *const u32));
         CACHED_CHIP_RESET = Some(core::ptr::read_volatile(CHIP_RESET as *const u32));
-    }
-}
-
-// =============================================================================
-// Temperature Sensor Command
-// =============================================================================
-
-/// Read the internal temperature sensor (ADC channel 4)
-///
-/// Returns the chip temperature in degrees Celsius.
-/// The value is read on-demand by calling the registered temperature read function.
-pub fn cmd_temp<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
-    if let Some(read_fn) = unsafe { TEMP_READ_FN } {
-        let celsius = read_fn();
-        let mut msg = heapless::String::<64>::new();
-        write!(msg, "Temperature: {:.1}°C", celsius).ok();
-        Ok(Response::success(&msg).indented())
-    } else {
-        Ok(Response::success("Temperature sensor not initialized").indented())
     }
 }
 
@@ -543,42 +464,4 @@ pub fn cmd_gpio<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> 
     Ok(Response::success(&msg).indented())
 }
 
-// =============================================================================
-// LED Control Command
-// =============================================================================
-
-/// Control the onboard LED
-///
-/// # Arguments
-/// - `state`: "on" or "off"
-pub fn cmd_led<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
-    let state = args[0];
-
-    match state {
-        "on" => {
-            if let Some(control_fn) = unsafe { LED_CONTROL_FN } {
-                control_fn(true);
-                Ok(Response::success("LED turned on").indented())
-            } else {
-                Ok(Response::success("LED control not initialized").indented())
-            }
-        }
-        "off" => {
-            if let Some(control_fn) = unsafe { LED_CONTROL_FN } {
-                control_fn(false);
-                Ok(Response::success("LED turned off").indented())
-            } else {
-                Ok(Response::success("LED control not initialized").indented())
-            }
-        }
-        _ => {
-            let mut expected = heapless::String::<32>::new();
-            expected.push_str("on or off").ok();
-            Err(CliError::InvalidArgumentFormat {
-                arg_index: 0,
-                expected,
-            })
-        }
-    }
-}
 

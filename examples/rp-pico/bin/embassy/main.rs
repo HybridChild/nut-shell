@@ -44,7 +44,7 @@ use nut_shell::{
     shell::Shell,
 };
 
-use rp_pico_examples::{PicoAccessLevel, hw_commands, init_boot_time, init_chip_id, init_reset_reason};
+use rp_pico_examples::{PicoAccessLevel, init_boot_time, init_chip_id, init_reset_reason};
 
 #[cfg(feature = "authentication")]
 use rp_pico_examples::PicoCredentialProvider;
@@ -148,9 +148,6 @@ async fn main(spawner: Spawner) {
 
     // Initialize hardware peripherals (ADC, temperature sensor, LED)
     let hw_config = hw_setup::init_hardware(p.ADC, p.ADC_TEMP_SENSOR, p.PIN_25);
-
-    // Register temperature sensor read function
-    hw_commands::register_temp_sensor(hw_state::read_temperature);
 
     // Create LED command channel
     static LED_CHANNEL: StaticCell<Channel<ThreadModeRawMutex, LedCommand, 1>> = StaticCell::new();

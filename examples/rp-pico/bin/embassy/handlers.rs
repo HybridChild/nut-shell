@@ -10,6 +10,8 @@ use nut_shell::{
 };
 use rp_pico_examples::{hw_commands, system_commands};
 
+use crate::hw_state;
+
 pub enum LedCommand {
     On,
     Off,
@@ -51,6 +53,13 @@ impl PicoHandlers {
             }
         }
     }
+
+    fn temperature(&self) -> Result<Response<DefaultConfig>, CliError> {
+        let celsius = hw_state::read_temperature();
+        let mut msg = heapless::String::<64>::new();
+        write!(msg, "Temperature: {:.1}°C", celsius).ok();
+        Ok(Response::success(&msg).indented())
+    }
 }
 
 impl CommandHandler<DefaultConfig> for PicoHandlers {
@@ -68,7 +77,7 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
             "system_flash" => system_commands::cmd_flash::<DefaultConfig>(args),
             "system_crash" => system_commands::cmd_crash::<DefaultConfig>(args),
             // Hardware status commands
-            "hw_temp" => hw_commands::cmd_temp::<DefaultConfig>(args),
+            "hw_temp" => self.temperature(),
             "hw_chipid" => hw_commands::cmd_chipid::<DefaultConfig>(args),
             "hw_clocks" => hw_commands::cmd_clocks::<DefaultConfig>(args),
             "hw_core" => hw_commands::cmd_core::<DefaultConfig>(args),

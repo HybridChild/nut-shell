@@ -34,11 +34,21 @@ const SYSTEM_DIR: Directory<PicoAccessLevel> = Directory {
 // Hardware Commands
 // =============================================================================
 
+pub const CMD_TEMP: CommandMeta<PicoAccessLevel> = CommandMeta {
+    id: "hw_temp",
+    name: "temp",
+    description: "Read internal temperature sensor",
+    access_level: PicoAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
 // Hardware read commands
 const HARDWARE_GET_DIR: Directory<PicoAccessLevel> = Directory {
     name: "get",
     children: &[
-        Node::Command(&hw_commands::CMD_TEMP),
+        Node::Command(&CMD_TEMP),
         Node::Command(&hw_commands::CMD_CHIPID),
         Node::Command(&hw_commands::CMD_CLOCKS),
         Node::Command(&hw_commands::CMD_CORE),
@@ -49,9 +59,19 @@ const HARDWARE_GET_DIR: Directory<PicoAccessLevel> = Directory {
 };
 
 // Hardware write/control commands
+pub const CMD_LED: CommandMeta<PicoAccessLevel> = CommandMeta {
+    id: "hw_led",
+    name: "led",
+    description: "Control onboard LED (on/off)",
+    access_level: PicoAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 1,
+    max_args: 1,
+};
+
 const HARDWARE_SET_DIR: Directory<PicoAccessLevel> = Directory {
     name: "set",
-    children: &[Node::Command(&hw_commands::CMD_LED)],
+    children: &[Node::Command(&CMD_LED)],
     access_level: PicoAccessLevel::User,
 };
 
