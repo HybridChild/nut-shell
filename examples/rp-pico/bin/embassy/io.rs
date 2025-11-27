@@ -1,23 +1,26 @@
-//! Buffered UART CharIo implementation for Embassy async example
+//! Buffered CharIo implementation for Embassy async example
+//!
+//! This buffered I/O adapter works with any transport (USB CDC, UART, etc.).
 
 use core::cell::RefCell;
 use heapless;
 use nut_shell::io::CharIo;
 
 // =============================================================================
-// UART CharIo Implementation (Buffered for Embassy)
+// Buffered CharIo Implementation
 // =============================================================================
 
-/// Buffered UART I/O adapter for Embassy.
+/// Buffered I/O adapter for Embassy.
 ///
 /// Implements the deferred flush pattern described in IO_DESIGN.md:
 /// - `put_char()` and `write_str()` buffer to memory only
 /// - Output is stored in an internal buffer accessed via RefCell
-pub struct BufferedUartCharIo {
+/// - The main async loop reads from transport and flushes buffer to transport
+pub struct BufferedCharIo {
     output_buffer: &'static RefCell<heapless::Vec<u8, 512>>,
 }
 
-impl BufferedUartCharIo {
+impl BufferedCharIo {
     pub fn new(output_buffer: &'static RefCell<heapless::Vec<u8, 512>>) -> Self {
         Self { output_buffer }
     }
@@ -36,7 +39,7 @@ impl BufferedUartCharIo {
     }
 }
 
-impl CharIo for BufferedUartCharIo {
+impl CharIo for BufferedCharIo {
     type Error = ();
 
     fn get_char(&mut self) -> Result<Option<char>, Self::Error> {

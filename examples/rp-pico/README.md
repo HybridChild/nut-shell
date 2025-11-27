@@ -2,32 +2,18 @@
 
 Examples for Raspberry Pi Pico (RP2040) demonstrating **nut-shell** CLI framework on embedded hardware.
 
-- **[basic](#basic)** - Complete interactive command-line interface over UART with optional authentication, command navigation, and embedded-optimized features (synchronous/bare-metal).
-- **[embassy](#embassy)** - Embassy async runtime example with async command execution, buffered UART I/O, and optional authentication (demonstrates async feature).
+- **[basic](#basic)** - Complete interactive command-line interface over USB CDC with optional authentication, command navigation, and embedded-optimized features (synchronous/bare-metal).
+- **[embassy](#embassy)** - Embassy async runtime example with async command execution, buffered USB I/O, and optional authentication (demonstrates async feature).
 
 ## Hardware Setup
 
-### UART Connections
+### USB Connection
 
-The examples use UART0 for serial communication:
+Both examples use **USB CDC (Communications Device Class)** for serial communication - no external UART adapter needed!
 
-- **TX (Output)**: GPIO0
-- **RX (Input)**: GPIO1
-- **Baud Rate**: 115200
-- **Ground**: Connect GND pin
-
-### Connection Diagram
-
-```
-Raspberry Pi Pico          USB-to-Serial Adapter
-┌─────────────┐            ┌──────────────┐
-│          GP0├────────────┤RX            │
-│          GP1├────────────┤TX            │
-│          GND├────────────┤GND           │
-└─────────────┘            └──────────────┘
-```
-
-**Note**: Connect Pico GP0 (TX) to adapter RX, and Pico GP1 (RX) to adapter TX (crossover).
+- **Connection**: Simply connect the Pico's USB port directly to your computer
+- **Serial Port**: Appears as `/dev/tty.usbmodemnut_shell1` (macOS/Linux) or `COMx` (Windows)
+- **Baud Rate**: Not applicable (USB Full Speed - 12 Mbps)
 
 ## Building and Flashing
 
@@ -35,8 +21,8 @@ Raspberry Pi Pico          USB-to-Serial Adapter
 
 - Rust toolchain with `thumbv6m-none-eabi` target
 - probe-rs (recommended) or elf2uf2-rs for flashing
-- USB-to-Serial adapter (e.g., FTDI, CP2102)
 - Serial terminal (screen, minicom, PuTTY)
+- **No USB-to-Serial adapter needed** - uses built-in USB!
 
 ### Install Target
 
@@ -86,17 +72,17 @@ cp <example_name>.uf2 /media/$USER/RPI-RP2/  # Linux
 
 ### Connect to Serial
 
-After flashing, connect to the serial port:
+After flashing, the Pico will enumerate as a USB serial device. Connect using:
 
 ```bash
 # Linux
-screen /dev/ttyUSB0 115200
+screen /dev/tty.usbmodemnut_shell1 115200
 
 # macOS
-screen /dev/tty.usbserial-* 115200
+screen /dev/tty.usbmodemnut_shell1 115200
 
 # Windows (PowerShell)
-# Use PuTTY or another terminal emulator
+# Use PuTTY or another terminal emulator - look for "USB Serial Device (COMx)"
 ```
 
 **Exit screen**: Press `Ctrl+A` then `K` then `Y`
@@ -105,10 +91,10 @@ screen /dev/tty.usbserial-* 115200
 
 ### basic
 
-A complete interactive command-line interface demonstrating nut-shell on embedded hardware.
+A complete interactive command-line interface demonstrating nut-shell on embedded hardware over USB CDC.
 
 **Features:**
-- UART communication at 115200 baud
+- USB CDC serial communication (no external adapter needed)
 - Optional user authentication with password hashing (SHA-256)
 - Hierarchical command tree navigation (`cd`, `..`)
 - Optional command execution with access control
@@ -121,8 +107,22 @@ A complete interactive command-line interface demonstrating nut-shell on embedde
 ```
 /
 ├── system/
-│   └── info    - Show device information (User)
-└── led <on|off> - Toggle LED (User)
+│   ├── info       - Show device information (User)
+│   ├── uptime     - Show system uptime (User)
+│   ├── meminfo    - Display memory information (User)
+│   ├── benchmark  - Run performance benchmark (User)
+│   ├── flash      - Display flash memory info (User)
+│   └── crash      - Trigger panic for testing (Admin)
+└── hardware/
+    ├── get/
+    │   ├── temp       - Read temperature sensor (User)
+    │   ├── chipid     - Show flash unique ID (User)
+    │   ├── clocks     - Display clock frequencies (User)
+    │   ├── core       - Show CPU core ID (User)
+    │   ├── bootreason - Show last reset reason (User)
+    │   └── gpio <pin> - Show GPIO pin status (User)
+    └── set/
+        └── led <on|off> - Control onboard LED (User)
 
 Global:
   ?      - Show help
@@ -142,14 +142,14 @@ Login format: `username:password` (no spaces)
 Without authentication, the CLI starts directly at the prompt.
 
 **What you'll learn:**
-- How to implement CharIo trait for UART
+- How to implement CharIo trait for USB CDC
 - How to define command trees for embedded systems
 - How to integrate authentication in resource-constrained environments
 - How to build interactive CLIs without heap allocation
-- UART configuration and initialization on RP2040
+- USB device configuration on RP2040
 
 **Memory Usage:**
-- Flash: ~15KB (with all features)
+- Flash: ~18KB (with all features)
 - RAM: <2KB static allocation
 - No heap allocation (pure `no_std`)
 
@@ -172,37 +172,33 @@ admin@/> ?
   logout    - Exit current session
   clear     - Clear screen
   ESC ESC   - Clear input buffer
-
 admin@/> ls
 Directories:
   system/        (User)       System commands
+  hardware/      (User)       Hardware control
 
-Commands:
-  led            (User)       Toggle onboard LED
+admin@/> cd hardware/get
+admin@/hardware/get> temp
+Temperature: 24.5°C
 
-admin@/> cd system
-admin@/system> ls
-Commands:
-  info           (User)       Show device information
+admin@/hardware/get> cd ../set
+admin@/hardware/set> led on
+LED turned on
 
-admin@/system> info
-Device: Raspberry Pi Pico
-Chip: RP2040
-Firmware: nut-shell v0.1.0
-UART: GP0(TX)/GP1(RX) @ 115200
-
-admin@/system>
+admin@/hardware/set>
 ```
 
 ### embassy
 
-An Embassy-based async runtime example demonstrating nut-shell with async command execution.
+An Embassy-based async runtime example demonstrating nut-shell with async command execution over USB CDC.
 
 **Features:**
 - Embassy async executor for concurrent task execution
-- Async UART I/O with buffered output (deferred flush pattern)
+- USB CDC serial communication (no external adapter needed)
+- Async USB I/O with buffered output (deferred flush pattern)
 - Async command execution using `process_char_async()`
 - LED control via async channel communication
+- Background temperature monitoring task
 - Async delay command demonstration
 - Optional user authentication with password hashing (SHA-256)
 - Minimal memory footprint with static allocation
@@ -212,9 +208,23 @@ An Embassy-based async runtime example demonstrating nut-shell with async comman
 ```
 /
 ├── system/
-│   ├── info    - Show device information (User)
+│   ├── info       - Show device information (User)
+│   ├── uptime     - Show system uptime (User)
+│   ├── meminfo    - Display memory information (User)
+│   ├── benchmark  - Run performance benchmark (User)
+│   ├── flash      - Display flash memory info (User)
+│   ├── crash      - Trigger panic for testing (Admin)
 │   └── delay <seconds> - Async delay demo (User) [ASYNC]
-└── led <on|off> - Toggle LED (User)
+└── hardware/
+    ├── get/
+    │   ├── temp       - Read temperature sensor (User)
+    │   ├── chipid     - Show flash unique ID (User)
+    │   ├── clocks     - Display clock frequencies (User)
+    │   ├── core       - Show CPU core ID (User)
+    │   ├── bootreason - Show last reset reason (User)
+    │   └── gpio <pin> - Show GPIO pin status (User)
+    └── set/
+        └── led <on|off> - Control onboard LED (User)
 
 Global:
   ?      - Show help
@@ -233,15 +243,17 @@ Without authentication, the CLI starts directly at the prompt.
 
 **What you'll learn:**
 - How to integrate nut-shell with Embassy async runtime
+- USB CDC device implementation with embassy-usb
 - Async I/O buffering patterns (deferred flush)
+- Handling large output with packet chunking
 - Async command execution with `process_char_async()`
 - Concurrent task spawning with Embassy executor
 - Inter-task communication using Embassy channels
 - RefCell pattern for shared buffer access
 
 **Memory Usage:**
-- Flash: ~26KB (with async + authentication)
-- RAM: ~5.7KB (including executor stack)
+- Flash: ~30KB (with async + authentication)
+- RAM: ~6KB (including executor stack)
 - No heap allocation (pure `no_std`)
 
 **Build and Run:**
@@ -271,9 +283,11 @@ user@/system>
 
 **Architecture Highlights:**
 
-- **Deferred Flush Pattern**: Output is buffered to memory during `process_char_async()`, then flushed to UART after processing completes (see `IO_DESIGN.md`)
+- **USB CDC Implementation**: Uses embassy-usb for full-speed USB device with CDC-ACM class
+- **Packet Chunking**: Automatically splits output larger than 64 bytes into multiple USB packets
+- **Deferred Flush Pattern**: Output is buffered to memory during `process_char_async()`, then flushed to USB after processing completes (see `IO_DESIGN.md`)
 - **RefCell for Interior Mutability**: Shared buffer accessed through RefCell to enable both Shell and flush logic to access the same buffer
-- **Dual I/O References**: Two `BufferedUartCharIo` instances reference the same buffer - one owned by Shell, one for flushing
+- **Dual I/O References**: Two `BufferedCharIo` instances reference the same buffer - one owned by Shell, one for flushing
 
 ## Building with Different Feature Combinations
 
@@ -366,12 +380,22 @@ cargo build --release --bin embassy --no-default-features --features embassy,aut
 - Try `probe-rs list` to verify probe detection
 - Use UF2 bootloader method if no debug probe available
 
-### Serial port not appearing
+### USB serial port not appearing
 
-- Check USB-to-Serial adapter connection
-- Verify UART wiring (TX/RX crossover, GND connected)
-- Try different USB port or cable
-- Check adapter is recognized: `ls /dev/tty*` (Linux/macOS)
+- Check USB cable connection (ensure it's a data cable, not charge-only)
+- Try a different USB port on your computer
+- Wait a few seconds after flashing for USB enumeration
+- Check if device appears in system:
+  - **macOS**: `ls /dev/tty.usb*`
+  - **Linux**: `ls /dev/ttyACM*` or `dmesg | tail`
+  - **Windows**: Device Manager → Ports (COM & LPT)
+
+### Embassy example not enumerating (no USB device)
+
+This was a bug that has been fixed. Ensure you have the latest code with:
+- Correct USB descriptor buffers (config, BOS, control)
+- Proper task spawning order (USB task first)
+- Output packet chunking for data >64 bytes
 
 ### "Permission denied" on serial port (Linux)
 
@@ -380,11 +404,9 @@ sudo usermod -a -G dialout $USER
 # Log out and back in for changes to take effect
 ```
 
-### Garbled output on serial terminal
+### Commands execute but no output visible
 
-- Verify baud rate is set to 115200
-- Check 8N1 configuration (8 data bits, no parity, 1 stop bit)
-- Ensure ground connection between Pico and serial adapter
+This was a bug in the embassy example where output >64 bytes was truncated. Fixed by chunking output into multiple USB packets. Ensure you have the latest code.
 
 ### Build errors about missing target
 
@@ -394,9 +416,13 @@ rustup target add thumbv6m-none-eabi
 
 ## Hardware Verification
 
-These examples have been compiled and verified to build correctly for the thumbv6m-none-eabi target. Hardware testing on physical Raspberry Pi Pico devices is pending.
-
-If you test these examples on hardware, please report your results!
+These examples have been tested and verified working on physical Raspberry Pi Pico hardware:
+- ✅ Basic example: USB CDC communication working
+- ✅ Embassy example: USB CDC with async working
+- ✅ All commands functional
+- ✅ Authentication working
+- ✅ Tab completion working
+- ✅ Command history working
 
 ## License
 

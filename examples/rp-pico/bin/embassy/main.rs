@@ -1,17 +1,17 @@
-//! RP2040 (Raspberry Pi Pico) Embassy UART example with async support
+//! RP2040 (Raspberry Pi Pico) Embassy USB CDC example with async support
 //!
 //! This example demonstrates nut-shell running on RP2040 hardware with Embassy async runtime,
-//! showcasing async command execution with UART communication.
+//! showcasing async command execution with USB CDC serial communication.
 //!
 //! # Hardware Setup
-//! - UART TX: GP0
-//! - UART RX: GP1
-//! - Baud rate: 115200
+//! - USB connection provides serial interface
+//! - No external UART adapter needed
+//! - Connect Pico directly to computer via USB
 //!
 //! # Features
 //! - Embassy async runtime
 //! - Async command execution with `process_char_async()`
-//! - Buffered UART I/O (deferred flush pattern)
+//! - Buffered USB I/O (deferred flush pattern)
 //! - Async delay command demonstration
 
 #![no_std]
@@ -27,14 +27,14 @@ mod tree;
 use core::cell::RefCell;
 use embassy_executor::Spawner;
 use embassy_rp::{
-    bind_interrupts,
-    peripherals::UART0,
-    uart::{self, BufferedInterruptHandler, BufferedUart, BufferedUartRx, BufferedUartTx},
+    peripherals::USB,
+    usb::{Driver, InterruptHandler},
 };
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
 use embassy_sync::channel::Channel;
 use embassy_time::{Duration, Timer};
-use embedded_io_async::{Read as AsyncRead, Write as AsyncWrite};
+use embassy_usb::{Builder, Config};
+use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use heapless;
 use panic_halt as _;
 use static_cell::StaticCell;
@@ -50,23 +50,22 @@ use rp_pico_examples::{PicoAccessLevel, init_boot_time, init_chip_id, init_reset
 use rp_pico_examples::PicoCredentialProvider;
 
 use crate::handlers::{LedCommand, PicoHandlers};
-use crate::io::BufferedUartCharIo;
+use crate::io::BufferedCharIo;
 use crate::tree::ROOT;
 
-// Bind UART interrupt handler
-bind_interrupts!(struct UartIrqs {
-    UART0_IRQ => BufferedInterruptHandler<UART0>;
+// Bind USB interrupt handler
+embassy_rp::bind_interrupts!(struct Irqs {
+    USBCTRL_IRQ => InterruptHandler<USB>;
 });
 
 // =============================================================================
 // Shell Task
 // =============================================================================
 
-/// Shell task with async command processing.
+/// Shell task with async command processing and USB CDC transport.
 #[embassy_executor::task]
 async fn shell_task(
-    mut tx: BufferedUartTx,
-    mut rx: BufferedUartRx,
+    mut usb_class: CdcAcmClass<'static, Driver<'static, USB>>,
     led_channel: &'static Channel<ThreadModeRawMutex, LedCommand, 1>,
 ) {
     // Create output buffer wrapped in RefCell for interior mutability
@@ -74,10 +73,8 @@ async fn shell_task(
     let output_buffer = OUTPUT_BUFFER.init(RefCell::new(heapless::Vec::new()));
 
     // Create buffered I/O (we'll create two references to the same buffer)
-    let io = BufferedUartCharIo::new(output_buffer);
-    let io_flush = BufferedUartCharIo::new(output_buffer); // Second reference for flushing
-
-    // Initialize hardware status cache (done in main, before spawning tasks)
+    let io = BufferedCharIo::new(output_buffer);
+    let io_flush = BufferedCharIo::new(output_buffer); // Second reference for flushing
 
     // Create handlers
     let handlers = PicoHandlers { led_channel };
@@ -88,12 +85,15 @@ async fn shell_task(
 
     // Create shell (with or without authentication based on feature flag)
     #[cfg(feature = "authentication")]
-    let mut shell: Shell<PicoAccessLevel, BufferedUartCharIo, PicoHandlers, DefaultConfig> =
+    let mut shell: Shell<PicoAccessLevel, BufferedCharIo, PicoHandlers, DefaultConfig> =
         Shell::new(&ROOT, handlers, &provider, io);
 
     #[cfg(not(feature = "authentication"))]
-    let mut shell: Shell<PicoAccessLevel, BufferedUartCharIo, PicoHandlers, DefaultConfig> =
+    let mut shell: Shell<PicoAccessLevel, BufferedCharIo, PicoHandlers, DefaultConfig> =
         Shell::new(&ROOT, handlers, io);
+
+    // Wait for USB connection
+    usb_class.wait_connection().await;
 
     // Activate shell
     shell.activate().ok();
@@ -101,28 +101,49 @@ async fn shell_task(
     // Flush initial output (welcome message)
     if io_flush.has_data() {
         let data = io_flush.take_buffer();
-        AsyncWrite::write_all(&mut tx, &data).await.ok();
+        // Write all data, splitting into 64-byte packets as needed
+        let mut offset = 0;
+        while offset < data.len() {
+            let chunk_size = (data.len() - offset).min(64);
+            let chunk = &data[offset..offset + chunk_size];
+            match usb_class.write_packet(chunk).await {
+                Ok(_) => offset += chunk_size,
+                Err(_) => break,
+            }
+        }
     }
 
     // Main async loop
+    let mut usb_buf = [0u8; 64];
     loop {
-        // Read character from UART (async)
-        let mut buf = [0u8; 1];
-        match AsyncRead::read_exact(&mut rx, &mut buf).await {
-            Ok(_) => {
-                let c = buf[0] as char;
+        // Read from USB (async)
+        match usb_class.read_packet(&mut usb_buf).await {
+            Ok(n) if n > 0 => {
+                // Process each character
+                for &byte in &usb_buf[..n] {
+                    let c = byte as char;
 
-                // Process character (async)
-                shell.process_char_async(c).await.ok();
+                    // Process character (async)
+                    shell.process_char_async(c).await.ok();
 
-                // Flush buffered output (deferred flush pattern)
-                if io_flush.has_data() {
-                    let data = io_flush.take_buffer();
-                    AsyncWrite::write_all(&mut tx, &data).await.ok();
+                    // Flush buffered output after each character (deferred flush pattern)
+                    if io_flush.has_data() {
+                        let data = io_flush.take_buffer();
+                        // Write all data, splitting into 64-byte packets as needed
+                        let mut offset = 0;
+                        while offset < data.len() {
+                            let chunk_size = (data.len() - offset).min(64);
+                            let chunk = &data[offset..offset + chunk_size];
+                            match usb_class.write_packet(chunk).await {
+                                Ok(_) => offset += chunk_size,
+                                Err(_) => break, // Stop on error
+                            }
+                        }
+                    }
                 }
             }
-            Err(_) => {
-                // UART error - could log or handle
+            _ => {
+                // USB error or disconnection
                 Timer::after(Duration::from_millis(100)).await;
             }
         }
@@ -140,7 +161,7 @@ async fn main(spawner: Spawner) {
     init_reset_reason();
     init_boot_time();
 
-    // Initialize Embassy runtime
+    // Initialize Embassy runtime (default config includes USB clock setup)
     let p = embassy_rp::init(Default::default());
 
     // Initialize hardware status (chip ID must be read after HAL initialization)
@@ -153,25 +174,56 @@ async fn main(spawner: Spawner) {
     static LED_CHANNEL: StaticCell<Channel<ThreadModeRawMutex, LedCommand, 1>> = StaticCell::new();
     let led_channel = LED_CHANNEL.init(Channel::new());
 
-    // Configure UART on GP0 (TX) and GP1 (RX)
-    static TX_BUF: StaticCell<[u8; 256]> = StaticCell::new();
-    static RX_BUF: StaticCell<[u8; 256]> = StaticCell::new();
-    let tx_buf = TX_BUF.init([0u8; 256]);
-    let rx_buf = RX_BUF.init([0u8; 256]);
+    // Create USB driver
+    let driver = Driver::new(p.USB, Irqs);
 
-    let uart = BufferedUart::new(
-        p.UART0,
-        p.PIN_0,  // tx_pin
-        p.PIN_1,  // rx_pin
-        UartIrqs,
-        tx_buf,
-        rx_buf,
-        uart::Config::default(),
+    // Create embassy-usb DeviceBuilder
+    let mut config = Config::new(0x16c0, 0x27dd);
+    config.manufacturer = Some("Raspberry Pi");
+    config.product = Some("Pico");
+    config.serial_number = Some("nut-shell");
+    config.max_power = 100;
+    config.max_packet_size_0 = 64;
+
+    // Set device release version
+    config.device_release = 0x0100;
+
+    // Required buffers for USB descriptor building
+    static CONFIG_DESC: StaticCell<[u8; 256]> = StaticCell::new();
+    static BOS_DESC: StaticCell<[u8; 256]> = StaticCell::new();
+    static CONTROL_BUF: StaticCell<[u8; 64]> = StaticCell::new();
+
+    let mut builder = Builder::new(
+        driver,
+        config,
+        CONFIG_DESC.init([0; 256]),
+        BOS_DESC.init([0; 256]),
+        &mut [], // no msos descriptors
+        CONTROL_BUF.init([0; 64]),
     );
-    let (tx, rx) = uart.split();
 
-    // Spawn tasks
+    // Create CDC-ACM class (serial port)
+    static STATE: StaticCell<State> = StaticCell::new();
+    let state = STATE.init(State::new());
+    let usb_class = CdcAcmClass::new(&mut builder, state, 64);
+
+    // Build the USB device
+    let usb = builder.build();
+
+    // Spawn USB task first to start enumeration
+    spawner.spawn(embassy_usb_task(usb)).unwrap();
+
+    // Small delay to allow USB enumeration to start
+    Timer::after(Duration::from_millis(100)).await;
+
+    // Spawn other tasks
     spawner.spawn(tasks::led_task(hw_config.led, led_channel)).unwrap();
     spawner.spawn(tasks::temperature_monitor(hw_config.adc, hw_config.temp_channel)).unwrap();
-    spawner.spawn(shell_task(tx, rx, led_channel)).unwrap();
+    spawner.spawn(shell_task(usb_class, led_channel)).unwrap();
+}
+
+/// USB device task (handles USB protocol)
+#[embassy_executor::task]
+async fn embassy_usb_task(mut usb: embassy_usb::UsbDevice<'static, Driver<'static, USB>>) -> ! {
+    usb.run().await
 }

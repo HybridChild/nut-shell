@@ -1,18 +1,20 @@
 //! Hardware initialization for basic (non-async) example
 
 use cortex_m::delay::Delay;
-use fugit::HertzU32;
 use rp2040_hal::{
     Sio,
     adc::Adc,
     clocks::{Clock, init_clocks_and_plls},
-    gpio::{FunctionUart, Pins},
+    gpio::Pins,
     pac,
-    uart::{DataBits, StopBits, UartConfig, UartPeripheral},
+    usb::UsbBus,
     watchdog::Watchdog,
 };
+use usb_device::{class_prelude::UsbBusAllocator, prelude::*};
+use usbd_serial::SerialPort;
+use static_cell::StaticCell;
 
-use crate::{hw_state, io::UartType};
+use crate::hw_state;
 
 // =============================================================================
 // Hardware Initialization
@@ -20,7 +22,6 @@ use crate::{hw_state, io::UartType};
 
 /// Initialized hardware peripherals returned from setup
 pub struct HardwareConfig {
-    pub uart: UartType,
     pub delay: Delay,
 }
 
@@ -29,9 +30,12 @@ pub struct HardwareConfig {
 /// This function configures:
 /// - System clocks (125 MHz from 12 MHz crystal)
 /// - GPIO pins
-/// - UART0 on GP0/GP1 at 115200 baud
+/// - USB device (CDC serial)
 /// - ADC and temperature sensor
 /// - LED on GP25
+///
+/// Returns the hardware configuration struct.
+/// USB device and serial are initialized globally via `io::init_usb()`.
 pub fn init_hardware(
     mut pac: pac::Peripherals,
     core: pac::CorePeripherals,
@@ -69,28 +73,36 @@ pub fn init_hardware(
     let led = pins.gpio25.into_push_pull_output();
     hw_state::init_led(led);
 
-    // Configure UART on GP0 (TX) and GP1 (RX)
-    let uart_pins = (
-        pins.gpio0.into_function::<FunctionUart>(),
-        pins.gpio1.into_function::<FunctionUart>(),
-    );
-
-    let uart = UartPeripheral::new(pac.UART0, uart_pins, &mut pac.RESETS)
-        .enable(
-            UartConfig::new(
-                HertzU32::from_raw(115200),
-                DataBits::Eight,
-                None,
-                StopBits::One,
-            ),
-            clocks.peripheral_clock.freq(),
-        )
-        .unwrap();
-
     // Initialize ADC and temperature sensor
     let mut adc = Adc::new(pac.ADC, &mut pac.RESETS);
     let temp_sensor = adc.take_temp_sensor().unwrap();
     hw_state::init_temp_sensor(adc, temp_sensor);
 
-    HardwareConfig { uart, delay }
+    // Set up USB bus allocator (must be static)
+    static USB_BUS: StaticCell<UsbBusAllocator<UsbBus>> = StaticCell::new();
+    let usb_bus = USB_BUS.init(UsbBusAllocator::new(UsbBus::new(
+        pac.USBCTRL_REGS,
+        pac.USBCTRL_DPRAM,
+        clocks.usb_clock,
+        true,
+        &mut pac.RESETS,
+    )));
+
+    // Create USB serial device
+    let serial = SerialPort::new(usb_bus);
+
+    // Create USB device
+    let usb_device = UsbDeviceBuilder::new(usb_bus, UsbVidPid(0x16c0, 0x27dd))
+        .strings(&[StringDescriptors::default()
+            .manufacturer("Raspberry Pi")
+            .product("Pico")
+            .serial_number("nut-shell")])
+        .unwrap()
+        .device_class(usbd_serial::USB_CLASS_CDC)
+        .build();
+
+    // Initialize USB globals
+    crate::io::init_usb(usb_device, serial);
+
+    HardwareConfig { delay }
 }

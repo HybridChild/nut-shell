@@ -1,11 +1,11 @@
-//! RP2040 (Raspberry Pi Pico) UART example
+//! RP2040 (Raspberry Pi Pico) USB CDC example
 //!
-//! This example demonstrates nut-shell running on RP2040 hardware with UART communication.
+//! This example demonstrates nut-shell running on RP2040 hardware with USB CDC serial communication.
 //!
 //! # Hardware Setup
-//! - UART TX: GP0
-//! - UART RX: GP1
-//! - Baud rate: 115200
+//! - USB connection provides serial interface
+//! - No external UART adapter needed
+//! - Connect Pico directly to computer via USB
 
 #![no_std]
 #![no_main]
@@ -36,7 +36,7 @@ use rp_pico_examples::{PicoAccessLevel, init_boot_time, init_chip_id, init_reset
 use rp_pico_examples::PicoCredentialProvider;
 
 use crate::handlers::PicoHandlers;
-use crate::io::UartCharIo;
+use crate::io::UsbCharIo;
 use crate::tree::ROOT;
 
 // =============================================================================
@@ -54,12 +54,13 @@ fn main() -> ! {
     let pac = pac::Peripherals::take().unwrap();
     let core = pac::CorePeripherals::take().unwrap();
 
-    // Initialize all hardware (clocks, GPIO, UART, ADC, LED, temperature sensor)
+    // Initialize all hardware (clocks, GPIO, ADC, LED, temperature sensor)
+    // This also sets up USB and returns the USB bus allocator
     let hw_config = hw_setup::init_hardware(pac, core);
     let mut delay = hw_config.delay;
 
     // Create CharIo wrapper
-    let io = UartCharIo::new(hw_config.uart);
+    let io = UsbCharIo::new();
 
     // Initialize hardware status (chip ID must be read after HAL initialization)
     init_chip_id();
@@ -73,19 +74,22 @@ fn main() -> ! {
 
     // Create shell (with or without authentication based on feature flag)
     #[cfg(feature = "authentication")]
-    let mut shell: Shell<PicoAccessLevel, UartCharIo, PicoHandlers, DefaultConfig> =
+    let mut shell: Shell<PicoAccessLevel, UsbCharIo, PicoHandlers, DefaultConfig> =
         Shell::new(&ROOT, handlers, &provider, io);
 
     #[cfg(not(feature = "authentication"))]
-    let mut shell: Shell<PicoAccessLevel, UartCharIo, PicoHandlers, DefaultConfig> =
+    let mut shell: Shell<PicoAccessLevel, UsbCharIo, PicoHandlers, DefaultConfig> =
         Shell::new(&ROOT, handlers, io);
 
     // Activate shell (show welcome and prompt)
     shell.activate().ok();
 
     // Main polling loop
-    // The shell.poll() method checks for incoming UART characters and processes them
+    // The shell.poll() method checks for incoming USB characters and processes them
     loop {
+        // Poll USB device to handle USB events
+        io::poll_usb();
+
         // Poll for incoming characters and process them
         shell.poll().ok();
 
