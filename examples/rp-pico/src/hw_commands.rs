@@ -526,18 +526,19 @@ pub fn cmd_gpio<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> 
         0 // No pull
     };
 
-    let dir_str = if direction == 1 { "OUT" } else { "IN " };
-    let val_str = if value == 1 { "HI" } else { "LO" };
+    let dir_str = if direction == 1 { "Output" } else { "Input " };
+    let val_str = if value == 1 { "High" } else { "Low" };
     let pull_str = match pull {
-        1 => "UP",
-        2 => "DN",
-        _ => "--",
+        1 => "Pull-up",
+        2 => "Pull-down",
+        _ => "No pull",
     };
 
     let mut msg = heapless::String::<128>::new();
-    write!(msg, "| Pin | Dir | Val | Pull |\r\n").ok();
-    write!(msg, "|-----|-----|-----|------|\r\n").ok();
-    write!(msg, "| {:2}  | {} | {}  | {}   |" , pin_num, dir_str, val_str, pull_str).ok();
+    write!(msg, "Pin       : {}\r\n", pin_num).ok();
+    write!(msg, "Direction : {}\r\n", dir_str).ok();
+    write!(msg, "Value     : {}\r\n", val_str).ok();
+    write!(msg, "Pull      : {}", pull_str).ok();
 
     Ok(Response::success(&msg).indented())
 }
