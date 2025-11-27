@@ -1,0 +1,47 @@
+[package]
+name = "stm32_examples"
+version = "0.1.0"
+edition = "2024"
+authors = ["Esben Dueholm Nørgaard"]
+
+[dependencies]
+# Nut-shell library (parent crate)
+# Default features for examples (synchronous, no authentication by default)
+nut-shell = { path = "../..", default-features = false }
+
+# Cortex-M support
+cortex-m = "0.7.7"
+cortex-m-rt = "0.7.5"
+
+# Embedded HAL traits
+embedded-hal = "1.0.0"
+
+# STM32F0-specific crates (for NUCLEO-F072RB)
+stm32f0xx-hal = { version = "0.18", features = ["stm32f072", "rt"] }
+
+# Utilities
+panic-halt = "1.0.0"
+heapless = "0.9"
+nb = "1.1"
+
+[[bin]]
+name = "basic"
+path = "bin/basic/main.rs"
+
+[features]
+
+# Import features from nut-shell for pass through
+authentication = ["nut-shell/authentication"]
+completion = ["nut-shell/completion"]
+history = ["nut-shell/history"]
+async = ["nut-shell/async"]
+
+# Minimal default features for STM32F072's limited RAM (16KB)
+# Completion and history can cause stack overflow on constrained devices
+# Enable individually if you have sufficient stack space
+default = []
+
+[profile.release]
+debug = true
+lto = true
+opt-level = "z"
