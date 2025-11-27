@@ -29,6 +29,23 @@ const SYSTEM_DIR: Directory<Stm32AccessLevel> = Directory {
 // Hardware Commands
 // =============================================================================
 
+pub const CMD_TEMP: CommandMeta<Stm32AccessLevel> = CommandMeta {
+    id: "hw_temp",
+    name: "temp",
+    description: "Read internal temperature sensor",
+    access_level: Stm32AccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+// Hardware read commands
+const HARDWARE_GET_DIR: Directory<Stm32AccessLevel> = Directory {
+    name: "get",
+    children: &[Node::Command(&CMD_TEMP)],
+    access_level: Stm32AccessLevel::User,
+};
+
 pub const CMD_LED: CommandMeta<Stm32AccessLevel> = CommandMeta {
     id: "hw_led",
     name: "led",
@@ -49,6 +66,7 @@ const HARDWARE_SET_DIR: Directory<Stm32AccessLevel> = Directory {
 const HARDWARE_DIR: Directory<Stm32AccessLevel> = Directory {
     name: "hardware",
     children: &[
+        Node::Directory(&HARDWARE_GET_DIR),
         Node::Directory(&HARDWARE_SET_DIR),
     ],
     access_level: Stm32AccessLevel::User,

@@ -42,9 +42,12 @@ fn main() -> ! {
     let pac = pac::Peripherals::take().unwrap();
     let core = pac::CorePeripherals::take().unwrap();
 
-    // Initialize all hardware (clocks, GPIO, UART, LED)
+    // Initialize all hardware (clocks, GPIO, UART, LED, ADC)
     let hw_config = hw_setup::init_hardware(pac, core);
     let mut delay = hw_config.delay;
+
+    // Initialize ADC for temperature sensor
+    hw_state::init_adc(hw_config.adc);
 
     // Create CharIo wrapper
     let io = UartCharIo::new(hw_config.uart_tx, hw_config.uart_rx);

@@ -47,7 +47,7 @@ impl PicoHandlers {
     fn temperature(&self) -> Result<Response<DefaultConfig>, CliError> {
         let celsius = hw_state::read_temperature();
         let mut msg = heapless::String::<64>::new();
-        write!(msg, "Temperature: {:.1}°C", celsius).ok();
+        write!(msg, "Temperature: {:.1} deg C", celsius).ok();
         Ok(Response::success(&msg).indented())
     }
 }

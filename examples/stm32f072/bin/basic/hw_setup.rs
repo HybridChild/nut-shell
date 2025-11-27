@@ -2,6 +2,7 @@
 
 use cortex_m::delay::Delay;
 use stm32f0xx_hal::{
+    adc::Adc,
     pac,
     prelude::*,
     serial::Serial,
@@ -18,6 +19,7 @@ pub struct HardwareConfig {
     pub uart_tx: UartTx,
     pub uart_rx: UartRx,
     pub delay: Delay,
+    pub adc: Adc,
 }
 
 /// Initialize all hardware peripherals
@@ -27,6 +29,7 @@ pub struct HardwareConfig {
 /// - GPIO pins
 /// - USART2 on PA2/PA3 at 115200 baud (connected to ST-LINK VCP)
 /// - LED on PA5
+/// - ADC with temperature sensor
 pub fn init_hardware(
     mut pac: pac::Peripherals,
     core: pac::CorePeripherals,
@@ -54,9 +57,13 @@ pub fn init_hardware(
     // Split into TX and RX
     let (uart_tx, uart_rx) = serial.split();
 
+    // Initialize ADC for temperature sensor
+    let adc = Adc::new(pac.ADC, &mut rcc);
+
     HardwareConfig {
         uart_tx,
         uart_rx,
         delay,
+        adc,
     }
 }

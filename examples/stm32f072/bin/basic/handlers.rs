@@ -21,6 +21,13 @@ impl Stm32Handlers {
         Ok(Response::success(&msg).indented())
     }
 
+    fn temperature<C: ShellConfig>(&self) -> Result<Response<C>, CliError> {
+        let celsius = hw_state::read_temperature();
+        let mut msg = heapless::String::<64>::new();
+        write!(msg, "Temperature: {:.1} deg C", celsius).ok();
+        Ok(Response::success(&msg).indented())
+    }
+
     fn led_control<C: ShellConfig>(&self, args: &[&str]) -> Result<Response<C>, CliError> {
         let state = args[0];
 
@@ -53,6 +60,7 @@ impl<C: ShellConfig> CommandHandler<C> for Stm32Handlers {
     ) -> Result<Response<C>, CliError> {
         match id {
             "system_info" => self.system_info(),
+            "hw_temp" => self.temperature(),
             "hw_led" => self.led_control(args),
             _ => Err(CliError::CommandNotFound),
         }
