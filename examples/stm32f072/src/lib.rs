@@ -6,6 +6,7 @@
 #![no_std]
 
 pub mod access_level;
+pub mod hw_commands;
 
 // Re-export commonly used types for convenience
 pub use access_level::Stm32AccessLevel;

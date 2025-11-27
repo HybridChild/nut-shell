@@ -4,6 +4,7 @@ use core::fmt::Write;
 use nut_shell::{
     config::ShellConfig, response::Response, shell::handlers::CommandHandler, CliError,
 };
+use stm32_examples::hw_commands;
 
 use crate::hw_state;
 
@@ -60,7 +61,13 @@ impl<C: ShellConfig> CommandHandler<C> for Stm32Handlers {
     ) -> Result<Response<C>, CliError> {
         match id {
             "system_info" => self.system_info(),
+            // Hardware status commands
             "hw_temp" => self.temperature(),
+            "hw_chipid" => hw_commands::cmd_chipid::<C>(args),
+            "hw_clocks" => hw_commands::cmd_clocks::<C>(args),
+            "hw_core" => hw_commands::cmd_core::<C>(args),
+            "hw_bootreason" => hw_commands::cmd_bootreason::<C>(args),
+            // Hardware control commands
             "hw_led" => self.led_control(args),
             _ => Err(CliError::CommandNotFound),
         }

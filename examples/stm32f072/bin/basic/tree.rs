@@ -1,6 +1,6 @@
 //! Command tree definition for the NUCLEO-F072RB example
 
-use stm32_examples::Stm32AccessLevel;
+use stm32_examples::{Stm32AccessLevel, hw_commands};
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 
 // =============================================================================
@@ -42,7 +42,13 @@ pub const CMD_TEMP: CommandMeta<Stm32AccessLevel> = CommandMeta {
 // Hardware read commands
 const HARDWARE_GET_DIR: Directory<Stm32AccessLevel> = Directory {
     name: "get",
-    children: &[Node::Command(&CMD_TEMP)],
+    children: &[
+        Node::Command(&CMD_TEMP),
+        Node::Command(&hw_commands::CMD_CHIPID),
+        Node::Command(&hw_commands::CMD_CLOCKS),
+        Node::Command(&hw_commands::CMD_CORE),
+        Node::Command(&hw_commands::CMD_BOOTREASON),
+    ],
     access_level: Stm32AccessLevel::User,
 };
 
