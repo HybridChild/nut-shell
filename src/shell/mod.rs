@@ -8,9 +8,11 @@ use crate::config::ShellConfig;
 use crate::error::CliError;
 use crate::io::CharIo;
 use crate::response::Response;
-use crate::tree::completion::suggest_completions;
 use crate::tree::{CommandKind, Directory, Node};
 use core::marker::PhantomData;
+
+#[cfg(feature = "completion")]
+use crate::tree::completion::suggest_completions;
 
 // Sub-modules
 pub mod decoder;
