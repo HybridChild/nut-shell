@@ -15,9 +15,10 @@ mod handlers;
 mod hw_setup;
 mod hw_state;
 mod io;
+mod systick;
 mod tree;
 
-use cortex_m_rt::entry;
+use cortex_m_rt::{entry, exception};
 use panic_halt as _;
 use stm32f0xx_hal::pac;
 
@@ -42,9 +43,12 @@ fn main() -> ! {
     let pac = pac::Peripherals::take().unwrap();
     let core = pac::CorePeripherals::take().unwrap();
 
-    // Initialize all hardware (clocks, GPIO, UART, LED, ADC)
+    // Initialize all hardware (clocks, GPIO, UART, LED, ADC, SysTick)
     let hw_config = hw_setup::init_hardware(pac, core);
-    let mut delay = hw_config.delay;
+
+    // Capture boot time (after SysTick is running)
+    let boot_time_ms = systick::millis();
+    stm32_examples::init_boot_time(boot_time_ms);
 
     // Initialize ADC for temperature sensor
     hw_state::init_adc(hw_config.adc);
@@ -70,7 +74,19 @@ fn main() -> ! {
         // Poll for incoming characters and process them
         shell.poll().ok();
 
-        // Small delay to prevent busy-waiting and reduce CPU usage
-        delay.delay_us(100u32);
+        // Note: No delay needed - SysTick provides timing, and polling is non-blocking
     }
+}
+
+// =============================================================================
+// Interrupt Handlers
+// =============================================================================
+
+/// SysTick interrupt handler
+///
+/// Called every 1ms to increment the global millisecond counter.
+/// This provides accurate uptime tracking.
+#[exception]
+fn SysTick() {
+    systick::increment_millis();
 }

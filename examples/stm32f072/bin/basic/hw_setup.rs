@@ -1,6 +1,6 @@
 //! Hardware initialization for NUCLEO-F072RB
 
-use cortex_m::delay::Delay;
+use cortex_m::peripheral::syst::SystClkSource;
 use stm32f0xx_hal::{
     adc::Adc,
     pac,
@@ -18,7 +18,6 @@ use crate::io::{UartTx, UartRx};
 pub struct HardwareConfig {
     pub uart_tx: UartTx,
     pub uart_rx: UartRx,
-    pub delay: Delay,
     pub adc: Adc,
 }
 
@@ -32,13 +31,19 @@ pub struct HardwareConfig {
 /// - ADC with temperature sensor
 pub fn init_hardware(
     mut pac: pac::Peripherals,
-    core: pac::CorePeripherals,
+    mut core: pac::CorePeripherals,
 ) -> HardwareConfig {
     // Configure clocks
     let mut rcc = pac.RCC.configure().sysclk(48.mhz()).freeze(&mut pac.FLASH);
 
-    // Set up delay provider
-    let delay = Delay::new(core.SYST, rcc.clocks.sysclk().0);
+    // Configure SysTick for 1ms interrupts
+    // SysTick runs at CPU frequency (48 MHz)
+    // For 1ms (1000 Hz), we need: 48_000_000 / 1000 = 48_000 cycles
+    core.SYST.set_clock_source(SystClkSource::Core);
+    core.SYST.set_reload(48_000 - 1);
+    core.SYST.clear_current();
+    core.SYST.enable_counter();
+    core.SYST.enable_interrupt();
 
     // Get GPIO ports
     let gpioa = pac.GPIOA.split(&mut rcc);
@@ -63,7 +68,6 @@ pub fn init_hardware(
     HardwareConfig {
         uart_tx,
         uart_rx,
-        delay,
         adc,
     }
 }
