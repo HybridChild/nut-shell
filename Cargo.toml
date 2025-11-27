@@ -27,7 +27,7 @@ subtle = { version = "2.5", default-features = false, optional = true }
 tokio = { version = "1", features = ["macros", "rt"] }
 
 [features]
-default = ["authentication", "completion", "history"]
+default = ["completion", "history"]
 
 # Authentication feature - adds login/logout, password hashing, access control
 authentication = ["dep:sha2", "dep:subtle"]

@@ -36,10 +36,10 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for build instructions and [docs/
 - **Global commands** - `ls`, `?`, `clear` (and `logout` when authentication enabled)
 
 ### Optional Features
-- **Async commands** (`async` feature) - Natural async/await for long-running operations like network requests, flash I/O, and timers. Compatible with Embassy, RTIC, and other async runtimes. Zero overhead when disabled. *(Default: disabled)*
-- **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement (~2KB flash) *(Default: enabled)*
 - **Tab completion** (`completion` feature) - Command and path prefix matching (~2KB flash) *(Default: enabled)*
 - **Command history** (`history` feature) - Arrow key navigation with configurable buffer (~0.5-1.3KB RAM) *(Default: enabled)*
+- **Async commands** (`async` feature) - Natural async/await for long-running operations like network requests, flash I/O, and timers. Compatible with Embassy, RTIC, and other async runtimes. Zero overhead when disabled. *(Default: disabled)*
+- **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement (~2KB flash) *(Default: disabled - opt-in)*
 
 ### What We Explicitly Exclude
 - ❌ Shell scripting (piping, variables, conditionals)
@@ -196,7 +196,7 @@ nut-shell = { version = "0.1", default-features = false }
 ```
 
 **Available features:**
-- `authentication` - User login and access control (default: enabled)
+- `authentication` - User login and access control (default: disabled - opt-in)
 - `completion` - Tab completion for commands/paths (default: enabled)
 - `history` - Command history with arrow keys (default: enabled)
 - `async` - Async command execution support (default: disabled)

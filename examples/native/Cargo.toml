@@ -18,13 +18,14 @@ crossterm = "0.29"
 tokio = { version = "1.0", features = ["rt-multi-thread", "time", "macros"] }
 
 [features]
-default = ["authentication", "completion", "history"]
 
-# Pass features through to nut-shell
+# Import features from nut-shell for pass through
 authentication = ["nut-shell/authentication"]
 completion = ["nut-shell/completion"]
 history = ["nut-shell/history"]
 async = ["nut-shell/async"]
+
+default = ["completion", "history"]
 
 [[bin]]
 name = "basic"

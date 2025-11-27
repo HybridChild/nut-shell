@@ -357,11 +357,11 @@ Authentication can be disabled via Cargo features for unsecured development envi
 
 3. **Build Configuration:**
    ```bash
-   # With authentication (default)
-   cargo build
+   # With authentication (opt-in)
+   cargo build --features authentication
 
-   # Without authentication (no login required)
-   cargo build --no-default-features
+   # Without authentication (default - no login required)
+   cargo build
    ```
 
 See [DESIGN.md](DESIGN.md) for feature gating patterns and architectural details for both modes.

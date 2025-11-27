@@ -73,7 +73,7 @@ Global:
 
 **Authentication:**
 
-When built with authentication feature (default):
+When built with authentication feature (opt-in):
 - **admin:admin123** (Admin access - full control)
 - **user:user123** (User access - limited commands)
 - **guest:guest123** (Guest access - read-only)
@@ -218,7 +218,7 @@ Global:
 
 **Authentication:**
 
-When built with authentication feature (default):
+When built with authentication feature (opt-in):
 - **admin:admin123** (Admin access)
 - **user:user123** (User access)
 - **guest:guest123** (Guest access)

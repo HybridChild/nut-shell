@@ -123,7 +123,7 @@ Configure buffer sizes via the `ShellConfig` trait. Choose based on your command
 128 + 256 + 32 + 64 + 256 + (10 × 128) = ~2 KB
 ```
 
-**Disable history entirely:** `cargo build --no-default-features --features authentication,completion`
+**Disable history entirely:** `cargo build --no-default-features --features completion`
 
 ---
 
@@ -250,23 +250,26 @@ nut-shell = { version = "0.1", default-features = false, features = ["authentica
 ```
 
 **Available features:**
-- `authentication` - User login and access control (default: enabled)
+- `authentication` - User login and access control (default: disabled - opt-in)
 - `completion` - Tab completion for commands/paths (default: enabled)
 - `history` - Command history with arrow keys (default: enabled)
 - `async` - Async command execution support (default: disabled)
 
 **Build examples:**
 ```bash
-# All features (default)
+# Default (completion + history)
 cargo build
+
+# All features including authentication
+cargo build --features authentication
 
 # Minimal (no optional features)
 cargo build --no-default-features
 
-# Secure only (authentication only)
+# Authentication only
 cargo build --no-default-features --features authentication
 
-# Interactive only (no security)
+# Interactive only (completion + history, same as default)
 cargo build --no-default-features --features completion,history
 
 # With async support

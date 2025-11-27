@@ -275,13 +275,14 @@ The Rust implementation provides optional features that can be enabled or disabl
 
 **Available Optional Features:**
 - **async**: Enable async command execution with `process_char_async()` and `CommandHandler::execute_async()` (default: disabled, see [Section 1](#1-command-architecture-metadataexecution-separation-pattern) for complete architecture)
-- **authentication**: User login and access control system (default: enabled)
+- **authentication**: User login and access control system (default: disabled - opt-in)
 - **completion**: Tab completion for commands and paths (default: enabled)
 - **history**: Command history navigation with arrow keys (default: enabled)
 
 **Philosophy:**
-- Features are enabled by default for best user experience
-- Can be disabled individually or in combination for constrained environments
+- UX features (completion, history) are enabled by default for best user experience
+- Security features (authentication) are opt-in to minimize binary size and force explicit security choices
+- Can be disabled/enabled individually or in combination for different deployment scenarios
 - No runtime overhead when disabled (eliminated at compile time)
 - Graceful degradation when features are unavailable
 
@@ -396,9 +397,9 @@ All features follow this Cargo.toml pattern:
 
 ```toml
 [features]
-default = ["authentication", "completion", "history"]
+default = ["completion", "history"]
 
-authentication = ["dep:sha2", "dep:subtle"]  # Adds dependencies
+authentication = ["dep:sha2", "dep:subtle"]  # Adds dependencies (opt-in)
 completion = []                              # No dependencies
 history = []                                 # No dependencies
 
@@ -411,8 +412,11 @@ subtle = { version = "2.5", default-features = false, optional = true }
 
 **Build commands:**
 ```bash
-# All features (default)
+# Default (completion + history)
 cargo build
+
+# All features including authentication
+cargo build --features authentication
 
 # No optional features
 cargo build --no-default-features
@@ -527,7 +531,11 @@ Multiple features can be enabled or disabled in combination to suit different de
 #### Common Configuration Patterns
 
 ```toml
-# Full-featured build (default - no async)
+# Default - Interactive UX features (completion + history)
+[features]
+default = ["completion", "history"]
+
+# Full-featured including authentication
 [features]
 default = ["authentication", "completion", "history"]
 
@@ -543,17 +551,13 @@ default = []
 [features]
 default = ["async"]
 
-# Interactive but unsecured (development only)
-[features]
-default = ["completion", "history"]
-
 # Secured but non-interactive (scripted access)
 [features]
 default = ["authentication"]
 
 # Interactive with minimal RAM (small history)
 [features]
-default = ["authentication", "completion", "history"]
+default = ["completion", "history"]
 # Note: Set HISTORY_SIZE=4 via const generic to reduce RAM from 1.3KB to 0.5KB
 ```
 
@@ -563,22 +567,24 @@ default = ["authentication", "completion", "history"]
 # Development workstation (all features including async)
 cargo build --all-features
 
-# Production embedded device (default features, sync-only)
+# Production embedded device (default: completion + history)
 cargo build --target thumbv6m-none-eabi --release
+
+# Production with authentication
+cargo build --target thumbv6m-none-eabi --release --features authentication
 
 # Production with async (Embassy/RTIC)
 cargo build --target thumbv6m-none-eabi --release --features async
+
+# Production with async + authentication
+cargo build --target thumbv6m-none-eabi --release --features async,authentication
 
 # Constrained device (authentication only, ~4-5KB flash + 1.3KB RAM saved)
 cargo build --target thumbv6m-none-eabi --release \
   --no-default-features --features authentication
 
-# Async with authentication (no interactive features)
-cargo build --target thumbv6m-none-eabi --release \
-  --no-default-features --features async,authentication
-
-# Unsecured lab equipment (interactive features only, for ease of use)
-cargo build --no-default-features --features completion,history
+# Lab equipment (interactive features only, same as default)
+cargo build --target thumbv6m-none-eabi --release
 
 # Minimal bootloader/recovery (no optional features, sync-only)
 cargo build --target thumbv6m-none-eabi --release --no-default-features

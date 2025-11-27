@@ -51,13 +51,13 @@ required-features = ["embassy"]
 
 [features]
 
-default = ["completion", "history"]
-
-# Pass features through to nut-shell
+# Import features from nut-shell for pass through
 authentication = ["nut-shell/authentication"]
 completion = ["nut-shell/completion"]
 history = ["nut-shell/history"]
 async = ["nut-shell/async"]
+
+default = ["completion", "history"]
 
 # Embassy async support (enables async feature in nut-shell and all embassy dependencies)
 embassy = [
