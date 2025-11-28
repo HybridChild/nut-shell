@@ -17,8 +17,8 @@ impl PicoCredentialProvider {
         let admin_salt: [u8; 16] = [1; 16];
         let user_salt: [u8; 16] = [2; 16];
 
-        let admin_hash = hasher.hash("pico123", &admin_salt);
-        let user_hash = hasher.hash("pico456", &user_salt);
+        let admin_hash = hasher.hash("admin123", &admin_salt);
+        let user_hash = hasher.hash("user123", &user_salt);
 
         let mut admin_username = heapless::String::new();
         admin_username.push_str("admin").unwrap();

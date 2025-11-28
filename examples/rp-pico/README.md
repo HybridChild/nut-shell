@@ -52,8 +52,8 @@ Global:
 ```
 
 **Authentication** (when enabled):
-- `admin:pico123` - Admin access
-- `user:pico456` - User access
+- `admin:admin123` - Admin access
+- `user:user123` - User access
 
 **Memory Usage:**
 - Flash: ~18KB (with all features)
