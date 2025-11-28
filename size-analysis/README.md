@@ -14,129 +14,79 @@ This will build a minimal reference binary with all feature combinations and gen
 
 ## What Gets Analyzed
 
-### Minimal Reference Binary
-
-The analysis uses `size-analysis/minimal/` - a bare-bones embedded binary that:
+The analysis uses `size-analysis/minimal/` - a bare-bones embedded binary with:
 
 - **Empty directory tree**: No commands, no directories (measures pure shell overhead)
-- **Minimal buffers**: Small `ShellConfig` constants to isolate nut-shell code size
+- **MinimalConfig**: Reduced buffers and message strings to isolate nut-shell overhead
 - **Zero-size generics**: Stub implementations for `CharIo`, `CredentialProvider`, and `CommandHandler`
 - **Real embedded target**: `thumbv6m-none-eabi` (Cortex-M0/M0+)
 - **Size-optimized build**: `opt-level = "z"` with LTO enabled
 
 ### Feature Combinations Tested
 
-1. **none** - Minimal build (no features)
+1. **none** - Minimal build (no additional features)
 2. **authentication** - Login and access control only
 3. **completion** - Tab completion only
 4. **history** - Command history only
 5. **async** - Async support only
-6. **authentication,completion** - Auth + completion
-7. **authentication,history** - Auth + history
-8. **completion,history** - Interactive features
-9. **all** - All features enabled
+6. **completion,history** - Interactive features only (default configuration)
+7. **all** - All features enabled
 
-## Understanding the Report
+## Reading the Report
 
-### Memory Sections
+The generated `report.md` contains:
 
-The report breaks down binary size into these sections:
+1. **Summary Table** - Quick overview of Flash/RAM usage for each feature combination
+2. **Detailed Analysis** - Per-feature breakdown with:
+   - Binary size by section (.text, .rodata, .data, .bss)
+   - Top 10 largest symbols contributing to Flash usage
+3. **Interpretation Guide** - Detailed explanations including:
+   - Section meanings (.text, .rodata, .data, .bss)
+   - How generic type sizes affect your total footprint
+   - Buffer and message configuration costs
+   - Feature-by-feature impact analysis
 
-- **.text**: Executable code (Flash)
-- **.rodata**: Read-only data like string literals (Flash)
-- **.data**: Initialized variables (Flash storage, copied to RAM at startup)
-- **.bss**: Uninitialized variables (RAM only, zero Flash cost)
+### Understanding the Output
 
-**Total Flash usage** = `.text` + `.rodata` + `.data`
-**Total RAM usage** = `.data` + `.bss` + stack
+**Quick reference for memory calculations:**
 
-### Symbol-Level Analysis
+- **Flash usage** = `.text` + `.rodata` + `.data` (code + constants + initialized data)
+- **RAM usage** = `.data` + `.bss` + stack (initialized data + zero-initialized + runtime stack)
 
-For each feature combination, the report includes:
+The report's **Interpretation Guide** provides complete details on:
+- What each section means and where it's stored
+- How your trait implementations add to these baseline numbers
+- Buffer configuration impact (RAM scales with buffer sizes)
+- Message customization costs (Flash .rodata section)
 
-1. **Binary size breakdown** - Section sizes from `arm-none-eabi-size`
-2. **Top 10 largest symbols** - Functions/data contributing most to Flash usage (from `cargo-bloat`)
+### Key Insights from the Report
 
-This helps identify exactly which functions or features consume the most space.
+- **Baseline overhead**: Check the "none" configuration for minimum nut-shell footprint
+- **Feature costs**: Compare each feature against baseline to see incremental cost
+- **Symbol analysis**: Identify which functions consume the most Flash
+- **Your actual costs**: The report explains how your trait implementations add to these numbers
 
-### Generic Type Sizes
+## Using the Results
 
-nut-shell is generic over several user-provided types. The analysis uses **zero-size stubs** to measure only nut-shell's contribution:
-
-| Generic Type | Analysis Uses | Typical Real Implementation |
-|--------------|---------------|------------------------------|
-| `CharIo` | Zero-size `MinimalIo` (0 bytes) | UART wrapper (~0-16 bytes) or buffered (~64-512 bytes) |
-| `CredentialProvider` | Zero-size `MinCredentials` (0 bytes) | Static array or flash-backed (~4-32 bytes) |
-| `CommandHandler` | Zero-size `MinHandlers` (0 bytes) | Stateless (0 bytes) or stateful (depends on fields) |
-
-**Your actual sizes will be higher** based on your implementations.
-
-### Buffer Configuration Impact
-
-The minimal binary uses small buffers to isolate nut-shell overhead:
-
-```rust
-const MAX_INPUT: usize = 64;          // vs. 128 (default)
-const MAX_PATH_DEPTH: usize = 4;      // vs. 8 (default)
-const MAX_ARGS: usize = 8;            // vs. 16 (default)
-const MAX_PROMPT: usize = 32;         // vs. 64 (default)
-const MAX_RESPONSE: usize = 128;      // vs. 256 (default)
-const HISTORY_SIZE: usize = 0;        // vs. 10 (default)
-```
-
-**RAM scales linearly with buffer sizes.** Doubling `MAX_INPUT` adds ~64 bytes RAM.
-
-## Tools Required
-
-The analysis script requires:
-
-1. **Rust toolchain** with `thumbv6m-none-eabi` target
-   ```bash
-   rustup target add thumbv6m-none-eabi
-   ```
-
-2. **cargo-bloat** for symbol-level analysis
-   ```bash
-   cargo install cargo-bloat
-   ```
-
-3. **ARM GCC toolchain** (optional, for `arm-none-eabi-size`)
-   - macOS: `brew install --cask gcc-arm-embedded`
-   - Linux: `sudo apt-get install gcc-arm-none-eabi`
-   - Fallback: Script uses `size` command if ARM tools unavailable
-
-## Interpreting Results
-
-### Feature Impact
-
-Compare the "none" baseline with feature-enabled builds:
-
-```
-Feature Set          | Flash Delta | Purpose
----------------------|-------------|----------------------------------
-authentication       | +2-3KB      | SHA-256 hashing, login state machine
-completion           | +1-2KB      | Prefix matching, candidate search
-history              | +0.5-1KB    | History buffer (scales with HISTORY_SIZE)
-async                | +0.5-1KB    | Async runtime integration
-```
-
-### RAM vs. Flash Trade-offs
-
-- **Flash**: Feature code (fixed cost per feature)
-- **RAM**: Buffers and state (configurable via `ShellConfig`)
-
-Example:
-- Enabling `authentication` adds ~2KB Flash (fixed)
-- Setting `HISTORY_SIZE = 10` adds ~1.3KB RAM (configurable)
-
-### Optimization Tips
+### Optimization Strategies
 
 If you need to reduce size:
 
-1. **Disable unused features**: Use `default-features = false`
-2. **Reduce buffer sizes**: Adjust `ShellConfig` constants
-3. **Minimize command tree**: Fewer commands = less metadata in `.rodata`
-4. **Check symbol sizes**: Use `cargo-bloat` to identify large functions
+1. **Disable unused features**: Use `default-features = false` in your `Cargo.toml`
+2. **Reduce buffer sizes**: Customize `ShellConfig` constants for your needs
+3. **Minimize command tree**: Fewer commands = less metadata in Flash
+4. **Check symbol sizes**: Use the symbol analysis to identify optimization targets
+
+### Understanding Your Total Cost
+
+The analysis measures **only nut-shell's overhead** using zero-size stubs. Your actual binary will be larger due to:
+
+- Your command implementations
+- Your directory tree structure
+- Your `CharIo`, `CredentialProvider`, and `CommandHandler` implementations
+- Your chosen buffer sizes
+
+See the report's "Interpretation Guide" for detailed explanations of how to calculate your total memory footprint.
 
 ## CI Integration
 
@@ -148,63 +98,3 @@ The `.github/workflows/size-analysis.yml` workflow:
 - Does NOT fail builds on size increases
 
 Size increases may be justified for feature additions. The workflow provides data for informed decisions.
-
-## Methodology Rationale
-
-### Why Empty Directory Tree?
-
-An empty tree isolates nut-shell's **baseline overhead** - the cost of the shell infrastructure itself (parser, navigation, I/O handling, feature logic). Your actual binary adds:
-
-- Command metadata (const data in `.rodata`)
-- Command implementations (functions in `.text`)
-- Directory structure (const data in `.rodata`)
-
-### Why Zero-Size Generics?
-
-Your `CharIo`, `CredentialProvider`, and `CommandHandler` implementations are application-specific. Zero-size stubs ensure measurements reflect only nut-shell's contribution, not your custom logic.
-
-### Why `opt-level = "z"`?
-
-Embedded systems prioritize Flash size. The `"z"` optimization level (optimize for size) with LTO represents realistic production builds.
-
-## Local Development
-
-To test changes to the analysis infrastructure:
-
-```bash
-# Make script executable (if needed)
-chmod +x analyze.sh
-
-# Run analysis
-./analyze.sh
-
-# Check report
-cat report.md
-
-# Or open in editor
-code report.md
-```
-
-The script is idempotent - safe to run multiple times.
-
-## Files
-
-```
-size-analysis/
-├── README.md              # This file
-├── analyze.sh             # Analysis script
-├── report.md              # Generated report (gitignored)
-└── minimal/               # Minimal reference binary
-    ├── Cargo.toml         # Minimal dependencies
-    └── src/
-        └── main.rs        # Empty tree + zero-size stubs
-```
-
-## Questions?
-
-- **"Why is my binary larger?"** - You have commands, a real directory tree, and I/O implementations
-- **"Which feature should I disable?"** - Compare feature delta vs. your use case needs
-- **"How do I reduce RAM?"** - Adjust `ShellConfig` buffer sizes (see [../docs/EXAMPLES.md](../docs/EXAMPLES.md))
-- **"Why aren't generic sizes shown?"** - They're user-defined; document your implementation sizes
-
-For usage examples and configuration guidance, see [../docs/EXAMPLES.md](../docs/EXAMPLES.md).

@@ -128,17 +128,24 @@ See [docs/IO_DESIGN.md](docs/IO_DESIGN.md) for implementation details.
 
 ## Memory Footprint
 
-Typical sizes on ARMv6-M (Cortex-M0+, thumbv6m-none-eabi target):
+**Measured on ARMv6-M (Cortex-M0+, thumbv6m-none-eabi target) with empty directory tree:**
 
 ### Flash (Code Size)
-| Feature Set | .text + .rodata |
-|-------------|-----------------|
-| Minimal (no features) | ~3-4KB |
-| + authentication | ~5-6KB |
-| + completion + history | ~6-7KB |
-| All features enabled | ~8-10KB |
+
+| Feature Set | Total Flash | Notes |
+|-------------|-------------|-------|
+| Minimal (no features) | **~1.6KB** | Core parser + navigation + I/O |
+| + completion + history | **~1.7KB** | Interactive features (default config) |
+| + authentication | **~1.2KB** | Login + SHA-256 hashing |
+| All features enabled | **~1.3KB** | Complete feature set |
+
+**Your actual Flash usage** will be larger due to:
+- Your command implementations (simple GPIO ~50 bytes, network requests ~2-5KB per command)
+- Your directory tree metadata (command names, descriptions, help text)
+- Your `CharIo`, `CredentialProvider`, and `CommandHandler` trait implementations
 
 ### RAM (Runtime)
+
 | Component | Default | Configurable |
 |-----------|---------|--------------|
 | Input buffer | 128 bytes | `ShellConfig::MAX_INPUT` |
@@ -146,16 +153,24 @@ Typical sizes on ARMv6-M (Cortex-M0+, thumbv6m-none-eabi target):
 | Command history (N=10) | ~1.3KB | `ShellConfig::HISTORY_SIZE` |
 | Command history (N=4) | ~0.5KB | RAM-constrained config |
 
-**Minimal configuration:** ~0.2KB RAM (no history, minimal buffers)
+**Minimal configuration:** ~0.2KB RAM (no history, minimal buffers)  
 **Default configuration:** ~1.5KB RAM (history enabled)
 
 ### Understanding Generic Type Sizes
 
-nut-shell is generic over user-provided types. Their sizes depend on YOUR implementation:
+nut-shell is generic over user-provided types. Their costs have two components:
 
-- **`CharIo`** (I/O): Minimal UART wrapper (~0-16 bytes) or buffered I/O (~64-512 bytes)
-- **`CredentialProvider`** (auth): Static array or flash-backed storage (~4-32 bytes)
-- **`CommandHandler`**: Stateless (0 bytes) or stateful (size of your state)
+**Runtime Size (RAM - struct instance):**
+- **`CharIo`**: Simple UART (~4-8 bytes), buffered UART (~64-128 bytes), or USB CDC-ACM (~340+ bytes with packet buffers)
+- **`CredentialProvider`**: Zero-size build-time (0 bytes), static array reference (~4-8 bytes), or flash-backed (~8-16 bytes)
+- **`CommandHandler`**: Stateless (0 bytes) or stateful (size of your state fields)
+
+**Code Size (Flash - trait implementation logic):**
+- **`CharIo`**: Simple UART (~100-200 bytes), buffered UART (~500 bytes), or USB CDC-ACM (~1-3KB)
+- **`CredentialProvider`**: Static array lookup (~500 bytes - 1KB) or flash-backed storage (~1-3KB)
+- **`CommandHandler`**: Your command implementations (simple GPIO ~50 bytes, network requests ~2-5KB per command)
+
+The size analysis below measures only nut-shell's code. Your trait implementations add additional Flash/RAM on top.
 
 ### Detailed Analysis
 

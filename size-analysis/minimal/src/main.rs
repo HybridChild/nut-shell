@@ -2,8 +2,9 @@
 #![no_main]
 
 use core::fmt::Write;
-use nut_shell::tree::{Directory, Node};
-use nut_shell::{CharIo, CliError, CommandHandler, Response, Shell, ShellConfig};
+use nut_shell::config::MinimalConfig;
+use nut_shell::tree::Directory;
+use nut_shell::{CharIo, CliError, CommandHandler, Response, Shell};
 use panic_halt as _;
 
 // Minimal access level for testing
@@ -33,25 +34,6 @@ impl Write for MinimalIo {
     }
 }
 
-// Minimal configuration - use small buffers to measure base overhead
-struct MinConfig;
-
-impl ShellConfig for MinConfig {
-    const MAX_INPUT: usize = 64;
-    const MAX_PATH_DEPTH: usize = 4;
-    const MAX_ARGS: usize = 8;
-    const MAX_PROMPT: usize = 32;
-    const MAX_RESPONSE: usize = 128;
-    const HISTORY_SIZE: usize = 0; // Disabled unless history feature enabled
-
-    const MSG_WELCOME: &'static str = "nut-shell\r\n";
-    const MSG_LOGIN_PROMPT: &'static str = "login: ";
-    const MSG_LOGIN_SUCCESS: &'static str = "ok\r\n";
-    const MSG_LOGIN_FAILED: &'static str = "fail\r\n";
-    const MSG_LOGOUT: &'static str = "bye\r\n";
-    const MSG_INVALID_LOGIN_FORMAT: &'static str = "invalid\r\n";
-}
-
 // Empty directory tree - measures ONLY nut-shell overhead
 const ROOT: Directory<Level> = Directory {
     name: "",
@@ -62,12 +44,12 @@ const ROOT: Directory<Level> = Directory {
 // Minimal command handler
 struct MinHandlers;
 
-impl CommandHandler<MinConfig> for MinHandlers {
+impl CommandHandler<MinimalConfig> for MinHandlers {
     fn execute_sync(
         &self,
         _id: &str,
         _args: &[&str],
-    ) -> Result<Response<MinConfig>, CliError> {
+    ) -> Result<Response<MinimalConfig>, CliError> {
         Err(CliError::CommandNotFound)
     }
 
@@ -76,7 +58,7 @@ impl CommandHandler<MinConfig> for MinHandlers {
         &self,
         _id: &str,
         _args: &[&str],
-    ) -> Result<Response<MinConfig>, CliError> {
+    ) -> Result<Response<MinimalConfig>, CliError> {
         Err(CliError::CommandNotFound)
     }
 }
@@ -118,12 +100,15 @@ fn main() -> ! {
     let mut shell = Shell::new(&ROOT, handlers, io);
 
     // Activate shell to ensure all code paths are included
-    let _ = shell.activate();
+    // Use black_box to prevent optimizer from removing the code
+    let _ = core::hint::black_box(shell.activate());
 
     // Process one character to ensure process_char code is included
-    let _ = shell.process_char('?');
+    let _ = core::hint::black_box(shell.process_char('?'));
 
+    // Keep shell alive to prevent optimization
     loop {
+        core::hint::black_box(&shell);
         cortex_m::asm::nop();
     }
 }
