@@ -55,13 +55,13 @@
 //!
 //! This library is `no_std` by default. Enable the `std` feature for testing only.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 
-// Core dependencies
-#[cfg(not(feature = "std"))]
-extern crate core;
+// Bring in std when the feature is enabled (for testing and Error trait impl)
+#[cfg(feature = "std")]
+extern crate std;
 
 extern crate heapless;
 

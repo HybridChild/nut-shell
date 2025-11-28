@@ -5,6 +5,9 @@
 //!
 //! See [docs/IO_DESIGN.md](../docs/IO_DESIGN.md) for complete design and buffering requirements.
 
+#[cfg(feature = "std")]
+use std::{string::String, vec::Vec};
+
 /// Platform-agnostic character I/O trait.
 ///
 /// Implementations must buffer output internally. See IO_DESIGN.md for buffering requirements:
