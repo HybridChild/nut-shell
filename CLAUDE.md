@@ -201,12 +201,12 @@ impl ShellConfig for MyAppConfig {
     const HISTORY_SIZE: usize = 10;
 
     // Customize messages for your application
-    const MSG_WELCOME: &'static str = "🚀 MyDevice v1.0 Ready\r\n";
+    const MSG_WELCOME: &'static str = "🚀 MyDevice v1.0 Ready";
     const MSG_LOGIN_PROMPT: &'static str = "Login (user:pass): ";
-    const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted\r\n";
-    const MSG_LOGIN_FAILED: &'static str = "✗ Access denied\r\n";
-    const MSG_LOGOUT: &'static str = "Session terminated\r\n";
-    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Format: username:password\r\n";
+    const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted";
+    const MSG_LOGIN_FAILED: &'static str = "✗ Access denied";
+    const MSG_LOGOUT: &'static str = "Session terminated";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Format: username:password";
 }
 
 // Use your custom config when creating the Shell

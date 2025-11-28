@@ -272,6 +272,7 @@ where
     /// Transitions from `Inactive` to appropriate state (LoggedOut or LoggedIn).
     pub fn activate(&mut self) -> Result<(), IO::Error> {
         self.io.write_str(C::MSG_WELCOME)?;
+        self.io.write_str("\r\n")?;
 
         #[cfg(feature = "authentication")]
         {
@@ -686,21 +687,25 @@ where
                         self.current_user = Some(user);
                         self.state = CliState::LoggedIn;
                         self.io.write_str(C::MSG_LOGIN_SUCCESS)?;
+                        self.io.write_str("\r\n")?;
                         self.generate_and_write_prompt()?;
                     }
                     _ => {
                         // Login failed (user not found or wrong password)
                         self.io.write_str(C::MSG_LOGIN_FAILED)?;
+                        self.io.write_str("\r\n")?;
                         self.io.write_str(C::MSG_LOGIN_PROMPT)?;
                     }
                 }
             } else {
                 self.io.write_str(C::MSG_INVALID_LOGIN_FORMAT)?;
+                self.io.write_str("\r\n")?;
                 self.io.write_str(C::MSG_LOGIN_PROMPT)?;
             }
         } else {
             // No colon - invalid format, show error
             self.io.write_str(C::MSG_INVALID_LOGIN_FORMAT)?;
+            self.io.write_str("\r\n")?;
             self.io.write_str(C::MSG_LOGIN_PROMPT)?;
         }
 
@@ -749,6 +754,7 @@ where
                 self.state = CliState::LoggedOut;
                 self.current_path.clear();
                 self.io.write_str(C::MSG_LOGOUT)?;
+                self.io.write_str("\r\n")?;
                 self.io.write_str(C::MSG_LOGIN_PROMPT)?;
                 return Ok(());
             }
@@ -836,6 +842,7 @@ where
                 self.state = CliState::LoggedOut;
                 self.current_path.clear();
                 self.io.write_str(C::MSG_LOGOUT)?;
+                self.io.write_str("\r\n")?;
                 self.io.write_str(C::MSG_LOGIN_PROMPT)?;
                 return Ok(());
             }

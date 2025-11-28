@@ -79,7 +79,7 @@ pub trait ShellConfig {
 /// - MAX_ARGS: 16 arguments
 /// - MAX_PROMPT: 64 bytes
 /// - MAX_RESPONSE: 256 bytes
-/// - HISTORY_SIZE: 10 commands
+/// - HISTORY_SIZE: 10 commands (with `history` feature), 0 otherwise
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DefaultConfig;
 
@@ -89,14 +89,19 @@ impl ShellConfig for DefaultConfig {
     const MAX_ARGS: usize = 16;
     const MAX_PROMPT: usize = 64;
     const MAX_RESPONSE: usize = 256;
+
+    #[cfg(feature = "history")]
     const HISTORY_SIZE: usize = 10;
 
-    const MSG_WELCOME: &'static str = "Welcome to nut-shell!\r\n";
+    #[cfg(not(feature = "history"))]
+    const HISTORY_SIZE: usize = 0;
+
+    const MSG_WELCOME: &'static str = "Welcome to nut-shell!";
     const MSG_LOGIN_PROMPT: &'static str = "Login> ";
-    const MSG_LOGIN_SUCCESS: &'static str = "Logged in. Type '?' for help.\r\n";
-    const MSG_LOGIN_FAILED: &'static str = "Login failed. Try again.\r\n";
-    const MSG_LOGOUT: &'static str = "Logged out.\r\n";
-    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use <username>:<password>\r\n";
+    const MSG_LOGIN_SUCCESS: &'static str = "Logged in. Type '?' for help.";
+    const MSG_LOGIN_FAILED: &'static str = "Login failed. Try again.";
+    const MSG_LOGOUT: &'static str = "Logged out.";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use <username>:<password>";
 }
 
 /// Minimal configuration for resource-constrained systems.
@@ -107,7 +112,7 @@ impl ShellConfig for DefaultConfig {
 /// - MAX_ARGS: 8 arguments
 /// - MAX_PROMPT: 32 bytes
 /// - MAX_RESPONSE: 128 bytes
-/// - HISTORY_SIZE: 5 commands
+/// - HISTORY_SIZE: 4 commands (with `history` feature), 0 otherwise
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct MinimalConfig;
 
@@ -117,14 +122,19 @@ impl ShellConfig for MinimalConfig {
     const MAX_ARGS: usize = 8;
     const MAX_PROMPT: usize = 32;
     const MAX_RESPONSE: usize = 128;
-    const HISTORY_SIZE: usize = 5;
 
-    const MSG_WELCOME: &'static str = "Welcome!\r\n";
+    #[cfg(feature = "history")]
+    const HISTORY_SIZE: usize = 4;
+
+    #[cfg(not(feature = "history"))]
+    const HISTORY_SIZE: usize = 0;
+
+    const MSG_WELCOME: &'static str = "Welcome!";
     const MSG_LOGIN_PROMPT: &'static str = "Login> ";
-    const MSG_LOGIN_SUCCESS: &'static str = "Logged in.\r\n";
-    const MSG_LOGIN_FAILED: &'static str = "Login failed.\r\n";
-    const MSG_LOGOUT: &'static str = "Logged out.\r\n";
-    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use <name>:<password>\r\n";
+    const MSG_LOGIN_SUCCESS: &'static str = "Logged in.";
+    const MSG_LOGIN_FAILED: &'static str = "Login failed.";
+    const MSG_LOGOUT: &'static str = "Logged out.";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use <name>:<password>";
 }
 
 #[cfg(test)]
@@ -138,7 +148,12 @@ mod tests {
         assert_eq!(DefaultConfig::MAX_ARGS, 16);
         assert_eq!(DefaultConfig::MAX_PROMPT, 64);
         assert_eq!(DefaultConfig::MAX_RESPONSE, 256);
+
+        #[cfg(feature = "history")]
         assert_eq!(DefaultConfig::HISTORY_SIZE, 10);
+
+        #[cfg(not(feature = "history"))]
+        assert_eq!(DefaultConfig::HISTORY_SIZE, 0);
     }
 
     #[test]
@@ -148,7 +163,12 @@ mod tests {
         assert_eq!(MinimalConfig::MAX_ARGS, 8);
         assert_eq!(MinimalConfig::MAX_PROMPT, 32);
         assert_eq!(MinimalConfig::MAX_RESPONSE, 128);
-        assert_eq!(MinimalConfig::HISTORY_SIZE, 5);
+
+        #[cfg(feature = "history")]
+        assert_eq!(MinimalConfig::HISTORY_SIZE, 4);
+
+        #[cfg(not(feature = "history"))]
+        assert_eq!(MinimalConfig::HISTORY_SIZE, 0);
     }
 
     #[test]
@@ -164,24 +184,24 @@ mod tests {
             const MAX_RESPONSE: usize = 256;
             const HISTORY_SIZE: usize = 10;
 
-            const MSG_WELCOME: &'static str = "🚀 Custom System Ready\r\n";
+            const MSG_WELCOME: &'static str = "🚀 Custom System Ready";
             const MSG_LOGIN_PROMPT: &'static str = "Enter credentials (user:pass): ";
-            const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted\r\n";
-            const MSG_LOGIN_FAILED: &'static str = "✗ Access denied\r\n";
-            const MSG_LOGOUT: &'static str = "Session ended\r\n";
-            const MSG_INVALID_LOGIN_FORMAT: &'static str = "Format error\r\n";
+            const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted";
+            const MSG_LOGIN_FAILED: &'static str = "✗ Access denied";
+            const MSG_LOGOUT: &'static str = "Session ended";
+            const MSG_INVALID_LOGIN_FORMAT: &'static str = "Format error";
         }
 
         // Verify custom messages
-        assert_eq!(CustomConfig::MSG_WELCOME, "🚀 Custom System Ready\r\n");
+        assert_eq!(CustomConfig::MSG_WELCOME, "🚀 Custom System Ready");
         assert_eq!(
             CustomConfig::MSG_LOGIN_PROMPT,
             "Enter credentials (user:pass): "
         );
-        assert_eq!(CustomConfig::MSG_LOGIN_SUCCESS, "✓ Access granted\r\n");
-        assert_eq!(CustomConfig::MSG_LOGIN_FAILED, "✗ Access denied\r\n");
-        assert_eq!(CustomConfig::MSG_LOGOUT, "Session ended\r\n");
-        assert_eq!(CustomConfig::MSG_INVALID_LOGIN_FORMAT, "Format error\r\n");
+        assert_eq!(CustomConfig::MSG_LOGIN_SUCCESS, "✓ Access granted");
+        assert_eq!(CustomConfig::MSG_LOGIN_FAILED, "✗ Access denied");
+        assert_eq!(CustomConfig::MSG_LOGOUT, "Session ended");
+        assert_eq!(CustomConfig::MSG_INVALID_LOGIN_FORMAT, "Format error");
     }
 
     #[test]
