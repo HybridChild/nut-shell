@@ -100,6 +100,7 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 
 ### Tested Platforms
 - **Raspberry Pi Pico (RP2040)** - Primary development target
+- **STM32F072** - ARM Cortex-M0 microcontroller
 - **Native (std)** - Testing and development
 
 ### Runtime Environments
