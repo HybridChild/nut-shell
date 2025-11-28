@@ -1,4 +1,4 @@
-# nut-shell - Development Guide
+# DEVELOPMENT
 
 **Status**: Production-ready library ✅
 

@@ -111,7 +111,7 @@ screen /dev/tty.usbmodemnut_shell1 115200
 **Key implementation details:**
 - Embassy-usb for full-speed USB CDC device
 - Packet chunking for output >64 bytes
-- Deferred flush pattern (see docs/IO_DESIGN.md)
+- Deferred flush pattern (see docs/CHAR_IO.md)
 - RefCell for shared buffer access between Shell and flush logic
 
 ---

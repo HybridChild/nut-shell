@@ -98,126 +98,49 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 
 ## Platform Support
 
-### Tested Platforms
-- **Raspberry Pi Pico (RP2040)** - Primary development target
-- **STM32F072** - ARM Cortex-M0 microcontroller
-- **Native (std)** - Testing and development
+**Tested platforms:**
+- Raspberry Pi Pico (RP2040) - Primary development target
+- STM32F072 - ARM Cortex-M0
+- Native (std) - Testing and development
 
-### Runtime Environments
-- **Bare-metal** - Blocking I/O, polling loop
-- **Embassy** - Async runtime with USB/UART support
-- **RTIC** - Real-time interrupt-driven concurrency
+**Runtime environments:**
+- Bare-metal (blocking I/O, polling loop)
+- Embassy (async runtime with USB/UART)
+- RTIC (real-time interrupt-driven concurrency)
 
-### I/O Adapters
-The library uses a `CharIo` trait for platform-agnostic I/O:
-
-```rust
-pub trait CharIo {
-    type Error;
-    fn get_char(&mut self) -> Result<Option<char>, Self::Error>;
-    fn put_char(&mut self, c: char) -> Result<(), Self::Error>;
-}
-```
-
-**Buffering Model:**
-- **Bare-metal:** `put_char()` writes directly to UART (blocking acceptable)
-- **Async:** `put_char()` buffers to memory, `flush()` called externally after processing
-
-See [docs/IO_DESIGN.md](docs/IO_DESIGN.md) for implementation details.
+**I/O abstraction:** Platform-agnostic `CharIo` trait for UART, USB-CDC, or custom adapters. See [docs/CHAR_IO.md](docs/CHAR_IO.md) for implementation guide.
 
 ---
 
 ## Memory Footprint
 
-**Measured on ARMv6-M (Cortex-M0+, thumbv6m-none-eabi target) with empty directory tree:**
+**Typical footprint** (measured on ARMv6-M with default features):
+- **Flash:** ~4-6KB (core + completion + history)
+- **RAM:** ~1.5KB (128-byte input buffer + 10-entry history)
 
-### Flash (Code Size)
+**Minimal configuration:**
+- **Flash:** ~1.6KB (no optional features)
+- **RAM:** ~0.2KB (no history, minimal buffers)
 
-| Feature Set | Total Flash | Notes |
-|-------------|-------------|-------|
-| Minimal (no features) | **~1.6KB** | Core parser + navigation + I/O |
-| + completion + history | **~1.7KB** | Interactive features (default config) |
-| + authentication | **~1.2KB** | Login + SHA-256 hashing |
-| All features enabled | **~1.3KB** | Complete feature set |
+**Your actual size** will be larger due to:
+- Command implementations (simple GPIO ~50 bytes, network ~2-5KB each)
+- Directory tree metadata (names, descriptions)
+- CharIo/CredentialProvider/CommandHandler trait implementations
 
-**Your actual Flash usage** will be larger due to:
-- Your command implementations (simple GPIO ~50 bytes, network requests ~2-5KB per command)
-- Your directory tree metadata (command names, descriptions, help text)
-- Your `CharIo`, `CredentialProvider`, and `CommandHandler` trait implementations
-
-### RAM (Runtime)
-
-| Component | Default | Configurable |
-|-----------|---------|--------------|
-| Input buffer | 128 bytes | `ShellConfig::MAX_INPUT` |
-| Path stack | 32 bytes | `ShellConfig::MAX_PATH_DEPTH` |
-| Command history (N=10) | ~1.3KB | `ShellConfig::HISTORY_SIZE` |
-| Command history (N=4) | ~0.5KB | RAM-constrained config |
-
-**Minimal configuration:** ~0.2KB RAM (no history, minimal buffers)  
-**Default configuration:** ~1.5KB RAM (history enabled)
-
-### Understanding Generic Type Sizes
-
-nut-shell is generic over user-provided types. Their costs have two components:
-
-**Runtime Size (RAM - struct instance):**
-- **`CharIo`**: Simple UART (~4-8 bytes), buffered UART (~64-128 bytes), or USB CDC-ACM (~340+ bytes with packet buffers)
-- **`CredentialProvider`**: Zero-size build-time (0 bytes), static array reference (~4-8 bytes), or flash-backed (~8-16 bytes)
-- **`CommandHandler`**: Stateless (0 bytes) or stateful (size of your state fields)
-
-**Code Size (Flash - trait implementation logic):**
-- **`CharIo`**: Simple UART (~100-200 bytes), buffered UART (~500 bytes), or USB CDC-ACM (~1-3KB)
-- **`CredentialProvider`**: Static array lookup (~500 bytes - 1KB) or flash-backed storage (~1-3KB)
-- **`CommandHandler`**: Your command implementations (simple GPIO ~50 bytes, network requests ~2-5KB per command)
-
-The size analysis below measures only nut-shell's code. Your trait implementations add additional Flash/RAM on top.
-
-### Detailed Analysis
-
-For exact measurements and symbol-level analysis across all feature combinations:
-
-```bash
-cd size-analysis
-./analyze.sh
-cat report.md
-```
-
-The analysis uses a minimal reference binary with an empty directory tree to isolate the pure overhead of nut-shell itself. Your actual binary will be larger due to your command implementations, directory tree structure, and I/O adapters.
-
-See [size-analysis/README.md](size-analysis/README.md) for methodology and interpretation guide.
+**For detailed analysis:** See [size-analysis/README.md](size-analysis/README.md) for methodology and complete breakdown across all feature combinations.
 
 ---
 
 ## Authentication & Security
 
-When the `authentication` feature is enabled:
+Optional `authentication` feature provides:
+- SHA-256 password hashing with per-user salts
+- Constant-time comparison (prevents timing attacks)
+- Password masking during input
+- Access control enforced at every path segment
+- Pluggable credential providers (build-time, flash storage, custom)
 
-- **SHA-256 password hashing** with per-user salts
-- **Constant-time comparison** to prevent timing attacks
-- **Password masking** during input (shows `*` after colon)
-- **Access control** enforced at every path segment
-- **Pluggable credential providers** (build-time, flash storage, custom)
-
-```rust
-// Login format
-> admin:********
-  Logged in. Type ? for help.
-
-admin@/> system/reboot
-  Rebooting...
-
-admin@/> logout
-  Logged out.
-```
-
-**Credential Storage Options:**
-1. **Build-time environment variables** - Hashed credentials configured during build
-2. **Flash storage** - Per-device unique credentials (production recommended)
-3. **Const provider** - Hardcoded for examples/testing only
-4. **Custom provider** - Trait-based extensibility (LDAP, HSM, etc.)
-
-See [docs/SECURITY.md](docs/SECURITY.md) for security architecture and threat model.
+**See [docs/SECURITY.md](docs/SECURITY.md) for security architecture, threat model, and implementation patterns.**
 
 ---
 
@@ -234,41 +157,27 @@ nut-shell = { version = "0.1", default-features = false }
 ```
 
 **Available features:**
-- `authentication` - User login and access control (default: disabled - opt-in)
-- `completion` - Tab completion for commands/paths (default: enabled)
-- `history` - Command history with arrow keys (default: enabled)
-- `async` - Async command execution support (default: disabled)
+- `authentication` - User login and access control *(Default: disabled)*
+- `completion` - Tab completion for commands/paths *(Default: enabled)*
+- `history` - Command history with arrow keys *(Default: enabled)*
+- `async` - Async command execution support *(Default: disabled)*
 
-### Const Generics
-
-Customize buffer sizes at compile time:
-
-```rust
-type InputBuffer = heapless::String<64>;  // Default: 128
-type PathStack = heapless::Vec<usize, 4>;  // Default: 8
-type History = CommandHistory<4>;  // Default: 10
-```
-
-See [docs/EXAMPLES.md](docs/EXAMPLES.md) for complete configuration examples, CharIo implementation patterns, and troubleshooting guide.
+**See [docs/EXAMPLES.md](docs/EXAMPLES.md) for configuration examples and buffer sizing guide.**
 
 ---
 
 ## Documentation
 
-### For Library Users
-- **[README.md](README.md)** (this file) - Quick start and overview
-- **[docs/EXAMPLES.md](docs/EXAMPLES.md)** - Complete examples, configuration guide, and troubleshooting
-- **[docs/IO_DESIGN.md](docs/IO_DESIGN.md)** - CharIo trait and platform adapter implementation guide
-- **[docs/SECURITY.md](docs/SECURITY.md)** - Authentication patterns and security considerations
-- **Run `cargo doc --open`** - Complete API reference
-
-### For Contributors
-- **[CLAUDE.md](CLAUDE.md)** - AI-assisted development guidance
-- **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** - Design philosophy and feature criteria
-- **[docs/DESIGN.md](docs/DESIGN.md)** - Architecture decisions and design patterns
-- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Build commands, testing workflows, and CI
-
-See [docs/README.md](docs/README.md) for complete documentation navigation.
+| Document | Description |
+|----------|-------------|
+| **[README.md](README.md)** | Quick start and overview (this file) |
+| **[docs/EXAMPLES.md](docs/EXAMPLES.md)** | Implementation patterns, configuration, troubleshooting |
+| **[docs/CHAR_IO.md](docs/CHAR_IO.md)** | CharIo trait design and platform adapters |
+| **[docs/SECURITY.md](docs/SECURITY.md)** | Authentication patterns and security considerations |
+| **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** | Design philosophy and feature criteria |
+| **[docs/DESIGN.md](docs/DESIGN.md)** | Architecture decisions and design patterns |
+| **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Build workflows, testing, and CI |
+| **`cargo doc --open`** | Complete API reference |
 
 ---
 
