@@ -22,9 +22,9 @@ mod handlers;
 mod tree;
 
 use handlers::ExampleHandlers;
-use native_examples::{ExampleAccessLevel, RawModeGuard, StdioCharIo};
 #[cfg(feature = "authentication")]
 use native_examples::ExampleCredentialProvider;
+use native_examples::{ExampleAccessLevel, RawModeGuard, StdioCharIo};
 use nut_shell::{config::DefaultConfig, shell::Shell};
 use std::io::{self as stdio, Read};
 use tree::ROOT;

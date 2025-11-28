@@ -1,14 +1,9 @@
 //! Hardware initialization for NUCLEO-F072RB
 
 use cortex_m::peripheral::syst::SystClkSource;
-use stm32f0xx_hal::{
-    adc::Adc,
-    pac,
-    prelude::*,
-    serial::Serial,
-};
+use stm32f0xx_hal::{adc::Adc, pac, prelude::*, serial::Serial};
 
-use crate::io::{UartTx, UartRx};
+use crate::io::{UartRx, UartTx};
 
 // =============================================================================
 // Hardware Initialization
@@ -29,10 +24,7 @@ pub struct HardwareConfig {
 /// - USART2 on PA2/PA3 at 115200 baud (connected to ST-LINK VCP)
 /// - LED on PA5
 /// - ADC with temperature sensor
-pub fn init_hardware(
-    mut pac: pac::Peripherals,
-    mut core: pac::CorePeripherals,
-) -> HardwareConfig {
+pub fn init_hardware(mut pac: pac::Peripherals, mut core: pac::CorePeripherals) -> HardwareConfig {
     // Configure clocks
     let mut rcc = pac.RCC.configure().sysclk(48.mhz()).freeze(&mut pac.FLASH);
 

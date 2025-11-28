@@ -1,7 +1,7 @@
 //! Command tree definition for the NUCLEO-F072RB example
 
-use stm32_examples::{Stm32AccessLevel, hw_commands, system_commands};
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
+use stm32_examples::{Stm32AccessLevel, hw_commands, system_commands};
 
 // =============================================================================
 // System Commands
@@ -89,9 +89,6 @@ const HARDWARE_DIR: Directory<Stm32AccessLevel> = Directory {
 
 pub const ROOT: Directory<Stm32AccessLevel> = Directory {
     name: "/",
-    children: &[
-        Node::Directory(&SYSTEM_DIR),
-        Node::Directory(&HARDWARE_DIR),
-    ],
+    children: &[Node::Directory(&SYSTEM_DIR), Node::Directory(&HARDWARE_DIR)],
     access_level: Stm32AccessLevel::User,
 };

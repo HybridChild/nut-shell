@@ -8,10 +8,15 @@
 //!
 //! These commands are designed to be reusable across different STM32F072 examples.
 
+use crate::access_level::Stm32AccessLevel;
 use core::fmt::Write;
 use heapless;
-use nut_shell::{config::ShellConfig, response::Response, tree::{CommandMeta, CommandKind}, CliError};
-use crate::access_level::Stm32AccessLevel;
+use nut_shell::{
+    CliError,
+    config::ShellConfig,
+    response::Response,
+    tree::{CommandKind, CommandMeta},
+};
 
 // =============================================================================
 // Command Metadata (for use in command trees)
@@ -80,12 +85,7 @@ pub fn cmd_chipid<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErro
     let uid2 = unsafe { core::ptr::read_volatile((UID_BASE + 8) as *const u32) };
 
     let mut msg = heapless::String::<128>::new();
-    write!(
-        msg,
-        "Unique ID: {:08X}{:08X}{:08X}",
-        uid2, uid1, uid0
-    )
-    .ok();
+    write!(msg, "Unique ID: {:08X}{:08X}{:08X}", uid2, uid1, uid0).ok();
 
     Ok(Response::success(&msg).indented())
 }
@@ -101,8 +101,8 @@ pub fn cmd_chipid<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErro
 pub fn cmd_clocks<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
     // RCC register base address
     const RCC_BASE: u32 = 0x4002_1000;
-    const RCC_CFGR: u32 = RCC_BASE + 0x04;   // Clock configuration register
-    const RCC_CR: u32 = RCC_BASE + 0x00;     // Clock control register
+    const RCC_CFGR: u32 = RCC_BASE + 0x04; // Clock configuration register
+    const RCC_CR: u32 = RCC_BASE + 0x00; // Clock control register
 
     // Read RCC registers
     let cfgr = unsafe { core::ptr::read_volatile(RCC_CFGR as *const u32) };

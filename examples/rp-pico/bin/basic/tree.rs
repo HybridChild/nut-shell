@@ -1,7 +1,7 @@
 //! Command tree definition for the basic example
 
-use rp_pico_examples::{PicoAccessLevel, hw_commands, system_commands};
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
+use rp_pico_examples::{PicoAccessLevel, hw_commands, system_commands};
 
 // =============================================================================
 // System Commands
@@ -90,9 +90,6 @@ const HARDWARE_DIR: Directory<PicoAccessLevel> = Directory {
 
 pub const ROOT: Directory<PicoAccessLevel> = Directory {
     name: "/",
-    children: &[
-        Node::Directory(&SYSTEM_DIR),
-        Node::Directory(&HARDWARE_DIR),
-    ],
+    children: &[Node::Directory(&SYSTEM_DIR), Node::Directory(&HARDWARE_DIR)],
     access_level: PicoAccessLevel::User,
 };

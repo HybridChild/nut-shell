@@ -1,7 +1,7 @@
 //! Command tree definition for the embassy example
 
-use rp_pico_examples::{PicoAccessLevel, hw_commands, system_commands};
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
+use rp_pico_examples::{PicoAccessLevel, hw_commands, system_commands};
 
 // =============================================================================
 // LED Control Command (Embassy channel-based)

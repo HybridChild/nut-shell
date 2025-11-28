@@ -3,7 +3,7 @@
 use stm32f0xx_hal::{
     pac::USART2,
     prelude::*,
-    serial::{Tx, Rx},
+    serial::{Rx, Tx},
 };
 
 use nut_shell::io::CharIo;

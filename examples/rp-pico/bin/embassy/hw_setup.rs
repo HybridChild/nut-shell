@@ -1,10 +1,13 @@
 //! Hardware initialization for Embassy async example
 
 use embassy_rp::{
-    adc::{Adc, Async as AdcAsync, Channel as AdcChannel, Config as AdcConfig, InterruptHandler as AdcInterruptHandler},
+    Peri,
+    adc::{
+        Adc, Async as AdcAsync, Channel as AdcChannel, Config as AdcConfig,
+        InterruptHandler as AdcInterruptHandler,
+    },
     bind_interrupts,
     gpio::{Level, Output},
-    Peri,
 };
 
 // Bind ADC interrupt handler

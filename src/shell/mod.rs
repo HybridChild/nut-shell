@@ -1511,10 +1511,7 @@ mod tests {
     // Test tree
     const TEST_TREE: Directory<MockLevel> = Directory {
         name: "/",
-        children: &[
-            Node::Command(&CMD_TEST),
-            Node::Directory(&DIR_SYSTEM),
-        ],
+        children: &[Node::Command(&CMD_TEST), Node::Directory(&DIR_SYSTEM)],
         access_level: MockLevel::User,
     };
 
@@ -1788,7 +1785,10 @@ mod tests {
 
         // Invalid: Cannot navigate through command to another segment
         let result = shell.resolve_path("test-cmd/invalid");
-        assert!(result.is_err(), "Should fail when navigating through command");
+        assert!(
+            result.is_err(),
+            "Should fail when navigating through command"
+        );
         assert_eq!(
             result.unwrap_err(),
             CliError::InvalidPath,
@@ -1797,7 +1797,10 @@ mod tests {
 
         // Invalid: Multiple segments after command
         let result = shell.resolve_path("test-cmd/extra/path");
-        assert!(result.is_err(), "Should fail with multiple segments after command");
+        assert!(
+            result.is_err(),
+            "Should fail with multiple segments after command"
+        );
         assert_eq!(
             result.unwrap_err(),
             CliError::InvalidPath,
@@ -1923,7 +1926,11 @@ mod tests {
         // Path should have indices for system (0), network (2), and status (0)
         // [0] = system (index 0 in children of root)
         // [2] = network (index 2 in children of system)
-        assert_eq!(path.len(), 2, "Path should have 2 elements (system, network)");
+        assert_eq!(
+            path.len(),
+            2,
+            "Path should have 2 elements (system, network)"
+        );
 
         // Test 2: Use .. to go back to system from system/network
         let result = shell.resolve_path("system/network/..");
@@ -1951,4 +1958,3 @@ mod tests {
         }
     }
 }
-

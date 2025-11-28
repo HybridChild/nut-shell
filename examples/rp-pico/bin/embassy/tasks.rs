@@ -36,7 +36,10 @@ pub async fn led_task(
 /// This background task reads the temperature sensor every 500ms and updates
 /// the cached value that's returned by the `temp` command via `hw_state::read_temperature()`.
 #[embassy_executor::task]
-pub async fn temperature_monitor(mut adc: Adc<'static, AdcAsync>, mut temp_channel: AdcChannel<'static>) {
+pub async fn temperature_monitor(
+    mut adc: Adc<'static, AdcAsync>,
+    mut temp_channel: AdcChannel<'static>,
+) {
     loop {
         // Read temperature sensor
         let adc_value = adc.read(&mut temp_channel).await.unwrap();

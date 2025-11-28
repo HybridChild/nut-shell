@@ -22,10 +22,7 @@ use cortex_m_rt::{entry, exception};
 use panic_halt as _;
 use stm32f0xx_hal::pac;
 
-use nut_shell::{
-    config::MinimalConfig,
-    shell::Shell,
-};
+use nut_shell::{config::MinimalConfig, shell::Shell};
 
 use stm32_examples::Stm32AccessLevel;
 #[cfg(feature = "authentication")]

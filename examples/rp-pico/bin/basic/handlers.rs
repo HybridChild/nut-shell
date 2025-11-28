@@ -3,7 +3,7 @@
 use core::fmt::Write;
 use heapless;
 use nut_shell::{
-    config::DefaultConfig, response::Response, shell::handlers::CommandHandler, CliError,
+    CliError, config::DefaultConfig, response::Response, shell::handlers::CommandHandler,
 };
 use rp_pico_examples::{hw_commands, system_commands};
 
@@ -53,11 +53,7 @@ impl PicoHandlers {
 }
 
 impl CommandHandler<DefaultConfig> for PicoHandlers {
-    fn execute_sync(
-        &self,
-        id: &str,
-        args: &[&str],
-    ) -> Result<Response<DefaultConfig>, CliError> {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
             "system_info" => self.system_info(),
             // System diagnostic commands

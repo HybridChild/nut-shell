@@ -10,9 +10,9 @@ use rp2040_hal::{
     usb::UsbBus,
     watchdog::Watchdog,
 };
+use static_cell::StaticCell;
 use usb_device::{class_prelude::UsbBusAllocator, prelude::*};
 use usbd_serial::SerialPort;
-use static_cell::StaticCell;
 
 use crate::hw_state;
 
@@ -36,10 +36,7 @@ pub struct HardwareConfig {
 ///
 /// Returns the hardware configuration struct.
 /// USB device and serial are initialized globally via `io::init_usb()`.
-pub fn init_hardware(
-    mut pac: pac::Peripherals,
-    core: pac::CorePeripherals,
-) -> HardwareConfig {
+pub fn init_hardware(mut pac: pac::Peripherals, core: pac::CorePeripherals) -> HardwareConfig {
     // Set up watchdog
     let mut watchdog = Watchdog::new(pac.WATCHDOG);
 

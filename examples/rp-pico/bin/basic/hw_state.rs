@@ -6,18 +6,14 @@ use embedded_hal_0_2::adc::OneShot;
 use embedded_hal_0_2::digital::v2::OutputPin;
 use rp2040_hal::{
     adc::Adc,
-    gpio::{Pin, FunctionSio, SioOutput, PullDown},
+    gpio::{FunctionSio, Pin, PullDown, SioOutput},
 };
 
 // =============================================================================
 // Type Aliases
 // =============================================================================
 
-pub type LedPin = Pin<
-    rp2040_hal::gpio::bank0::Gpio25,
-    FunctionSio<SioOutput>,
-    PullDown,
->;
+pub type LedPin = Pin<rp2040_hal::gpio::bank0::Gpio25, FunctionSio<SioOutput>, PullDown>;
 
 pub type TempSensor = rp2040_hal::adc::TempSense;
 pub type AdcType = Adc;

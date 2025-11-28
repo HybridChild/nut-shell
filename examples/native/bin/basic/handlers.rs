@@ -2,17 +2,13 @@
 
 use core::fmt::Write;
 use nut_shell::{
-    config::DefaultConfig, response::Response, shell::handlers::CommandHandler, CliError,
+    CliError, config::DefaultConfig, response::Response, shell::handlers::CommandHandler,
 };
 
 pub struct ExampleHandlers;
 
 impl CommandHandler<DefaultConfig> for ExampleHandlers {
-    fn execute_sync(
-        &self,
-        id: &str,
-        args: &[&str],
-    ) -> Result<Response<DefaultConfig>, CliError> {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
             "coffee_make" => Ok(Response::success("Brewing coffee...")),
             "system_reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!")),
@@ -67,12 +63,7 @@ impl CommandHandler<DefaultConfig> for ExampleHandlers {
     ) -> Result<Response<DefaultConfig>, CliError> {
         // This example doesn't use async commands
         let mut msg = heapless::String::<256>::new();
-        write!(
-            msg,
-            "Async command '{}' not supported in this example",
-            id
-        )
-        .ok();
+        write!(msg, "Async command '{}' not supported in this example", id).ok();
         Err(CliError::Other(msg))
     }
 }

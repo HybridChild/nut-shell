@@ -79,10 +79,7 @@ impl Default for ExampleCredentialProvider {
 impl nut_shell::auth::CredentialProvider<ExampleAccessLevel> for ExampleCredentialProvider {
     type Error = ();
 
-    fn find_user(
-        &self,
-        username: &str,
-    ) -> Result<Option<User<ExampleAccessLevel>>, Self::Error> {
+    fn find_user(&self, username: &str) -> Result<Option<User<ExampleAccessLevel>>, Self::Error> {
         Ok(self
             .users
             .iter()

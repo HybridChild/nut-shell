@@ -4,10 +4,7 @@ use core::cell::RefCell;
 use cortex_m::interrupt::Mutex;
 use stm32f0xx_hal::{
     adc::{Adc, VTemp},
-    gpio::{
-        gpioa::PA5,
-        Output, PushPull,
-    },
+    gpio::{Output, PushPull, gpioa::PA5},
     prelude::*,
 };
 

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use syn::{Data, DeriveInput, Fields, parse_macro_input};
 
 /// Derives the `AccessLevel` trait for enums.
 ///
@@ -58,12 +58,9 @@ pub fn derive_access_level(input: TokenStream) -> TokenStream {
     let variants = match &input.data {
         Data::Enum(data_enum) => &data_enum.variants,
         _ => {
-            return syn::Error::new_spanned(
-                &input,
-                "AccessLevel can only be derived for enums",
-            )
-            .to_compile_error()
-            .into();
+            return syn::Error::new_spanned(&input, "AccessLevel can only be derived for enums")
+                .to_compile_error()
+                .into();
         }
     };
 

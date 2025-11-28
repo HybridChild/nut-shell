@@ -67,10 +67,7 @@ impl Default for Stm32CredentialProvider {
 impl nut_shell::auth::CredentialProvider<Stm32AccessLevel> for Stm32CredentialProvider {
     type Error = ();
 
-    fn find_user(
-        &self,
-        username: &str,
-    ) -> Result<Option<User<Stm32AccessLevel>>, Self::Error> {
+    fn find_user(&self, username: &str) -> Result<Option<User<Stm32AccessLevel>>, Self::Error> {
         Ok(self
             .users
             .iter()

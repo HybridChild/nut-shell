@@ -7,10 +7,15 @@
 //! - Flash memory information
 //! - Controlled crash for testing
 
+use crate::access_level::Stm32AccessLevel;
 use core::fmt::Write;
 use heapless;
-use nut_shell::{config::ShellConfig, response::Response, tree::{CommandMeta, CommandKind}, CliError};
-use crate::access_level::Stm32AccessLevel;
+use nut_shell::{
+    CliError,
+    config::ShellConfig,
+    response::Response,
+    tree::{CommandKind, CommandMeta},
+};
 
 // =============================================================================
 // Static Cache Storage
@@ -116,8 +121,8 @@ pub fn cmd_uptime<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErro
 /// stack reservation, and memory usage percentages.
 pub fn cmd_meminfo<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
     // STM32F072 memory layout
-    const TOTAL_RAM_BYTES: u32 = 16 * 1024;  // 16 KB SRAM
-    const TOTAL_FLASH_BYTES: u32 = 128 * 1024;  // 128 KB Flash
+    const TOTAL_RAM_BYTES: u32 = 16 * 1024; // 16 KB SRAM
+    const TOTAL_FLASH_BYTES: u32 = 128 * 1024; // 128 KB Flash
 
     // Declare linker symbols for complete memory map
     unsafe extern "C" {
@@ -166,8 +171,13 @@ pub fn cmd_meminfo<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErr
     write!(msg, "\r\n").ok();
 
     // RAM breakdown
-    write!(msg, "RAM ({}K, {}% static):\r\n",
-           TOTAL_RAM_BYTES / 1024, ram_used_percent).ok();
+    write!(
+        msg,
+        "RAM ({}K, {}% static):\r\n",
+        TOTAL_RAM_BYTES / 1024,
+        ram_used_percent
+    )
+    .ok();
     write!(msg, "  .data:  {} bytes\r\n", data_size).ok();
     write!(msg, "  .bss:   {} bytes\r\n", bss_size).ok();
     write!(msg, "  Static: {} bytes\r\n", static_ram).ok();
@@ -258,9 +268,7 @@ fn is_prime(n: u32) -> bool {
 pub fn cmd_flash<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
     // Read flash size from device register
     const FLASH_SIZE_REG: u32 = 0x1FFF_F7CC;
-    let flash_size_kb = unsafe {
-        core::ptr::read_volatile(FLASH_SIZE_REG as *const u16) as u32
-    };
+    let flash_size_kb = unsafe { core::ptr::read_volatile(FLASH_SIZE_REG as *const u16) as u32 };
 
     // Declare linker symbols for flash usage
     unsafe extern "C" {

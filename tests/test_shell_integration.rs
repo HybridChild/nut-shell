@@ -571,7 +571,7 @@ fn create_test_provider() -> (
     nut_shell::auth::password::Sha256Hasher,
 ) {
     use fixtures::MockAccessLevel;
-    use nut_shell::auth::{password::Sha256Hasher, PasswordHasher, User, ConstCredentialProvider};
+    use nut_shell::auth::{ConstCredentialProvider, PasswordHasher, User, password::Sha256Hasher};
 
     let hasher = Sha256Hasher::new();
 

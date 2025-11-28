@@ -10,10 +10,15 @@
 //!
 //! These commands are designed to be reusable across different RP2040 examples.
 
+use crate::access_level::PicoAccessLevel;
 use core::fmt::Write;
 use heapless;
-use nut_shell::{config::ShellConfig, response::Response, tree::{CommandMeta, CommandKind}, CliError};
-use crate::access_level::PicoAccessLevel;
+use nut_shell::{
+    CliError,
+    config::ShellConfig,
+    response::Response,
+    tree::{CommandKind, CommandMeta},
+};
 
 // =============================================================================
 // Static Cache Storage
@@ -305,9 +310,7 @@ pub fn cmd_core<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError>
 /// - CHIP_RESET: Detailed source flags (sticky bits)
 pub fn cmd_bootreason<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
     // Read cached values (set by init_reset_reason() at startup)
-    let (watchdog_reason, chip_reset) = unsafe {
-        (CACHED_WATCHDOG_REASON, CACHED_CHIP_RESET)
-    };
+    let (watchdog_reason, chip_reset) = unsafe { (CACHED_WATCHDOG_REASON, CACHED_CHIP_RESET) };
 
     let mut msg = heapless::String::<256>::new();
     write!(msg, "Reset Diagnostics:\r\n").ok();
@@ -410,9 +413,9 @@ pub fn cmd_gpio<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> 
 
     // Read GPIO state directly from hardware registers
     // SIO (Single-cycle I/O) registers
-    const SIO_GPIO_IN: u32 = 0xd000_0004;   // Current input values
-    const SIO_GPIO_OE: u32 = 0xd000_0020;   // Output enable (direction)
-    const SIO_GPIO_OUT: u32 = 0xd000_0010;  // Output values
+    const SIO_GPIO_IN: u32 = 0xd000_0004; // Current input values
+    const SIO_GPIO_OE: u32 = 0xd000_0020; // Output enable (direction)
+    const SIO_GPIO_OUT: u32 = 0xd000_0010; // Output values
 
     // PADS_BANK0 registers for pull configuration
     const PADS_BANK0_BASE: u32 = 0x4001_c000;
@@ -463,5 +466,3 @@ pub fn cmd_gpio<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> 
 
     Ok(Response::success(&msg).indented())
 }
-
-

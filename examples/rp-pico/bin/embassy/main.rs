@@ -33,16 +33,13 @@ use embassy_rp::{
 use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
 use embassy_sync::channel::Channel;
 use embassy_time::{Duration, Timer};
-use embassy_usb::{Builder, Config};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
+use embassy_usb::{Builder, Config};
 use heapless;
 use panic_halt as _;
 use static_cell::StaticCell;
 
-use nut_shell::{
-    config::DefaultConfig,
-    shell::Shell,
-};
+use nut_shell::{config::DefaultConfig, shell::Shell};
 
 use rp_pico_examples::{PicoAccessLevel, init_boot_time, init_chip_id, init_reset_reason};
 
@@ -217,8 +214,15 @@ async fn main(spawner: Spawner) {
     Timer::after(Duration::from_millis(100)).await;
 
     // Spawn other tasks
-    spawner.spawn(tasks::led_task(hw_config.led, led_channel)).unwrap();
-    spawner.spawn(tasks::temperature_monitor(hw_config.adc, hw_config.temp_channel)).unwrap();
+    spawner
+        .spawn(tasks::led_task(hw_config.led, led_channel))
+        .unwrap();
+    spawner
+        .spawn(tasks::temperature_monitor(
+            hw_config.adc,
+            hw_config.temp_channel,
+        ))
+        .unwrap();
     spawner.spawn(shell_task(usb_class, led_channel)).unwrap();
 }
 

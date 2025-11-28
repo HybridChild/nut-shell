@@ -2,18 +2,14 @@
 
 use core::fmt::Write;
 use nut_shell::{
-    config::DefaultConfig, response::Response, shell::handlers::CommandHandler, CliError,
+    CliError, config::DefaultConfig, response::Response, shell::handlers::CommandHandler,
 };
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 pub struct AsyncHandlers;
 
 impl CommandHandler<DefaultConfig> for AsyncHandlers {
-    fn execute_sync(
-        &self,
-        id: &str,
-        args: &[&str],
-    ) -> Result<Response<DefaultConfig>, CliError> {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
             "sync_echo" => {
                 if args.is_empty() {

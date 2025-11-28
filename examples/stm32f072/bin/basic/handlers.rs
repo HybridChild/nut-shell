@@ -2,7 +2,7 @@
 
 use core::fmt::Write;
 use nut_shell::{
-    config::ShellConfig, response::Response, shell::handlers::CommandHandler, CliError,
+    CliError, config::ShellConfig, response::Response, shell::handlers::CommandHandler,
 };
 use stm32_examples::{hw_commands, system_commands};
 
@@ -80,15 +80,11 @@ impl Stm32Handlers {
 }
 
 impl<C: ShellConfig> CommandHandler<C> for Stm32Handlers {
-    fn execute_sync(
-        &self,
-        id: &str,
-        args: &[&str],
-    ) -> Result<Response<C>, CliError> {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match id {
             "system_info" => self.system_info(),
             // System diagnostic commands
-            "system_uptime" => self.uptime::<C>(),  // Use local implementation with systick access
+            "system_uptime" => self.uptime::<C>(), // Use local implementation with systick access
             "system_meminfo" => system_commands::cmd_meminfo::<C>(args),
             "system_benchmark" => system_commands::cmd_benchmark::<C>(args),
             "system_flash" => system_commands::cmd_flash::<C>(args),
@@ -106,11 +102,7 @@ impl<C: ShellConfig> CommandHandler<C> for Stm32Handlers {
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(
-        &self,
-        _id: &str,
-        _args: &[&str],
-    ) -> Result<Response<C>, CliError> {
+    async fn execute_async(&self, _id: &str, _args: &[&str]) -> Result<Response<C>, CliError> {
         // Basic example is synchronous-only, no async commands
         Err(CliError::CommandNotFound)
     }

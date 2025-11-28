@@ -25,10 +25,7 @@ use rp2040_hal::pac;
 #[used]
 pub static BOOT2: [u8; 256] = rp2040_boot2::BOOT_LOADER_GENERIC_03H;
 
-use nut_shell::{
-    config::DefaultConfig,
-    shell::Shell,
-};
+use nut_shell::{config::DefaultConfig, shell::Shell};
 
 use rp_pico_examples::{PicoAccessLevel, init_boot_time, init_chip_id, init_reset_reason};
 

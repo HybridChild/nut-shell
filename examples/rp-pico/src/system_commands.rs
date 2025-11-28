@@ -10,10 +10,15 @@
 //! While these commands interact with RP2040 hardware (timers, linker symbols),
 //! they represent higher-level system diagnostics rather than direct hardware control.
 
+use crate::access_level::PicoAccessLevel;
 use core::fmt::Write;
 use heapless;
-use nut_shell::{config::ShellConfig, response::Response, tree::{CommandMeta, CommandKind}, CliError};
-use crate::access_level::PicoAccessLevel;
+use nut_shell::{
+    CliError,
+    config::ShellConfig,
+    response::Response,
+    tree::{CommandKind, CommandMeta},
+};
 
 // =============================================================================
 // Static Cache Storage
@@ -144,8 +149,8 @@ pub fn cmd_uptime<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErro
 /// stack reservation, and memory usage percentages.
 pub fn cmd_meminfo<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
     // RP2040 memory layout
-    const TOTAL_RAM_BYTES: u32 = 264 * 1024;  // 264 KB SRAM
-    const TOTAL_FLASH_BYTES: u32 = 2 * 1024 * 1024;  // 2 MB Flash
+    const TOTAL_RAM_BYTES: u32 = 264 * 1024; // 264 KB SRAM
+    const TOTAL_FLASH_BYTES: u32 = 2 * 1024 * 1024; // 2 MB Flash
 
     // Declare linker symbols for complete memory map
     unsafe extern "C" {
@@ -166,12 +171,17 @@ pub fn cmd_meminfo<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErr
     // Get all linker symbol addresses
     let (
         // RAM sections
-        data_start, data_end,
-        bss_start, bss_end,
-        stack_start, stack_end,
+        data_start,
+        data_end,
+        bss_start,
+        bss_end,
+        stack_start,
+        stack_end,
         // Flash sections
-        text_start, text_end,
-        rodata_start, rodata_end,
+        text_start,
+        text_end,
+        rodata_start,
+        rodata_end,
     ) = (
         core::ptr::addr_of!(__sdata) as usize,
         core::ptr::addr_of!(__edata) as usize,
@@ -205,8 +215,13 @@ pub fn cmd_meminfo<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErr
     write!(msg, "\r\n").ok();
 
     // RAM breakdown
-    write!(msg, "RAM ({}K total, {}% used):\r\n",
-           TOTAL_RAM_BYTES / 1024, ram_used_percent).ok();
+    write!(
+        msg,
+        "RAM ({}K total, {}% used):\r\n",
+        TOTAL_RAM_BYTES / 1024,
+        ram_used_percent
+    )
+    .ok();
     write!(msg, "  .data:  {} bytes\r\n", data_size).ok();
     write!(msg, "  .bss:   {} bytes\r\n", bss_size).ok();
     write!(msg, "  Stack:  {} KB\r\n", stack_size / 1024).ok();
@@ -263,7 +278,12 @@ pub fn cmd_benchmark<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliE
 
     let mut msg = heapless::String::<256>::new();
     write!(msg, "Benchmark Results:\r\n").ok();
-    write!(msg, "  Primes < 1000: {} ({} us)\r\n", prime_count, prime_time).ok();
+    write!(
+        msg,
+        "  Primes < 1000: {} ({} us)\r\n",
+        prime_count, prime_time
+    )
+    .ok();
     write!(msg, "  Memory ops: {} us\r\n", mem_time).ok();
     write!(msg, "  CPU: RP2040 Cortex-M0+").ok();
 
@@ -336,7 +356,12 @@ pub fn cmd_flash<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError
 
     let mut msg = heapless::String::<256>::new();
     write!(msg, "Flash Memory:\r\n").ok();
-    write!(msg, "  Total:     {} MB ({} KB)\r\n", flash_size_mb, flash_size_kb).ok();
+    write!(
+        msg,
+        "  Total:     {} MB ({} KB)\r\n",
+        flash_size_mb, flash_size_kb
+    )
+    .ok();
     write!(msg, "  Firmware:  {} KB ({}%)\r\n", used_kb, used_percent).ok();
     write!(msg, "    .text:   {} bytes\r\n", text_size).ok();
     write!(msg, "    .rodata: {} bytes\r\n", rodata_size).ok();

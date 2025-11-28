@@ -13,16 +13,15 @@ use nut_shell::io::CharIo;
 // =============================================================================
 
 /// Global USB device and serial port protected by Mutex
-static USB_DEVICE: Mutex<RefCell<Option<UsbDevice<'static, UsbBus>>>> = Mutex::new(RefCell::new(None));
-static USB_SERIAL: Mutex<RefCell<Option<SerialPort<'static, UsbBus>>>> = Mutex::new(RefCell::new(None));
+static USB_DEVICE: Mutex<RefCell<Option<UsbDevice<'static, UsbBus>>>> =
+    Mutex::new(RefCell::new(None));
+static USB_SERIAL: Mutex<RefCell<Option<SerialPort<'static, UsbBus>>>> =
+    Mutex::new(RefCell::new(None));
 
 /// Initialize USB device and serial port
 ///
 /// This must be called once during startup with the initialized USB bus.
-pub fn init_usb(
-    usb_device: UsbDevice<'static, UsbBus>,
-    serial: SerialPort<'static, UsbBus>,
-) {
+pub fn init_usb(usb_device: UsbDevice<'static, UsbBus>, serial: SerialPort<'static, UsbBus>) {
     cortex_m::interrupt::free(|cs| {
         USB_DEVICE.borrow(cs).replace(Some(usb_device));
         USB_SERIAL.borrow(cs).replace(Some(serial));
