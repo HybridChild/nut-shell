@@ -28,24 +28,46 @@ Complete interactive CLI over UART demonstrating nut-shell on STM32 hardware.
 
 ```
 /
-└── system/
-    └── info    - Show device information (User)
+├── system/
+│   ├── info       - Show device information
+│   ├── uptime     - Show system uptime
+│   ├── meminfo    - Display memory usage statistics
+│   ├── benchmark  - Run CPU performance benchmark
+│   ├── flash      - Show flash memory information
+│   └── crash      - Trigger controlled panic (Admin only!)
+│
+└── hardware/
+    ├── get/
+    │   ├── temp       - Read internal temperature sensor
+    │   ├── chipid     - Display unique device ID (96-bit)
+    │   ├── clocks     - Show clock frequencies
+    │   ├── core       - Display CPU core information
+    │   └── bootreason - Show last reset reason
+    │
+    └── set/
+        └── led        - Control USER LED (on/off)
 
 Global:
   ?      - Show help
   ls     - List directory contents
   clear  - Clear screen
-  logout - End session (returns to login)
+  logout - End session (authentication only)
 ```
 
 **Authentication** (when enabled):
-- `admin:stm32admin` - Admin access
-- `user:stm32user` - User access
+- `admin:admin123` - Admin access
+- `user:user123` - User access
 
-**Memory Usage:**
-- Flash: ~15KB (with all features)
+**Memory Usage (Release Build):**
+- Flash: ~35KB (minimal) to ~45KB (all features)
 - RAM: <2KB static allocation
 - No heap allocation (pure `no_std`)
+
+Feature impact on flash:
+- Base (no features): 35KB
+- +completion: +1KB
+- +history: +2KB
+- +authentication: +7KB
 
 **Flash and connect:**
 
@@ -79,20 +101,23 @@ arm-none-eabi-gdb target/thumbv6m-none-eabi/release/basic
 # With authentication
 cargo build --release --bin basic --features authentication
 
-# Minimal (no optional features)
-cargo build --release --bin basic --no-default-features
+# Minimal (no optional features - debug build supported)
+cargo build --bin basic --no-default-features
 
 # Custom combinations
 cargo build --release --bin basic --features completion,history
+cargo build --release --bin basic --features authentication,completion,history
 ```
 
 Available features: `authentication`, `completion`, `history`
+
+**Important:** Due to the STM32F072's limited flash memory (128KB), **any build with optional features enabled requires release mode**. Debug builds overflow flash memory with any feature combination except the minimal no-features configuration. Release builds with all features fit comfortably (~42KB flash).
 
 ---
 
 ## Hardware Verification
 
-This example has been compiled and verified to build correctly for the thumbv6m-none-eabi target. Hardware testing on physical NUCLEO-F072RB boards is pending.
+This example has been verified to build and run successfully on physical NUCLEO-F072RB hardware with all feature combinations.
 
 ## License
 

@@ -28,6 +28,8 @@ use nut_shell::{
 };
 
 use stm32_examples::Stm32AccessLevel;
+#[cfg(feature = "authentication")]
+use stm32_examples::Stm32CredentialProvider;
 
 use crate::handlers::Stm32Handlers;
 use crate::io::UartCharIo;
@@ -62,6 +64,13 @@ fn main() -> ! {
     // Create shell with minimal configuration for resource-constrained STM32
     // MinimalConfig uses smaller buffers (64-byte input, 128-byte response)
     // to reduce stack usage on devices with limited RAM (16KB on STM32F072)
+    #[cfg(feature = "authentication")]
+    let provider = Stm32CredentialProvider::new();
+    #[cfg(feature = "authentication")]
+    let mut shell: Shell<Stm32AccessLevel, UartCharIo, Stm32Handlers, MinimalConfig> =
+        Shell::new(&ROOT, handlers, &provider, io);
+
+    #[cfg(not(feature = "authentication"))]
     let mut shell: Shell<Stm32AccessLevel, UartCharIo, Stm32Handlers, MinimalConfig> =
         Shell::new(&ROOT, handlers, io);
 
