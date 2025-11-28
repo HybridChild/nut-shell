@@ -51,6 +51,7 @@ pub trait CommandHandler<C: ShellConfig> {
     /// - `Ok(Response)`: Command executed successfully
     /// - `Err(CliError::CommandNotFound)`: Command ID not recognized
     /// - `Err(CliError)`: Other execution error
+    #[allow(clippy::result_large_err)]
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     /// Execute asynchronous command by unique ID (requires `async` feature).

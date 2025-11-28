@@ -55,10 +55,10 @@ impl<const N: usize, const INPUT_SIZE: usize> CommandHistory<N, INPUT_SIZE> {
         }
 
         // Don't add if same as most recent
-        if let Some(last) = self.buffer.last() {
-            if last.as_str() == cmd {
-                return;
-            }
+        if let Some(last) = self.buffer.last()
+            && last.as_str() == cmd
+        {
+            return;
         }
 
         let mut entry = heapless::String::new();
@@ -82,7 +82,7 @@ impl<const N: usize, const INPUT_SIZE: usize> CommandHistory<N, INPUT_SIZE> {
 
     /// Navigate to previous command (up arrow).
     #[cfg(feature = "history")]
-    pub fn previous(&mut self) -> Option<heapless::String<INPUT_SIZE>> {
+    pub fn previous_command(&mut self) -> Option<heapless::String<INPUT_SIZE>> {
         if self.buffer.is_empty() {
             return None;
         }
@@ -99,13 +99,13 @@ impl<const N: usize, const INPUT_SIZE: usize> CommandHistory<N, INPUT_SIZE> {
 
     /// Navigate to previous command (stub version - returns None).
     #[cfg(not(feature = "history"))]
-    pub fn previous(&mut self) -> Option<heapless::String<INPUT_SIZE>> {
+    pub fn previous_command(&mut self) -> Option<heapless::String<INPUT_SIZE>> {
         None
     }
 
     /// Navigate to next command (down arrow).
     #[cfg(feature = "history")]
-    pub fn next(&mut self) -> Option<heapless::String<INPUT_SIZE>> {
+    pub fn next_command(&mut self) -> Option<heapless::String<INPUT_SIZE>> {
         match self.position {
             None => None, // Not navigating
             Some(p) if p >= self.buffer.len() - 1 => {
@@ -123,7 +123,7 @@ impl<const N: usize, const INPUT_SIZE: usize> CommandHistory<N, INPUT_SIZE> {
 
     /// Navigate to next command (stub version - returns None).
     #[cfg(not(feature = "history"))]
-    pub fn next(&mut self) -> Option<heapless::String<INPUT_SIZE>> {
+    pub fn next_command(&mut self) -> Option<heapless::String<INPUT_SIZE>> {
         None
     }
 
@@ -160,19 +160,19 @@ mod tests {
         history.add("cmd3");
 
         // Navigate backwards
-        assert_eq!(history.previous().unwrap().as_str(), "cmd3");
-        assert_eq!(history.previous().unwrap().as_str(), "cmd2");
-        assert_eq!(history.previous().unwrap().as_str(), "cmd1");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd3");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd2");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd1");
 
         // At oldest - should stay
-        assert_eq!(history.previous().unwrap().as_str(), "cmd1");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd1");
 
         // Navigate forward
-        assert_eq!(history.next().unwrap().as_str(), "cmd2");
-        assert_eq!(history.next().unwrap().as_str(), "cmd3");
+        assert_eq!(history.next_command().unwrap().as_str(), "cmd2");
+        assert_eq!(history.next_command().unwrap().as_str(), "cmd3");
 
         // At newest - should return None
-        assert!(history.next().is_none());
+        assert!(history.next_command().is_none());
     }
 
     #[test]
@@ -181,8 +181,8 @@ mod tests {
         let mut history = CommandHistory::<5, 128>::new();
 
         history.add("cmd1");
-        assert!(history.previous().is_none());
-        assert!(history.next().is_none());
+        assert!(history.previous_command().is_none());
+        assert!(history.next_command().is_none());
     }
 
     #[test]
@@ -199,12 +199,12 @@ mod tests {
         history.add("cmd4");
 
         // Navigate to oldest (should be cmd2 now)
-        assert_eq!(history.previous().unwrap().as_str(), "cmd4");
-        assert_eq!(history.previous().unwrap().as_str(), "cmd3");
-        assert_eq!(history.previous().unwrap().as_str(), "cmd2");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd4");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd3");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd2");
 
         // cmd1 should be gone
-        assert_eq!(history.previous().unwrap().as_str(), "cmd2"); // Stay at oldest
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd2"); // Stay at oldest
     }
 
     #[test]
@@ -218,9 +218,9 @@ mod tests {
         history.add("cmd2");
 
         // Only cmd1 and cmd2 should be in history
-        assert_eq!(history.previous().unwrap().as_str(), "cmd2");
-        assert_eq!(history.previous().unwrap().as_str(), "cmd1");
-        assert_eq!(history.previous().unwrap().as_str(), "cmd1"); // At oldest
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd2");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd1");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd1"); // At oldest
     }
 
     #[test]
@@ -235,9 +235,9 @@ mod tests {
         history.add("cmd1"); // Different from last - should be added
 
         // Should have: cmd1, cmd2, cmd1
-        assert_eq!(history.previous().unwrap().as_str(), "cmd1");
-        assert_eq!(history.previous().unwrap().as_str(), "cmd2");
-        assert_eq!(history.previous().unwrap().as_str(), "cmd1");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd1");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd2");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd1");
     }
 
     #[test]
@@ -246,8 +246,8 @@ mod tests {
         let mut history = CommandHistory::<5, 128>::new();
 
         // Try to navigate when empty
-        assert!(history.previous().is_none());
-        assert!(history.next().is_none());
+        assert!(history.previous_command().is_none());
+        assert!(history.next_command().is_none());
     }
 
     #[test]
@@ -260,14 +260,14 @@ mod tests {
         history.add("cmd3");
 
         // Navigate backwards
-        history.previous();
-        history.previous();
+        history.previous_command();
+        history.previous_command();
 
         // Reset position
         history.reset_position();
 
         // Next previous should return most recent
-        assert_eq!(history.previous().unwrap().as_str(), "cmd3");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd3");
     }
 
     #[test]
@@ -279,13 +279,13 @@ mod tests {
         history.add("cmd2");
 
         // Navigate backwards
-        history.previous();
+        history.previous_command();
 
         // Add new command - position should reset
         history.add("cmd3");
 
         // Next previous should return most recent
-        assert_eq!(history.previous().unwrap().as_str(), "cmd3");
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd3");
     }
 
     #[test]
@@ -293,7 +293,7 @@ mod tests {
     fn test_default() {
         let history = CommandHistory::<5, 128>::default();
         let mut history2 = history;
-        assert!(history2.previous().is_none());
+        assert!(history2.previous_command().is_none());
     }
 
     #[test]

@@ -61,6 +61,7 @@ pub enum CliState {
 ///
 /// See [TYPE_REFERENCE.md](../../docs/TYPE_REFERENCE.md) for complete type definition.
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Request<C: ShellConfig> {
     /// Valid authentication attempt
     #[cfg(feature = "authentication")]
@@ -521,10 +522,10 @@ where
 
         // Path part
         prompt.push('/').ok();
-        if !self.current_path.is_empty() {
-            if let Ok(path_str) = self.get_current_path_string() {
-                prompt.push_str(&path_str).ok();
-            }
+        if !self.current_path.is_empty()
+            && let Ok(path_str) = self.get_current_path_string()
+        {
+            prompt.push_str(&path_str).ok();
         }
 
         prompt.push_str("> ").ok();
@@ -591,6 +592,7 @@ where
     }
 
     /// Get current directory node.
+    #[allow(clippy::result_large_err)]
     fn get_current_dir(&self) -> Result<&'tree Directory<L>, CliError> {
         let mut current: &Directory<L> = self.tree;
 
@@ -606,6 +608,7 @@ where
 
     /// Get current path as string (for prompt).
     // TODO: Use C::MAX_INPUT when const generics stabilize
+    #[allow(clippy::result_large_err)]
     fn get_current_path_string(&self) -> Result<heapless::String<128>, CliError> {
         let mut path_str = heapless::String::new();
         let mut current: &Directory<L> = self.tree;
@@ -895,6 +898,7 @@ where
     ///
     /// Note: "command" here refers specifically to Node::Command,
     /// not generic user input.
+    #[allow(clippy::result_large_err)]
     fn execute_tree_path(&mut self, input: &str) -> Result<Response<C>, CliError> {
         // Parse path and arguments
         // TODO: Use C::MAX_ARGS + 1 when const generics stabilize (command + args)
@@ -924,10 +928,10 @@ where
             Some(Node::Command(cmd_meta)) => {
                 // Case 2: Tree command execution
                 // Check access control - use InvalidPath for security (don't reveal access denied)
-                if let Some(user) = &self.current_user {
-                    if user.access_level < cmd_meta.access_level {
-                        return Err(CliError::InvalidPath);
-                    }
+                if let Some(user) = &self.current_user
+                    && user.access_level < cmd_meta.access_level
+                {
+                    return Err(CliError::InvalidPath);
                 }
 
                 // Validate argument count
@@ -996,10 +1000,10 @@ where
             Some(Node::Command(cmd_meta)) => {
                 // Case 2: Tree command execution
                 // Check access control - use InvalidPath for security (don't reveal access denied)
-                if let Some(user) = &self.current_user {
-                    if user.access_level < cmd_meta.access_level {
-                        return Err(CliError::InvalidPath);
-                    }
+                if let Some(user) = &self.current_user
+                    && user.access_level < cmd_meta.access_level
+                {
+                    return Err(CliError::InvalidPath);
                 }
 
                 // Validate argument count
@@ -1031,6 +1035,7 @@ where
     /// Returns (node, path_stack) where path_stack is the navigation path.
     /// Node is None when path resolves to root directory.
     // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
+    #[allow(clippy::result_large_err)]
     fn resolve_path(
         &self,
         path_str: &str,
@@ -1072,10 +1077,10 @@ where
                     Node::Directory(dir) => dir.access_level,
                 };
 
-                if let Some(user) = &self.current_user {
-                    if user.access_level < node_level {
-                        continue; // User lacks access, skip this node
-                    }
+                if let Some(user) = &self.current_user
+                    && user.access_level < node_level
+                {
+                    continue; // User lacks access, skip this node
                 }
 
                 if child.name() == *segment {
@@ -1117,6 +1122,7 @@ where
 
     /// Get directory at specific path.
     // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
+    #[allow(clippy::result_large_err)]
     fn get_dir_at_path(
         &self,
         path: &heapless::Vec<usize, 8>,
@@ -1135,6 +1141,7 @@ where
 
     /// Get node at specific path.
     // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
+    #[allow(clippy::result_large_err)]
     fn get_node_at_path(&self, path: &heapless::Vec<usize, 8>) -> Result<&'tree Node<L>, CliError> {
         if path.is_empty() {
             // Root directory - need to find a way to return it as a Node
@@ -1222,8 +1229,8 @@ where
         #[cfg(feature = "history")]
         {
             let history_entry = match direction {
-                HistoryDirection::Previous => self.history.previous(),
-                HistoryDirection::Next => self.history.next(),
+                HistoryDirection::Previous => self.history.previous_command(),
+                HistoryDirection::Next => self.history.next_command(),
             };
 
             if let Some(entry) = history_entry {
@@ -1275,10 +1282,10 @@ where
                 Node::Directory(dir) => dir.access_level,
             };
 
-            if let Some(user) = &self.current_user {
-                if user.access_level < node_level {
-                    continue; // User lacks access, skip this node
-                }
+            if let Some(user) = &self.current_user
+                && user.access_level < node_level
+            {
+                continue; // User lacks access, skip this node
             }
 
             // Format output
@@ -1342,6 +1349,7 @@ where
     /// Allows tests to manually set authentication state.
     #[doc(hidden)]
     #[cfg(feature = "authentication")]
+    #[allow(clippy::result_large_err)]
     pub fn __test_set_authenticated_user(&mut self, user: Option<User<L>>) -> Result<(), CliError> {
         let is_some = user.is_some();
         self.current_user = user;
