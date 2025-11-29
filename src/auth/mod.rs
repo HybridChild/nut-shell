@@ -94,7 +94,9 @@ impl<L: AccessLevel> User<L> {
     #[allow(clippy::result_large_err)]
     pub fn new(username: &str, access_level: L) -> Result<Self, crate::error::CliError> {
         let mut user_str = heapless::String::new();
-        user_str.push_str(username).map_err(|_| crate::error::CliError::BufferFull)?;
+        user_str
+            .push_str(username)
+            .map_err(|_| crate::error::CliError::BufferFull)?;
 
         Ok(Self {
             username: user_str,
@@ -112,7 +114,9 @@ impl<L: AccessLevel> User<L> {
         salt: [u8; 16],
     ) -> Result<Self, crate::error::CliError> {
         let mut user_str = heapless::String::new();
-        user_str.push_str(username).map_err(|_| crate::error::CliError::BufferFull)?;
+        user_str
+            .push_str(username)
+            .map_err(|_| crate::error::CliError::BufferFull)?;
 
         Ok(Self {
             username: user_str,

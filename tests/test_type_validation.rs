@@ -170,7 +170,10 @@ fn test_all_types_instantiate_with_minimal_config() {
     assert_eq!(Config::MAX_ARGS, 8);
     assert_eq!(Config::MAX_PROMPT, 32);
     assert_eq!(Config::MAX_RESPONSE, 128);
+    #[cfg(feature = "history")]
     assert_eq!(Config::HISTORY_SIZE, 4);
+    #[cfg(not(feature = "history"))]
+    assert_eq!(Config::HISTORY_SIZE, 0);
 }
 
 // ============================================================================
@@ -649,7 +652,10 @@ fn test_config_constants() {
     assert_eq!(DefaultConfig::MAX_ARGS, 16);
     assert_eq!(DefaultConfig::MAX_PROMPT, 64);
     assert_eq!(DefaultConfig::MAX_RESPONSE, 256);
+    #[cfg(feature = "history")]
     assert_eq!(DefaultConfig::HISTORY_SIZE, 10);
+    #[cfg(not(feature = "history"))]
+    assert_eq!(DefaultConfig::HISTORY_SIZE, 0);
 
     // MinimalConfig
     assert_eq!(MinimalConfig::MAX_INPUT, 64);
@@ -657,7 +663,10 @@ fn test_config_constants() {
     assert_eq!(MinimalConfig::MAX_ARGS, 8);
     assert_eq!(MinimalConfig::MAX_PROMPT, 32);
     assert_eq!(MinimalConfig::MAX_RESPONSE, 128);
+    #[cfg(feature = "history")]
     assert_eq!(MinimalConfig::HISTORY_SIZE, 4);
+    #[cfg(not(feature = "history"))]
+    assert_eq!(MinimalConfig::HISTORY_SIZE, 0);
 
     // MinimalConfig should be smaller in all dimensions
     assert!(MinimalConfig::MAX_INPUT < DefaultConfig::MAX_INPUT);

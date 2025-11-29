@@ -359,8 +359,16 @@ fn test_minimal_config_is_smaller() {
         "MinimalConfig should have smaller response buffer"
     );
 
+    #[cfg(feature = "history")]
     assert!(
         MinimalConfig::HISTORY_SIZE < DefaultConfig::HISTORY_SIZE,
         "MinimalConfig should have smaller history"
+    );
+
+    #[cfg(not(feature = "history"))]
+    assert_eq!(
+        MinimalConfig::HISTORY_SIZE,
+        DefaultConfig::HISTORY_SIZE,
+        "Both configs should have zero history when feature is disabled"
     );
 }
