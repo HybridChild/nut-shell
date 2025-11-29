@@ -7,5 +7,6 @@ Cargo.lock
 
 !/examples/**/.cargo/
 
+/logs
 /reports
 /prompt.md
