@@ -141,8 +141,8 @@ jobs:
       - name: Check no_std build (no features)
         run: cargo check --target thumbv6m-none-eabi --no-default-features
 
-      - name: Check no_std build (all features)
-        run: cargo check --target thumbv6m-none-eabi --all-features
+      - name: Check no_std build (all features except std)
+        run: cargo check --target thumbv6m-none-eabi --features authentication,completion,history,async
 
   examples:
     name: Example Projects
