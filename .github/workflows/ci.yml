@@ -36,6 +36,10 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Sanitize cache key
+        id: cache-key
+        run: echo "key=$(echo '${{ matrix.features }}' | sed 's/,/-/g' | sed 's/ /-/g')" >> $GITHUB_OUTPUT
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -52,7 +56,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.features }}
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-${{ steps.cache-key.outputs.key }}
 
       - name: Run tests
         run: cargo test ${{ matrix.features }}

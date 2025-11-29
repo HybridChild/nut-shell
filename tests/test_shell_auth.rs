@@ -3,6 +3,8 @@
 //! These tests validate the authentication flow and password masking behavior
 //! as specified in SPECIFICATION.md.
 
+#![cfg(feature = "authentication")]
+
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;

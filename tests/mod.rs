@@ -58,9 +58,9 @@
 
 // Test modules (implementation phases):
 mod test_request_response; // Phase 5: Request/Response types
+mod test_rust_optimizations;
 mod test_tree; // Phase 3: Tree data model and metadata/execution separation
-mod test_type_validation; // Checkpoint: Type-Level Integration Validation
-mod test_rust_optimizations; // Rust-specific optimization tests
+mod test_type_validation; // Checkpoint: Type-Level Integration Validation // Rust-specific optimization tests
 
 // Shell tests
 #[cfg(feature = "authentication")]
