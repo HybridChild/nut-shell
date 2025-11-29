@@ -8,6 +8,7 @@
 
 #![allow(dead_code)]
 
+use heapless::{Deque, String as HString, Vec as HVec};
 use nut_shell::CharIo;
 use nut_shell::auth::AccessLevel;
 use nut_shell::config::DefaultConfig;
@@ -15,7 +16,6 @@ use nut_shell::error::CliError;
 use nut_shell::response::Response;
 use nut_shell::shell::handlers::CommandHandler;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
-use std::collections::VecDeque;
 
 // ============================================================================
 // MockIo - Test I/O Implementation
@@ -24,53 +24,62 @@ use std::collections::VecDeque;
 /// Mock I/O for testing.
 ///
 /// Provides in-memory character I/O with input queue and output capture.
-/// Uses `std` types (VecDeque, Vec) since tests run with std support.
+/// Uses heapless types to maintain no_std compatibility in tests.
 #[derive(Debug)]
 pub struct MockIo {
-    /// Input queue (simulates user typing)
-    input: VecDeque<char>,
+    /// Input queue (simulates user typing) - max 256 chars
+    input: Deque<char, 256>,
 
-    /// Output capture (collects all output)
-    output: Vec<char>,
+    /// Output capture (collects all output) - max 4096 chars
+    output: HVec<char, 4096>,
 }
 
 impl MockIo {
     /// Create new MockIo with empty buffers.
     pub fn new() -> Self {
         Self {
-            input: VecDeque::new(),
-            output: Vec::new(),
+            input: Deque::new(),
+            output: HVec::new(),
         }
     }
 
     /// Create MockIo with pre-loaded input string.
     pub fn with_input(input: &str) -> Self {
-        Self {
-            input: input.chars().collect(),
-            output: Vec::new(),
+        let mut io = Self::new();
+        for c in input.chars() {
+            let _ = io.input.push_back(c); // Ignore overflow - test data should fit
         }
+        io
     }
 
     /// Add input to queue (simulates user typing).
     pub fn push_input(&mut self, s: &str) {
         for c in s.chars() {
-            self.input.push_back(c);
+            let _ = self.input.push_back(c); // Ignore overflow - test data should fit
         }
     }
 
     /// Add single character to input queue.
     pub fn push_char(&mut self, c: char) {
-        self.input.push_back(c);
+        let _ = self.input.push_back(c); // Ignore overflow - test data should fit
     }
 
-    /// Get captured output as string.
-    pub fn output(&self) -> String {
-        self.output.iter().collect()
+    /// Get captured output as string (up to 1024 chars).
+    pub fn output(&self) -> HString<1024> {
+        let mut s = HString::new();
+        for &c in self.output.iter() {
+            let _ = s.push(c); // Truncate if too long
+        }
+        s
     }
 
     /// Get captured output as bytes (useful for checking ANSI sequences).
-    pub fn output_bytes(&self) -> Vec<u8> {
-        self.output.iter().map(|&c| c as u8).collect()
+    pub fn output_bytes(&self) -> HVec<u8, 1024> {
+        let mut v = HVec::new();
+        for &c in self.output.iter() {
+            let _ = v.push(c as u8); // Truncate if too long
+        }
+        v
     }
 
     /// Clear output buffer.
@@ -103,13 +112,13 @@ impl CharIo for MockIo {
     }
 
     fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
-        self.output.push(c);
+        let _ = self.output.push(c); // Ignore overflow - test output should fit
         Ok(())
     }
 
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
         for c in s.chars() {
-            self.output.push(c);
+            let _ = self.output.push(c); // Ignore overflow - test output should fit
         }
         Ok(())
     }
@@ -479,6 +488,27 @@ pub const TEST_TREE: Directory<MockAccessLevel> = Directory {
 /// work together correctly.
 pub struct MockHandlers;
 
+/// Helper to join string slices with spaces (no_std compatible).
+fn join_args(args: &[&str]) -> HString<256> {
+    let mut result = HString::new();
+    for (i, arg) in args.iter().enumerate() {
+        if i > 0 {
+            let _ = result.push(' ');
+        }
+        let _ = result.push_str(arg);
+    }
+    result
+}
+
+/// Helper to format a simple message (no_std compatible).
+fn format_msg(parts: &[&str]) -> HString<256> {
+    let mut result = HString::new();
+    for part in parts {
+        let _ = result.push_str(part);
+    }
+    result
+}
+
 impl CommandHandler<DefaultConfig> for MockHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
@@ -488,7 +518,7 @@ impl CommandHandler<DefaultConfig> for MockHandlers {
                 if args.is_empty() {
                     Ok(Response::success(""))
                 } else {
-                    let msg = args.join(" ");
+                    let msg = join_args(args);
                     Ok(Response::success(&msg))
                 }
             }
@@ -500,25 +530,22 @@ impl CommandHandler<DefaultConfig> for MockHandlers {
             // Network commands (system/network/)
             "net_status" => Ok(Response::success("Network OK")),
             "net_config" => {
-                let params = args.join(" ");
-                Ok(Response::success(&format!(
-                    "Network configured: {}",
-                    params
-                )))
+                let params = join_args(args);
+                let msg = format_msg(&["Network configured: ", &params]);
+                Ok(Response::success(&msg))
             }
             "net_ping" => {
                 let host = args.first().unwrap_or(&"localhost");
                 let count = args.get(1).unwrap_or(&"4");
-                Ok(Response::success(&format!(
-                    "Pinging {} ({} times)",
-                    host, count
-                )))
+                let msg = format_msg(&["Pinging ", host, " (", count, " times)"]);
+                Ok(Response::success(&msg))
             }
 
             // Hardware commands (system/hardware/)
             "hw_led" => {
                 let state = args.first().unwrap_or(&"off");
-                Ok(Response::success(&format!("LED: {}", state)))
+                let msg = format_msg(&["LED: ", state]);
+                Ok(Response::success(&msg))
             }
             "hw_temp" => Ok(Response::success("Temperature: 23.5°C")),
 
@@ -527,13 +554,15 @@ impl CommandHandler<DefaultConfig> for MockHandlers {
                 if args.is_empty() {
                     Ok(Response::success("Memory dump (full)"))
                 } else {
-                    let addr = args.join(" ");
-                    Ok(Response::success(&format!("Memory at {}", addr)))
+                    let addr = join_args(args);
+                    let msg = format_msg(&["Memory at ", &addr]);
+                    Ok(Response::success(&msg))
                 }
             }
             "debug_reg" => {
                 let reg = args.first().unwrap_or(&"0x00");
-                Ok(Response::success(&format!("Register {}: 0x1234", reg)))
+                let msg = format_msg(&["Register ", reg, ": 0x1234"]);
+                Ok(Response::success(&msg))
             }
 
             // Test commands for Response formatting flags
@@ -568,12 +597,29 @@ impl CommandHandler<DefaultConfig> for MockHandlers {
                     .first()
                     .and_then(|s| s.parse::<u32>().ok())
                     .unwrap_or(100);
-                let formatted = format!("Waited {}ms", duration);
+
+                // Format "Waited Xms" without std
                 let mut msg = heapless::String::<64>::new();
-                let _ = msg.push_str(&formatted);
-                if msg.is_empty() {
-                    let _ = msg.push_str("Async complete");
+                let _ = msg.push_str("Waited ");
+
+                // Convert u32 to string manually (simple approach for tests)
+                let mut num_str = heapless::String::<16>::new();
+                let mut n = duration;
+                if n == 0 {
+                    let _ = num_str.push('0');
+                } else {
+                    let mut digits = heapless::Vec::<char, 16>::new();
+                    while n > 0 {
+                        let _ = digits.push((b'0' + (n % 10) as u8) as char);
+                        n /= 10;
+                    }
+                    for &d in digits.iter().rev() {
+                        let _ = num_str.push(d);
+                    }
                 }
+
+                let _ = msg.push_str(&num_str);
+                let _ = msg.push_str("ms");
                 Ok(Response::success(msg.as_str()))
             }
             _ => Err(CliError::CommandNotFound),
@@ -587,20 +633,21 @@ impl CommandHandler<DefaultConfig> for MockHandlers {
 
 /// Create MockIo with input ending in newline.
 pub fn io_with_command(cmd: &str) -> MockIo {
-    let mut input = String::from(cmd);
-    if !input.ends_with('\n') {
-        input.push('\n');
+    let mut input = HString::<256>::new();
+    let _ = input.push_str(cmd);
+    if !cmd.ends_with('\n') {
+        let _ = input.push('\n');
     }
     MockIo::with_input(&input)
 }
 
 /// Create MockIo with multiple commands.
 pub fn io_with_commands(cmds: &[&str]) -> MockIo {
-    let mut input = String::new();
+    let mut input = HString::<512>::new();
     for cmd in cmds {
-        input.push_str(cmd);
+        let _ = input.push_str(cmd);
         if !cmd.ends_with('\n') {
-            input.push('\n');
+            let _ = input.push('\n');
         }
     }
     MockIo::with_input(&input)

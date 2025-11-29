@@ -27,8 +27,9 @@ cargo size --target thumbv6m-none-eabi --release -- -A
 - `authentication` - User authentication with credential providers
 - `completion` - Tab completion for commands and paths
 - `history` - Command history with arrow key navigation
-- `async` - Asynchronous command execution (incompatible with `no_std`)
+- `async` - Asynchronous command execution support
 
+**Note:** Both the library and tests are fully `no_std` - tests use `heapless` types to maintain consistency with the library's embedded patterns.
 
 ---
 

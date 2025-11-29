@@ -102,6 +102,7 @@ See EXAMPLES.md for complete patterns and usage.
 - **No heap allocation** - Use `heapless::Vec<T, N>`, `heapless::String<N>`
 - **Fixed sizes at compile time** - Specify maximum capacity
 - **Core dependencies only** - Check `default-features = false`
+- **Tests are also no_std** - Test fixtures use `heapless` types to maintain consistency
 
 ### Static Allocation
 - **Everything const-initializable** - Trees, commands, directories must be `const`

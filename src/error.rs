@@ -114,9 +114,6 @@ impl fmt::Display for CliError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for CliError {}
-
 #[cfg(test)]
 mod tests {
     use super::*;

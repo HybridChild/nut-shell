@@ -41,9 +41,6 @@ history = []
 # Async command support - enables async command execution
 async = []
 
-# For testing - enable std features in dependencies when running tests
-std = []
-
 [profile.release]
 opt-level = "z"       # Optimize for size
 lto = true            # Link-time optimization
