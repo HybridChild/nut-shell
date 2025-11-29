@@ -6,9 +6,9 @@
 //! - Sync and async commands compile and execute properly
 //! - Generic parameters (L, C) integrate correctly
 
+#[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-
 use fixtures::{MockAccessLevel, MockHandlers, TEST_TREE};
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
@@ -497,7 +497,7 @@ fn test_const_metadata_properties() {
     use fixtures::{CMD_DEBUG_REG, CMD_NET_STATUS};
 
     // These should be compile-time constants (const fn)
-    const _TEST_NAME: &'static str = CMD_NET_STATUS.name;
+    const _TEST_NAME: &str = CMD_NET_STATUS.name;
     const _TEST_MIN: usize = CMD_DEBUG_REG.min_args;
     const _TEST_MAX: usize = CMD_DEBUG_REG.max_args;
 
@@ -532,12 +532,11 @@ fn test_tree_can_navigate_full_paths() {
     }
 
     // Navigate: root -> system -> hardware -> temperature
-    if let Some(Node::Directory(sys_dir)) = TEST_TREE.find_child("system") {
-        if let Some(Node::Directory(hw_dir)) = sys_dir.find_child("hardware") {
-            if let Some(Node::Command(cmd)) = hw_dir.find_child("temperature") {
-                assert_eq!(cmd.name, "temperature");
-            }
-        }
+    if let Some(Node::Directory(sys_dir)) = TEST_TREE.find_child("system")
+        && let Some(Node::Directory(hw_dir)) = sys_dir.find_child("hardware")
+        && let Some(Node::Command(cmd)) = hw_dir.find_child("temperature")
+    {
+        assert_eq!(cmd.name, "temperature");
     }
 }
 
@@ -562,6 +561,7 @@ fn test_tree_can_navigate_full_paths() {
 /// This early validation ensures the foundational pattern is sound before
 /// proceeding to Phase 8 (Shell implementation), preventing costly refactoring.
 #[test]
+#[allow(clippy::assertions_on_constants)]
 fn test_phase_3_validation_complete() {
     // If we got here, all validations passed
     assert!(true);

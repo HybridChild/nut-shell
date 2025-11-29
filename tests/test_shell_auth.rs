@@ -3,11 +3,9 @@
 //! These tests validate the authentication flow and password masking behavior
 //! as specified in SPECIFICATION.md.
 
-#![cfg(feature = "authentication")]
-
+#[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-
 use fixtures::{MockAccessLevel, MockHandlers, MockIo, TEST_TREE};
 use nut_shell::auth::{ConstCredentialProvider, User, password::Sha256Hasher};
 use nut_shell::config::DefaultConfig;

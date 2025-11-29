@@ -56,18 +56,16 @@
 //! 3. **CI validation**: All feature combinations should pass in CI
 //! 4. **Document expectations**: Clearly note what behavior changes with features
 
-// Re-export fixtures for use in test files
-pub mod fixtures;
-
 // Test modules (implementation phases):
 mod test_request_response; // Phase 5: Request/Response types
 mod test_tree; // Phase 3: Tree data model and metadata/execution separation
 mod test_type_validation; // Checkpoint: Type-Level Integration Validation
+mod test_rust_optimizations; // Rust-specific optimization tests
 
 // Shell tests
 #[cfg(feature = "authentication")]
 mod test_shell_auth; // Shell authentication and password masking tests
+mod test_shell_integration; // Complete Shell integration tests
 
 // Future test modules:
 // mod test_io;
-// mod test_shell;

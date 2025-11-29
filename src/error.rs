@@ -11,6 +11,7 @@ use core::fmt;
 /// Error messages are designed to be user-friendly while maintaining security
 /// (e.g., `InvalidPath` for both non-existent and inaccessible paths).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::result_large_err)]
 pub enum CliError {
     /// Command not found in tree
     CommandNotFound,

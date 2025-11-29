@@ -507,7 +507,7 @@ impl CommandHandler<DefaultConfig> for MockHandlers {
                 )))
             }
             "net_ping" => {
-                let host = args.get(0).unwrap_or(&"localhost");
+                let host = args.first().unwrap_or(&"localhost");
                 let count = args.get(1).unwrap_or(&"4");
                 Ok(Response::success(&format!(
                     "Pinging {} ({} times)",
@@ -517,7 +517,7 @@ impl CommandHandler<DefaultConfig> for MockHandlers {
 
             // Hardware commands (system/hardware/)
             "hw_led" => {
-                let state = args.get(0).unwrap_or(&"off");
+                let state = args.first().unwrap_or(&"off");
                 Ok(Response::success(&format!("LED: {}", state)))
             }
             "hw_temp" => Ok(Response::success("Temperature: 23.5°C")),
@@ -532,7 +532,7 @@ impl CommandHandler<DefaultConfig> for MockHandlers {
                 }
             }
             "debug_reg" => {
-                let reg = args.get(0).unwrap_or(&"0x00");
+                let reg = args.first().unwrap_or(&"0x00");
                 Ok(Response::success(&format!("Register {}: 0x1234", reg)))
             }
 
@@ -565,7 +565,7 @@ impl CommandHandler<DefaultConfig> for MockHandlers {
             "async-wait" => {
                 // Simulate async operation
                 let duration = args
-                    .get(0)
+                    .first()
                     .and_then(|s| s.parse::<u32>().ok())
                     .unwrap_or(100);
                 let formatted = format!("Waited {}ms", duration);

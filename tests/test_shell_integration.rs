@@ -6,9 +6,9 @@
 //! Most tests are written for the no-auth case to avoid lifetime issues.
 //! Auth-specific tests are in test_shell_auth.rs.
 
+#[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-
 use fixtures::{MockHandlers, MockIo, TEST_TREE};
 use nut_shell::Shell;
 

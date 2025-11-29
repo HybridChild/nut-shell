@@ -14,9 +14,10 @@
 //! - Feature combinations compile cleanly
 //! - Lifetime relationships between tree and runtime state are sound
 
+#[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-
+use fixtures::{MockAccessLevel, MockHandlers, MockIo, TEST_TREE};
 use nut_shell::CharIo;
 use nut_shell::auth::{AccessLevel, User};
 use nut_shell::config::{DefaultConfig, MinimalConfig, ShellConfig};
@@ -26,8 +27,6 @@ use nut_shell::shell::handlers::CommandHandler;
 use nut_shell::shell::{CliState, HistoryDirection, Request};
 use nut_shell::tree::path::Path;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
-
-use fixtures::{MockAccessLevel, MockHandlers, MockIo, TEST_TREE};
 
 // Type alias for Path with DefaultConfig's MAX_PATH_DEPTH
 type TestPath<'a> = Path<'a, { DefaultConfig::MAX_PATH_DEPTH }>;
@@ -112,6 +111,7 @@ fn test_all_types_instantiate_with_default_config() {
     };
 
     // Extract path from request
+    #[allow(irrefutable_let_patterns)]
     if let Request::Command { path, .. } = request {
         assert_eq!(path.as_str(), "system/status");
     }
@@ -160,6 +160,7 @@ fn test_all_types_instantiate_with_minimal_config() {
         _phantom: core::marker::PhantomData,
     };
 
+    #[allow(irrefutable_let_patterns)]
     if let Request::Command { path, .. } = request {
         assert_eq!(path.as_str(), "test");
     }
@@ -285,6 +286,7 @@ fn test_request_response_with_handlers() {
     };
 
     // Execute command
+    #[allow(irrefutable_let_patterns)]
     if let Request::Command { args, .. } = request {
         // Convert args to &[&str]
         let arg_refs: heapless::Vec<&str, 16> = args.iter().map(|s| s.as_str()).collect();
@@ -645,6 +647,7 @@ fn test_complete_integration() {
 // ============================================================================
 
 #[test]
+#[allow(clippy::assertions_on_constants)]
 fn test_config_constants() {
     // DefaultConfig
     assert_eq!(DefaultConfig::MAX_INPUT, 128);

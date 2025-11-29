@@ -58,6 +58,7 @@
 #![no_std]
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
+#![allow(clippy::result_large_err)]
 
 // Bring in std when the feature is enabled (for testing and Error trait impl)
 #[cfg(feature = "std")]

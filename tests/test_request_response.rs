@@ -6,6 +6,9 @@
 //! - History exclusion functionality
 //! - HistoryDirection and CliState enums
 
+#[allow(clippy::duplicate_mod)]
+#[path = "fixtures/mod.rs"]
+mod fixtures;
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
@@ -31,7 +34,7 @@ fn test_history_direction_copy() {
 #[test]
 fn test_history_direction_clone() {
     let dir1 = HistoryDirection::Next;
-    let dir2 = dir1.clone();
+    let dir2 = dir1;
     assert_eq!(dir1, dir2);
 }
 

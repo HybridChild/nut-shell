@@ -6,9 +6,9 @@
 //! - ROM placement
 //! - Type safety and lifetimes
 
+#[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-
 use fixtures::{MockAccessLevel, TEST_TREE};
 use nut_shell::config::{DefaultConfig, MinimalConfig, ShellConfig};
 use nut_shell::shell::history::CommandHistory;
@@ -347,6 +347,7 @@ fn test_config_constants_are_compile_time() {
 }
 
 #[test]
+#[allow(clippy::assertions_on_constants)]
 fn test_minimal_config_is_smaller() {
     // MinimalConfig should have smaller buffer sizes than DefaultConfig
     assert!(
