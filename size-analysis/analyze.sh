@@ -75,14 +75,11 @@ for feat in "${FEATURES[@]}"; do
 
     # Build
     echo "  Building..."
-    BUILD_OUTPUT=$(cargo build --release --target $TARGET $FEAT_FLAGS 2>&1)
-    BUILD_EXIT=$?
-
-    # Show errors if build failed
-    if [ $BUILD_EXIT -ne 0 ]; then
-        echo "$BUILD_OUTPUT" | grep -E "error:|warning:" || echo "$BUILD_OUTPUT"
+    if ! BUILD_OUTPUT=$(cargo build --release --target $TARGET $FEAT_FLAGS 2>&1); then
         echo "  Error: Build failed for feature set: $feat"
-        continue
+        echo "  Build output:"
+        echo "$BUILD_OUTPUT"
+        exit 1
     fi
 
     # Get binary path
