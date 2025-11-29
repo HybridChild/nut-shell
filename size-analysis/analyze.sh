@@ -83,17 +83,19 @@ for feat in "${FEATURES[@]}"; do
     # Get binary path
     BINARY_PATH="target/$TARGET/release/$BINARY_NAME"
 
+    echo "  Checking binary at: $BINARY_PATH"
     if [ ! -f "$BINARY_PATH" ]; then
         echo "  Error: Binary not found at $BINARY_PATH"
-        continue
+        exit 1
     fi
 
     # Extract size information using size command
-    SIZE_OUTPUT=$(arm-none-eabi-size "$BINARY_PATH" 2>/dev/null || size "$BINARY_PATH" 2>/dev/null || cargo size --release --target $TARGET $FEAT_FLAGS 2>/dev/null)
+    echo "  Running size analysis..."
+    SIZE_OUTPUT=$(arm-none-eabi-size "$BINARY_PATH" 2>/dev/null || size "$BINARY_PATH" 2>/dev/null || cargo size --release --target $TARGET $FEAT_FLAGS 2>/dev/null) || true
 
     # Extract individual sections using cargo size -A format
     # Parse .text, .rodata, .data, .bss sizes
-    SIZE_DETAIL=$(cargo size --release --target $TARGET $FEAT_FLAGS -- -A 2>/dev/null)
+    SIZE_DETAIL=$(cargo size --release --target $TARGET $FEAT_FLAGS -- -A 2>/dev/null) || true
 
     TEXT=$(echo "$SIZE_DETAIL" | grep "^\.text" | awk '{print $2}' || echo "0")
     RODATA=$(echo "$SIZE_DETAIL" | grep "^\.rodata" | awk '{print $2}' || echo "0")
