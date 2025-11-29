@@ -1,0 +1,77 @@
+version: 2
+updates:
+  # Cargo dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "HybridChild"
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      # Group patch updates together to reduce PR noise
+      patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+      # Group dev dependencies separately
+      dev-dependencies:
+        patterns:
+          - "*"
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Cargo dependencies in macros subcrate
+  - package-ecosystem: "cargo"
+    directory: "/macros"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "HybridChild"
+    labels:
+      - "dependencies"
+      - "rust"
+      - "macros"
+    commit-message:
+      prefix: "deps(macros)"
+      include: "scope"
+    groups:
+      patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "HybridChild"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
