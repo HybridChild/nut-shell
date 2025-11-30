@@ -16,9 +16,9 @@ This will build a minimal reference binary with all feature combinations and gen
 
 The analysis uses `size-analysis/minimal/` - a bare-bones embedded binary with:
 
-- **Empty directory tree**: No commands, no directories (measures pure shell overhead)
+- **Minimal command tree**: One sync command (`status`) and one async command (`info`) to prevent optimizer removal
 - **MinimalConfig**: Reduced buffers and message strings to isolate nut-shell overhead
-- **Zero-size generics**: Stub implementations for `CharIo`, `CredentialProvider`, and `CommandHandler`
+- **Minimal generics**: Stub implementations for `CharIo`, `CredentialProvider`, and `CommandHandler`
 - **Real embedded target**: `thumbv6m-none-eabi` (Cortex-M0/M0+)
 - **Size-optimized build**: `opt-level = "z"` with LTO enabled
 
@@ -79,9 +79,9 @@ If you need to reduce size:
 
 ### Understanding Your Total Cost
 
-The analysis measures **only nut-shell's overhead** using zero-size stubs. Your actual binary will be larger due to:
+The analysis measures **nut-shell's overhead** using minimal stub implementations. Your actual binary will be larger due to:
 
-- Your command implementations
+- Your command implementations (beyond the two minimal test commands)
 - Your directory tree structure
 - Your `CharIo`, `CredentialProvider`, and `CommandHandler` implementations
 - Your chosen buffer sizes
