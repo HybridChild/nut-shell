@@ -192,7 +192,7 @@ Complete working implementations are in the `examples/` directory:
 
 | Platform | Example | Key Pattern |
 |----------|---------|-------------|
-| **RP2040 UART** | `examples/pico_uart.rs` | ISR fills queue, blocking TX |
+| **Bare-metal UART** | `examples/pico_uart.rs` | ISR fills queue, blocking TX |
 | **Embassy USB-CDC** | `examples/embassy_usb_cdc.rs` | Buffer + flush, `\r` → `\r\n` |
 | **Embassy UART** | `examples/embassy_uart.rs` | DMA transfers, deferred flush |
 | **Native** | `examples/native_simple.rs` | Stdio with immediate flush |

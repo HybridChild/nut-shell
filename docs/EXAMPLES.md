@@ -25,7 +25,7 @@ Complete working examples for specific platforms are in the `examples/` director
 | Platform | Example | Description |
 |----------|---------|-------------|
 | **Native** | `examples/native_simple.rs` | Basic CLI with stdio (testing/development) |
-| **RP2040** | `examples/pico_uart.rs` | Bare-metal UART with ISR-driven input queue |
+| **Bare-metal** | `examples/pico_uart.rs` | Bare-metal UART with ISR-driven input queue |
 | **Embassy** | `examples/embassy_usb_cdc.rs` | Async USB-CDC with buffered output |
 
 **See each example for complete CharIo implementations and platform-specific setup.**

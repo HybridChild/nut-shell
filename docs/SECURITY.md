@@ -77,7 +77,7 @@ pub struct User<L: AccessLevel> {
 | Computation | Fast (~1μs) | Slow by design (10-100ms) |
 | Embedded Suitability | ✅ Excellent | ⚠️ Challenging |
 | Security with Salt | ✅ Strong | ✅ Stronger |
-| RP2040 RAM (264KB) | ✅ Well-suited | ⚠️ Memory constrained |
+| Typical MCU RAM (~256KB) | ✅ Well-suited | ⚠️ Memory constrained |
 
 **Decision:** SHA-256 with per-user salts provides sufficient security for physically-secured embedded devices with low memory footprint and fast verification.
 
@@ -113,7 +113,7 @@ impl PasswordHasher for Sha256Hasher {
 - Stored alongside password hash
 
 **Sources:**
-- **Runtime:** Hardware RNG (e.g., RP2040 ROSC) for flash-stored credentials
+- **Runtime:** Hardware RNG (e.g., MCU ring oscillator) for flash-stored credentials
 - **Build-time:** Environment variables (see Implementation Patterns below)
 
 ---
@@ -285,7 +285,7 @@ This authentication system assumes:
 
 **For higher security requirements:**
 - Implement Argon2id instead of SHA-256 (accept performance cost)
-- Enable flash read protection (RP2040 boot2 configuration)
+- Enable flash read protection (MCU-specific bootloader configuration)
 - Add hardware security module (separate crypto chip)
 - Implement certificate-based auth (mTLS, client certificates)
 - Add audit logging with tamper-evident storage
