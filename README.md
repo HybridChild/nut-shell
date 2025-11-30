@@ -1,12 +1,12 @@
 # nut-shell
 
-> _A complete CLI framework for embedded systems, in a nutshell._
+> _Interactive CLI for microcontrollers. No heap, no bloat._
 
-A lightweight, embedded-first command-line interface library for `no_std` Rust environments with optional async support.
+A lightweight command shell library for `no_std` Rust environments with optional async and authentication support.
 
-[![Status](https://img.shields.io/badge/status-production--ready-brightgreen)](#project-status)
-[![Platform](https://img.shields.io/badge/platform-no_std-blue)](#platform-support)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)](#license)
+[![Status](https://img.shields.io/badge/status-production--ready-brightgreen)](https://github.com/HybridChild/nut-shell)
+[![Platform](https://img.shields.io/badge/platform-no_std-blue)](https://github.com/HybridChild/nut-shell)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)](https://github.com/HybridChild/nut-shell)
 
 ---
 
@@ -15,14 +15,6 @@ A lightweight, embedded-first command-line interface library for `no_std` Rust e
 **nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers like the Raspberry Pi Pico (RP2040), it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support for long-running operations (Embassy, RTIC compatible), authentication, tab completion, and command history.
 
 **Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat. See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for our feature decision framework.
-
----
-
-## Project Status
-
-✅ **Production-ready** - All implementation phases complete, fully tested and documented.
-
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for build instructions and [docs/EXAMPLES.md](docs/EXAMPLES.md) for usage guidance.
 
 ---
 
@@ -144,28 +136,6 @@ Optional `authentication` feature provides:
 
 ---
 
-## Configuration
-
-### Cargo Features
-
-```toml
-[dependencies]
-nut-shell = { version = "0.1", features = ["authentication", "completion", "history", "async"] }
-
-# Or minimal build
-nut-shell = { version = "0.1", default-features = false }
-```
-
-**Available features:**
-- `authentication` - User login and access control *(Default: disabled)*
-- `completion` - Tab completion for commands/paths *(Default: enabled)*
-- `history` - Command history with arrow keys *(Default: enabled)*
-- `async` - Async command execution support *(Default: disabled)*
-
-**See [docs/EXAMPLES.md](docs/EXAMPLES.md) for configuration examples and buffer sizing guide.**
-
----
-
 ## Documentation
 
 | Document | Description |
@@ -181,23 +151,11 @@ nut-shell = { version = "0.1", default-features = false }
 
 ---
 
-## Build Commands
-
-```bash
-cargo test --all-features                    # Test all features
-cargo test --no-default-features             # Test minimal
-cargo check --target thumbv6m-none-eabi      # Verify no_std
-```
-
-**See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for complete workflows.**
-
----
-
 ## Contributing
 
 Contributions welcome! Review [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for feature criteria and [docs/DESIGN.md](docs/DESIGN.md) for architectural patterns before implementing features.
 
-**Before submitting:** Run `./scripts/ci-local` to verify all CI checks pass.
+**Before submitting:** Run `./scripts/ci-local` to verify all CI checks pass. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for build workflows.
 
 ---
 
