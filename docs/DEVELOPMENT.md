@@ -7,11 +7,14 @@
 ## Quick Reference
 
 ```bash
-# Pre-commit validation (run before committing)
-cargo fmt && \
-cargo clippy --all-features -- -D warnings && \
-cargo test --all-features && \
-cargo check --target thumbv6m-none-eabi --release
+# Run all CI checks locally (recommended before push)
+./scripts/ci-local
+
+# Individual checks
+cargo fmt                                              # Format code
+cargo clippy --all-features --all-targets -- -D warnings  # Lint
+cargo test --all-features                              # Test all features
+cargo check --target thumbv6m-none-eabi --release     # Verify no_std
 
 # Feature testing (test graceful degradation)
 cargo test --all-features
@@ -60,7 +63,7 @@ cargo bloat --target thumbv6m-none-eabi --release --no-default-features
 
 Before submitting a pull request:
 
-1. Run pre-commit validation (see Quick Reference)
+1. Run `./scripts/ci-local` to verify all CI checks pass
 2. Test feature-gated code in both enabled/disabled states
 3. Verify `no_std` compliance for core functionality
 4. Check binary size impact with `cargo bloat` (if relevant)

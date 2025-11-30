@@ -197,6 +197,8 @@ cargo check --target thumbv6m-none-eabi      # Verify no_std
 
 Contributions welcome! Review [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for feature criteria and [docs/DESIGN.md](docs/DESIGN.md) for architectural patterns before implementing features.
 
+**Before submitting:** Run `./scripts/ci-local` to verify all CI checks pass.
+
 ---
 
 ## License

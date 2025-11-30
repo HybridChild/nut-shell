@@ -212,12 +212,15 @@ type History = CommandHistory<0, 128>;  // Stub
 ## Build Commands
 
 ```bash
+./scripts/ci-local                       # Run all CI checks locally (recommended)
 cargo check                              # Fast check
 cargo test --all-features                # Test all features
 cargo test --no-default-features         # Test minimal
 cargo check --target thumbv6m-none-eabi  # Verify no_std
 cargo fmt && cargo clippy --all-features -- -D warnings  # Lint
 ```
+
+**Before pushing:** Run `./scripts/ci-local` to verify all CI checks pass locally.
 
 See DEVELOPMENT.md for complete workflows and CI configuration.
 
@@ -257,10 +260,8 @@ See DEVELOPMENT.md for complete workflows and CI configuration.
 1. Review PHILOSOPHY.md for feature criteria (default answer is NO)
 2. Follow patterns in DESIGN.md
 3. Write tests first (TDD)
-4. Test all feature combinations (see DEVELOPMENT.md)
+4. Run `./scripts/ci-local` to verify all CI checks pass
 5. Update documentation (keep lean and professional)
-6. Run pre-commit: `cargo fmt && cargo clippy --all-features -- -D warnings && cargo test --all-features`
-7. Verify embedded: `cargo check --target thumbv6m-none-eabi`
 
 **Documentation updates:**
 - Eliminate redundancy across files

@@ -1,0 +1,163 @@
+#!/bin/bash
+# Verification script to catch errors before pushing to main
+# Run this script before pushing to ensure CI will pass
+
+set -e  # Exit on first error
+
+# Match CI environment: treat warnings as errors
+export RUSTFLAGS="-D warnings"
+
+echo "=========================================="
+echo "Running pre-push verification suite"
+echo "=========================================="
+echo ""
+
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+print_step() {
+    echo -e "${YELLOW}▶ $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✓ $1${NC}"
+    echo ""
+}
+
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+    exit 1
+}
+
+# 1. Check formatting
+print_step "Checking code formatting..."
+if cargo fmt --all -- --check; then
+    print_success "Formatting check passed"
+else
+    print_error "Formatting check failed. Run 'cargo fmt' to fix."
+fi
+
+# 2. Run clippy with no default features
+print_step "Running clippy (no default features)..."
+if cargo clippy --no-default-features --all-targets -- -D warnings; then
+    print_success "Clippy (no default features) passed"
+else
+    print_error "Clippy (no default features) failed"
+fi
+
+# 3. Run clippy with all features
+print_step "Running clippy (all features)..."
+if cargo clippy --all-features --all-targets -- -D warnings; then
+    print_success "Clippy (all features) passed"
+else
+    print_error "Clippy (all features) failed"
+fi
+
+# 4. Test minimal configuration
+print_step "Testing minimal configuration (no default features)..."
+if cargo test --no-default-features; then
+    print_success "Tests (no default features) passed"
+else
+    print_error "Tests (no default features) failed"
+fi
+
+# 5. Test individual features
+FEATURES=("authentication" "completion" "history" "async")
+for feature in "${FEATURES[@]}"; do
+    print_step "Testing with feature: $feature..."
+    if cargo test --no-default-features --features "$feature"; then
+        print_success "Tests (feature: $feature) passed"
+    else
+        print_error "Tests (feature: $feature) failed"
+    fi
+done
+
+# 6. Test feature combinations
+print_step "Testing feature combination: authentication,completion..."
+if cargo test --no-default-features --features authentication,completion; then
+    print_success "Tests (authentication,completion) passed"
+else
+    print_error "Tests (authentication,completion) failed"
+fi
+
+print_step "Testing feature combination: authentication,history..."
+if cargo test --no-default-features --features authentication,history; then
+    print_success "Tests (authentication,history) passed"
+else
+    print_error "Tests (authentication,history) failed"
+fi
+
+print_step "Testing feature combination: completion,history..."
+if cargo test --no-default-features --features completion,history; then
+    print_success "Tests (completion,history) passed"
+else
+    print_error "Tests (completion,history) failed"
+fi
+
+print_step "Testing feature combination: completion,history,async..."
+if cargo test --no-default-features --features completion,history,async; then
+    print_success "Tests (completion,history,async) passed"
+else
+    print_error "Tests (completion,history,async) failed"
+fi
+
+# 7. Test all features
+print_step "Testing with all features..."
+if cargo test --all-features; then
+    print_success "Tests (all features) passed"
+else
+    print_error "Tests (all features) failed"
+fi
+
+# 8. Verify no_std compatibility
+print_step "Verifying no_std compatibility (thumbv6m-none-eabi)..."
+if rustup target list | grep -q "thumbv6m-none-eabi (installed)"; then
+    print_step "  Checking no_std build (no features)..."
+    if cargo check --target thumbv6m-none-eabi --no-default-features; then
+        print_success "no_std check (no features) passed"
+    else
+        print_error "no_std check (no features) failed"
+    fi
+
+    print_step "  Checking no_std build (all features)..."
+    if cargo check --target thumbv6m-none-eabi --features authentication,completion,history,async; then
+        print_success "no_std check (all features) passed"
+    else
+        print_error "no_std check (all features) failed"
+    fi
+else
+    echo -e "${YELLOW}⚠ thumbv6m-none-eabi target not installed, skipping no_std check${NC}"
+    echo -e "${YELLOW}  Install with: rustup target add thumbv6m-none-eabi${NC}"
+    echo ""
+fi
+
+# 9. Check example projects
+print_step "Checking example projects..."
+EXAMPLES=("native" "rp-pico" "stm32f072")
+for example in "${EXAMPLES[@]}"; do
+    print_step "  Checking example: $example..."
+    if (cd "examples/$example" && cargo check --all-features); then
+        print_success "Example '$example' check passed"
+    else
+        print_error "Example '$example' check failed"
+    fi
+done
+
+# 10. Check for uncommitted changes
+print_step "Checking for uncommitted changes..."
+if git diff --quiet && git diff --cached --quiet; then
+    print_success "No uncommitted changes"
+else
+    echo -e "${YELLOW}⚠ You have uncommitted changes${NC}"
+    echo ""
+fi
+
+# Success!
+echo "=========================================="
+echo -e "${GREEN}✓ All checks passed!${NC}"
+echo "=========================================="
+echo ""
+echo "You can safely push to main."
