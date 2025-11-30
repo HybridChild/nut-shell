@@ -21,7 +21,7 @@ A lightweight command shell library for `no_std` Rust environments with optional
 ## Key Features
 
 ### Core Functionality (Always Present)
-- **Path-based navigation** - Unix-style hierarchical commands (`system/reboot`, `network/status`)
+- **Path-based navigation** - Unix-style hierarchical commands (`system/status`, `network/status`)
 - **Command execution** - Synchronous command support with structured argument parsing
 - **Input parsing** - Terminal I/O with line editing (backspace, arrows, double-ESC clear)
 - **Const initialization** - Zero runtime overhead, ROM placement
@@ -49,19 +49,23 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for rationale.
 **Bare-Metal Pattern:**
 ```rust
 // 1. Define command tree with metadata
-const REBOOT: CommandMeta<Level> = CommandMeta { /* ... */ };
+const STATUS: CommandMeta<Level> = CommandMeta { /* ... */ };
 const ROOT: Directory<Level> = Directory { /* ... */ };
 
 // 2. Implement CommandHandler trait
 impl CommandHandler<MyConfig> for MyHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
-        match id { "reboot" => reboot_fn::<MyConfig>(args), _ => Err(CliError::CommandNotFound) }
+        match id {
+            "status" => status_fn::<MyConfig>(args),
+            _ => Err(CliError::CommandNotFound)
+        }
     }
 }
 
 // 3. Main loop
 let mut shell = Shell::new(&ROOT, handlers, io);
 shell.activate().ok();
+
 loop {
     if let Some(c) = io.get_char()? {
         shell.process_char(c)?;

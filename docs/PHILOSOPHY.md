@@ -30,7 +30,7 @@ Every feature must justify its existence through the lens of embedded constraint
 | Category | Features | Why Excluded |
 |----------|----------|--------------|
 | **Shell scripting** | Piping, variables, conditionals, loops | Requires dynamic allocation, host-side tools better suited |
-| **Command aliases** | `r` → `reboot` shortcuts | Tab completion already solves this, costs flash for alias table |
+| **Command aliases** | `st` → `status` shortcuts | Tab completion already solves this, costs flash for alias table |
 | **Output paging** | `more`/`less` pagination | Terminal emulators provide scrollback, adds ~1-2KB |
 | **Audit logging** | Persistent command history | Platform-specific, flash wear concerns, application-layer concern |
 | **Advanced editing** | Vi-mode, undo/redo, Ctrl+K/U/W | Power-user features with diminishing returns (~50-100 bytes each) |
@@ -54,7 +54,7 @@ Design for RP2040-class microcontrollers, not Linux:
 ### 2. Path-Based Philosophy
 
 Unix-style paths replace traditional shell commands:
-- `system/reboot` instead of `cd system && reboot`
+- `system/status` instead of `cd system && status`
 - `../network/status` instead of `cd ../network && status`
 - Prompt shows current location (`user@/current/path>`)
 - Tab completion makes paths fast to type

@@ -172,11 +172,11 @@ pub enum MyAccessLevel {
 }
 
 // Use in command metadata
-const REBOOT: CommandMeta<MyAccessLevel> = CommandMeta {
-    id: "reboot",
-    name: "reboot",
-    description: "Reboot system",
-    access_level: MyAccessLevel::Admin,  // Only admins can reboot
+const STATUS: CommandMeta<MyAccessLevel> = CommandMeta {
+    id: "status",
+    name: "status",
+    description: "Show system status",
+    access_level: MyAccessLevel::Admin,  // Only admins can view status
     kind: CommandKind::Sync,
     min_args: 0,
     max_args: 0,

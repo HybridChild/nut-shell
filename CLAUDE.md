@@ -70,7 +70,7 @@ pub fn do_something() -> Result<Vec<&str, 32>> { Ok(Vec::new()) }  // No-op stub
 impl CommandHandler<MyConfig> for MyHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
-            "reboot" => reboot_fn::<MyConfig>(args),
+            "status" => status_fn::<MyConfig>(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
