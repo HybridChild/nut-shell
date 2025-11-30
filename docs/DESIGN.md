@@ -72,7 +72,7 @@ where
 - ✅ Additional generics `H: CommandHandler<C>` → zero runtime cost via monomorphization
 - ✅ Manual match statements in handlers → future macro can reduce boilerplate
 
-**Code Size Impact (RP2040):**
+**Code Size Impact (ARM Cortex-M0):**
 - Sync only: +200-300 bytes (dispatch logic)
 - Async enabled: +1.2-1.8KB (async machinery)
 
@@ -279,7 +279,7 @@ src/
 │   ├── password.rs     # Password hashing (SHA-256)
 │   └── providers/      # Credential storage backends
 │       ├── buildtime.rs    # Build-time environment variables
-│       ├── flash.rs        # Flash storage (RP2040)
+│       ├── flash.rs        # Flash storage (MCU-specific)
 │       └── const_provider.rs  # Hardcoded (examples/testing only)
 ├── response.rs         # Response type + formatting
 └── io.rs               # CharIo trait (see CHAR_IO.md for details)

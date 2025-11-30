@@ -148,7 +148,7 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 ## Platform Support
 
 Built for `no_std` embedded systems:
-- **Tested on:** Raspberry Pi Pico (RP2040), STM32F072 (ARM Cortex-M0)
+- **Tested on:** ARM Cortex-M0 microcontrollers (RP2040, STM32F072)
 - **Compatible with:** Any ARMv6-M or higher microcontroller
 
 **Runtime compatibility:**
