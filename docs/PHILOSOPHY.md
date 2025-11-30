@@ -14,16 +14,14 @@ Every feature must justify its existence through the lens of embedded constraint
 
 | Feature | Status | Cost | Rationale |
 |---------|--------|------|-----------|
-| **Path-based navigation** | Core | ~1KB flash | Essential CLI primitive, replaces cd/pwd/ls |
+| **Path-based navigation** | Core | ~1KB flash | Essential CLI primitive |
 | **Command execution** | Core | ~1KB flash | Sync and async via metadata/execution separation |
 | **Access control** | Core | 0 bytes | User-defined hierarchies via traits |
-| **Input parsing** | Core | ~1KB flash | Line editing with backspace, arrows, double-ESC |
-| **Global commands** | Core | ~300 bytes | `?`, `ls`, `logout`, `clear` for discoverability |
+| **Input parsing** | Core | ~1KB flash | Line editing with backspace, double-ESC |
+| **Global commands** | Core | ~300 bytes | Essential interactive commands |
 | **Authentication** | Optional | ~2KB flash | Password hashing, access control enforcement |
 | **Tab completion** | Default | ~2KB flash | Command/path prefix matching, reduces typing |
 | **Command history** | Default | ~0.8KB flash, ~1.3KB RAM | Arrow key navigation, configurable size (N=10) |
-
-**Note:** Async command support is built into the core via `process_char_async()` and `CommandHandler` trait - no additional feature flag needed.
 
 ### What's Excluded
 
@@ -37,15 +35,17 @@ Every feature must justify its existence through the lens of embedded constraint
 | **Session features** | Multiple sessions, auto-timeout | Requires multi-threading or timers (platform-specific) |
 | **ANSI colors** | Built-in color support | Terminal capability detection complexity, application-specific |
 
+**Note:** Audit logging can be implemented in your `CommandHandler` to meet application-specific requirements.
+
 ---
 
 ## Design Principles
 
 ### 1. Embedded-First Constraints
 
-Design for RP2040-class microcontrollers, not Linux:
-- **Flash:** 32KB-256KB typical (target: <32KB with all default features)
-- **RAM:** 8KB-264KB typical (target: <8KB with default config)
+Design for resource-constrained microcontrollers, not Linux:
+- **Flash:** 32KB-256KB typical
+- **RAM:** 8KB-264KB typical
 - **Serial:** 9600-115200 baud (slow connections)
 - **No heap allocation** - Pure stack + static only
 - **Single-threaded** - Deterministic execution
@@ -58,7 +58,7 @@ Unix-style paths replace traditional shell commands:
 - `../network/status` instead of `cd ../network && status`
 - Prompt shows current location (`user@/current/path>`)
 - Tab completion makes paths fast to type
-- `?` shows available commands at current location
+- `ls` shows contents of current location
 
 **Benefits:** Less typing, no state confusion, scriptable with absolute paths, natural for hierarchical commands.
 
@@ -69,8 +69,6 @@ Features should be independently disableable:
 - Each feature adds specific, measurable value
 - No cascading dependencies between optional features
 - Core functionality works without any optional features
-
-**Example:** `authentication`, `completion`, and `history` are all independent and optional.
 
 ### 4. Interactive Discovery
 
@@ -90,16 +88,16 @@ Users learn through interaction, not documentation:
 2. **Strong embedded use case** - Solves problem unique to embedded contexts
 3. **No reasonable alternative** - Can't be handled by terminal, host tools, or application layer
 4. **Justified cost** - Value proportional to flash/RAM consumption
-5. **Feature-gatable** - Can be made optional if >500 bytes
+5. **Feature-gatable** - Can be made optional if non-essential
 
 ### When to Exclude a Feature
 
 1. **Terminal emulator handles it** - Scrollback, colors, line wrapping
 2. **Host-side tools handle it better** - Scripting, batch commands, automation
-3. **Application layer concern** - Logging, custom commands, business logic
+3. **Application layer concern** - Logging, business logic, application-specific behavior
 4. **Desktop shell behavior** - Feature doesn't translate to embedded constraints
 5. **Requires dynamic allocation** - Breaks no_std compatibility
-6. **Cost exceeds value** - >500 bytes without proportional benefit
+6. **Cost exceeds value** - Flash/RAM cost without proportional benefit
 
 ### Key Questions
 
@@ -115,9 +113,8 @@ Before adding a feature, ask:
 ## Success Criteria
 
 **Goals:**
-- ✅ Compile for thumbv6m-none-eabi (RP2040)
-- ✅ Fit in <32KB flash with default features
-- ✅ Use <8KB RAM with default config
+- ✅ Compile for thumbv6m-none-eabi (Cortex-M0/M0+)
+- ✅ Fit in <2KB flash with all features
 - ✅ Zero heap allocation (stack + static only)
 - ✅ Independent feature toggling
 - ✅ Graceful degradation (minimal build still useful)
