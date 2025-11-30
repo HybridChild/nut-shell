@@ -8,5 +8,5 @@ Cargo.lock
 !/examples/**/.cargo/
 
 /logs
-/reports
+/notes
 /scratch.md
