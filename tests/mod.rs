@@ -63,8 +63,7 @@ mod test_tree; // Phase 3: Tree data model and metadata/execution separation
 mod test_type_validation; // Checkpoint: Type-Level Integration Validation // Rust-specific optimization tests
 
 // Shell tests
-#[cfg(feature = "authentication")]
-mod test_shell_auth; // Shell authentication and password masking tests
+mod test_shell_auth; // Shell authentication and password masking tests (feature-gated in file)
 mod test_shell_integration; // Complete Shell integration tests
 
 // Future test modules:
