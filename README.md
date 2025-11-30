@@ -12,7 +12,7 @@ A lightweight command shell library for `no_std` Rust environments with optional
 
 ## Overview
 
-**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers like the Raspberry Pi Pico (RP2040), it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support for long-running operations (Embassy, RTIC compatible), authentication, tab completion, and command history.
+**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers, it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support for long-running operations (Embassy, RTIC compatible), authentication, tab completion, and command history.
 
 **Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat. See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for our feature decision framework.
 
@@ -23,9 +23,8 @@ A lightweight command shell library for `no_std` Rust environments with optional
 ### Core Functionality (Always Present)
 - **Path-based navigation** - Unix-style hierarchical commands (`system/status`, `network/status`)
 - **Command execution** - Synchronous command support with structured argument parsing
-- **Input parsing** - Terminal I/O with line editing (backspace, arrows, double-ESC clear)
-- **Const initialization** - Zero runtime overhead, ROM placement
-- **Global commands** - `ls`, `?`, `clear` (and `logout` when authentication enabled)
+- **Input parsing** - Terminal I/O with line editing (backspace, double-ESC clear)
+- **Global commands** - `ls`, `?`, `clear`
 
 ### Optional Features
 - **Tab completion** (`completion` feature) - Command and path prefix matching (~2KB flash) *(Default: enabled)*
@@ -34,11 +33,11 @@ A lightweight command shell library for `no_std` Rust environments with optional
 - **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement (~2KB flash) *(Default: disabled - opt-in)*
 
 ### What We Explicitly Exclude
-- ❌ Shell scripting (piping, variables, conditionals)
+- ❌ Shell scripting (piping, variables, conditionals, command substitution)
 - ❌ Command aliases
+- ❌ Job control (background jobs, fg/bg)
 - ❌ Output paging
 - ❌ Persistent history across reboots
-- ❌ Heap allocation
 
 See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for rationale.
 
@@ -48,12 +47,40 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for rationale.
 
 **Bare-Metal Pattern:**
 ```rust
-// 1. Define command tree with metadata
-const STATUS: CommandMeta<Level> = CommandMeta { /* ... */ };
-const ROOT: Directory<Level> = Directory { /* ... */ };
+// 1. Implement CharIo trait for your platform
+impl CharIo for MyIo {
+    type Error = MyError;
+    fn get_char(&mut self) -> Result<Option<char>, Self::Error> { /* ... */ }
+    fn put_char(&mut self, c: char) -> Result<(), Self::Error> { /* ... */ }
+}
 
-// 2. Implement CommandHandler trait
-impl CommandHandler<MyConfig> for MyHandlers {
+// 2. Define command tree with metadata
+const STATUS: CommandMeta<Level> = CommandMeta {
+    id: "status",
+    name: "status",
+    description: "Show system status",
+    access_level: Level::User,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+const SYSTEM: Directory<Level> = Directory {
+    name: "system",
+    description: "System commands",
+    access_level: Level::User,
+    children: &[Node::Command(&STATUS)],
+};
+
+const ROOT: Directory<Level> = Directory {
+    name: "",
+    description: "Root",
+    access_level: Level::Guest,
+    children: &[Node::Directory(&SYSTEM)],
+};
+
+// 3. Implement CommandHandler trait
+impl CommandHandler<MyConfig> for MyHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
             "status" => status_fn::<MyConfig>(args),
@@ -62,8 +89,10 @@ impl CommandHandler<MyConfig> for MyHandlers {
     }
 }
 
-// 3. Main loop
-let mut shell = Shell::new(&ROOT, handlers, io);
+// 4. Create shell and run main loop
+let handler = MyHandler;    // Your CommandHandler implementation
+let io = MyIo::new();       // Your CharIo implementation
+let mut shell = Shell::new(&ROOT, handler, io);
 shell.activate().ok();
 
 loop {
@@ -75,9 +104,33 @@ loop {
 
 **Async Pattern** (Embassy):
 ```rust
+// 1. Define async command
+const FETCH: CommandMeta<Level> = CommandMeta {
+    id: "fetch",
+    name: "fetch",
+    description: "Fetch data from network",
+    access_level: Level::User,
+    kind: CommandKind::Async,  // Async command
+    min_args: 0,
+    max_args: 0,
+};
+
+// 2. Implement async handler
+impl CommandHandler<MyConfig> for MyHandler {
+    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
+        match id {
+            "fetch" => fetch_fn::<MyConfig>(args).await,
+            _ => Err(CliError::CommandNotFound)
+        }
+    }
+}
+
+// 3. Run shell in async task
 #[embassy_executor::task]
 async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
-    let mut shell = Shell::new(&ROOT, handlers, io);
+    let handler = MyHandler;
+    let io = MyIo::new(usb);
+    let mut shell = Shell::new(&ROOT, handler, io);
     shell.activate().ok();
 
     loop {
@@ -94,15 +147,14 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 
 ## Platform Support
 
-**Tested platforms:**
-- Raspberry Pi Pico (RP2040) - Primary development target
-- STM32F072 - ARM Cortex-M0
-- Native (std) - Testing and development
+Built for `no_std` embedded systems:
+- **Tested on:** Raspberry Pi Pico (RP2040), STM32F072 (ARM Cortex-M0)
+- **Compatible with:** Any ARMv6-M or higher microcontroller
 
-**Runtime environments:**
-- Bare-metal (blocking I/O, polling loop)
-- Embassy (async runtime with USB/UART)
-- RTIC (real-time interrupt-driven concurrency)
+**Runtime compatibility:**
+- Bare-metal (polling loop)
+- Embassy (async runtime)
+- RTIC and other async runtimes
 
 **I/O abstraction:** Platform-agnostic `CharIo` trait for UART, USB-CDC, or custom adapters. See [docs/CHAR_IO.md](docs/CHAR_IO.md) for implementation guide.
 
