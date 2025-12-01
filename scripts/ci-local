@@ -146,7 +146,20 @@ for example in "${EXAMPLES[@]}"; do
     fi
 done
 
-# 10. Check for uncommitted changes
+# 10. Run size analysis
+print_step "Running memory footprint analysis..."
+if [ -d "size-analysis" ] && [ -f "size-analysis/analyze.sh" ]; then
+    if (cd size-analysis && ./analyze.sh); then
+        print_success "Size analysis passed"
+    else
+        print_error "Size analysis failed"
+    fi
+else
+    echo -e "${YELLOW}⚠ size-analysis directory not found, skipping${NC}"
+    echo ""
+fi
+
+# 11. Check for uncommitted changes
 print_step "Checking for uncommitted changes..."
 if git diff --quiet && git diff --cached --quiet; then
     print_success "No uncommitted changes"
