@@ -46,18 +46,21 @@ jobs:
           path: size-analysis/minimal/target
           key: ${{ runner.os }}-cargo-build-size-${{ hashFiles('size-analysis/minimal/Cargo.lock') }}
 
+      - name: Cache cargo binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bin-
+
       - name: Install llvm-tools component
         run: rustup component add llvm-tools
 
       - name: Install cargo-bloat and cargo-binutils
         run: |
-          cargo install cargo-bloat --locked
-          cargo install cargo-binutils --locked
-
-      - name: Install ARM GCC toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi
+          cargo install cargo-bloat --locked || echo "cargo-bloat already installed"
+          cargo install cargo-binutils --locked || echo "cargo-binutils already installed"
 
       - name: Run size analysis
         run: |
