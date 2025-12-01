@@ -46,6 +46,9 @@ jobs:
           path: size-analysis/minimal/target
           key: ${{ runner.os }}-cargo-build-size-${{ hashFiles('size-analysis/minimal/Cargo.lock') }}
 
+      - name: Install llvm-tools component
+        run: rustup component add llvm-tools
+
       - name: Install cargo-bloat and cargo-binutils
         run: |
           cargo install cargo-bloat --locked
