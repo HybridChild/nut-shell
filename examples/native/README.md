@@ -38,7 +38,7 @@ Global:
 - `guest:guest123` - Guest access
 
 **Key implementation details:**
-- CharIo trait implementation for stdin/stdout
+- `CharIo` trait implementation for stdin/stdout
 - Raw terminal mode mimics embedded UART behavior (no local echo, character-at-a-time)
 - Main loop polls stdin and feeds characters to shell
 - Ctrl+C (0x03) used for graceful exit
@@ -79,7 +79,7 @@ Global:
 **Key implementation details:**
 - Commands marked `CommandKind::Async` in metadata
 - Async commands implement `execute_async()` trait method
-- Shell uses `process_char_async()` instead of `process_char()`
+- `Shell` uses `process_char_async()` instead of `process_char()`
 - Tokio runtime required
 
 **Run:** `cargo run --release --bin async --features async`

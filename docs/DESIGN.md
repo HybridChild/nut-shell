@@ -14,7 +14,7 @@ This document records architectural decisions for **nut-shell**. It explains why
    - Authentication: Opt-In Security
    - Completion/History: Opt-Out UX
    - Node Type System
-   - CharIo Buffering Model
+   - `CharIo` Buffering Model
 2. [Feature Gating](#feature-gating)
    - Stub Functions
    - Conditional State
@@ -110,7 +110,7 @@ where
 
 **Alternative Rejected**: Trait objects → runtime overhead, no const init
 
-### 5. CharIo Buffering Model
+### 5. `CharIo` Buffering Model
 
 **Decision**: Non-async trait with explicit buffering contract
 
@@ -124,7 +124,7 @@ where
 
 **Alternatives Rejected:**
 
-1. **Async CharIo trait** - Requires `async_trait` or unstable features, makes `process_char()` async, no benefit for bare-metal
+1. **Async `CharIo` trait** - Requires `async_trait` or unstable features, makes `process_char()` async, no benefit for bare-metal
 2. **Callback-based** - Can't propagate errors, lifetime issues in `no_std`, awkward API
 
 ---
@@ -199,6 +199,6 @@ pub enum CliState {
 - **[EXAMPLES.md](EXAMPLES.md)**: Usage examples and configuration patterns
 - **[SECURITY.md](SECURITY.md)**: Authentication, access control, and security design
 - **[PHILOSOPHY.md](PHILOSOPHY.md)**: Design philosophy and feature decision framework
-- **[CHAR_IO.md](CHAR_IO.md)**: CharIo trait and platform adapter guide
+- **[CHAR_IO.md](CHAR_IO.md)**: `CharIo` trait and platform adapter guide
 - **[DEVELOPMENT.md](DEVELOPMENT.md)**: Build commands and development workflows
 - **[../CLAUDE.md](../CLAUDE.md)**: AI-assisted development guidance

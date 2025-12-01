@@ -7,7 +7,7 @@ This document describes the security architecture for authentication and access 
 **Related Documentation:**
 - **[DESIGN.md](DESIGN.md)** - Unified architecture pattern and feature gating details
 - **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy
-- **[EXAMPLES.md](EXAMPLES.md)** - AccessLevel implementation and usage patterns
+- **[EXAMPLES.md](EXAMPLES.md)** - `AccessLevel` implementation and usage patterns
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Build and testing workflows
 
 ---
@@ -120,7 +120,7 @@ impl PasswordHasher for Sha256Hasher {
 
 ## Access Control System
 
-### AccessLevel Trait
+### `AccessLevel` Trait
 
 User-defined access level hierarchies via the `AccessLevel` trait. The trait requires `PartialOrd` for hierarchical comparison (higher levels have all permissions of lower levels).
 
@@ -217,7 +217,7 @@ impl CredentialProvider<MyAccessLevel> for BuildTimeProvider {
 
 - Check access level at every path segment during tree traversal
 - Return `CliError::InvalidPath` for both nonexistent and inaccessible nodes (prevents information leakage)
-- Verify access before dispatching to CommandHandler
+- Verify access before dispatching to `CommandHandler`
 
 ### Feature Gating
 
@@ -308,5 +308,5 @@ This authentication system assumes:
 
 - **[DESIGN.md](DESIGN.md)** - Unified architecture pattern and feature gating
 - **[PHILOSOPHY.md](PHILOSOPHY.md)** - Security-by-design philosophy
-- **[EXAMPLES.md](EXAMPLES.md)** - AccessLevel implementation patterns
+- **[EXAMPLES.md](EXAMPLES.md)** - `AccessLevel` implementation patterns
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Build commands and testing workflows

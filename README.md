@@ -47,7 +47,7 @@ See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for rationale.
 
 **Bare-Metal Pattern:**
 ```rust
-// 1. Implement CharIo trait for your platform
+// 1. Implement `CharIo` trait for your platform
 impl CharIo for MyIo {
     type Error = MyError;
     fn get_char(&mut self) -> Result<Option<char>, Self::Error> { /* ... */ }
@@ -79,7 +79,7 @@ const ROOT: Directory<Level> = Directory {
     children: &[Node::Directory(&SYSTEM)],
 };
 
-// 3. Implement CommandHandler trait
+// 3. Implement `CommandHandler` trait
 impl CommandHandler<MyConfig> for MyHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
@@ -90,8 +90,8 @@ impl CommandHandler<MyConfig> for MyHandler {
 }
 
 // 4. Create shell and run main loop
-let handler = MyHandler;    // Your CommandHandler implementation
-let io = MyIo::new();       // Your CharIo implementation
+let handler = MyHandler;    // Your `CommandHandler` implementation
+let io = MyIo::new();       // Your `CharIo` implementation
 let mut shell = Shell::new(&ROOT, handler, io);
 shell.activate().ok();
 
@@ -173,7 +173,7 @@ Built for `no_std` embedded systems:
 **Your actual size** will be larger due to:
 - Command implementations (simple GPIO ~50 bytes, network ~2-5KB each)
 - Directory tree metadata (names, descriptions)
-- CharIo/CredentialProvider/CommandHandler trait implementations
+- `CharIo`/`CredentialProvider`/`CommandHandler` trait implementations
 
 **For detailed analysis:** See [size-analysis/README.md](size-analysis/README.md) for methodology and complete breakdown across all feature combinations.
 
@@ -198,7 +198,7 @@ Optional `authentication` feature provides:
 |----------|-------------|
 | **[README.md](README.md)** | Quick start and overview (this file) |
 | **[docs/EXAMPLES.md](docs/EXAMPLES.md)** | Implementation patterns, configuration, troubleshooting |
-| **[docs/CHAR_IO.md](docs/CHAR_IO.md)** | CharIo trait design and platform adapters |
+| **[docs/CHAR_IO.md](docs/CHAR_IO.md)** | `CharIo` trait design and platform adapters |
 | **[docs/SECURITY.md](docs/SECURITY.md)** | Authentication patterns and security considerations |
 | **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)** | Design philosophy and feature criteria |
 | **[docs/DESIGN.md](docs/DESIGN.md)** | Architecture decisions and design patterns |

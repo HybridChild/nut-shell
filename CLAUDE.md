@@ -37,7 +37,7 @@ This repository maintains **professional, lean documentation**:
 
 ### Adding a Command
 
-**Pattern:** Metadata/execution separation (CommandMeta + CommandHandler)
+**Pattern:** Metadata/execution separation (`CommandMeta` + `CommandHandler`)
 
 **Steps:**
 1. Define command function: `fn cmd<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError>`
@@ -65,7 +65,7 @@ pub fn do_something() -> Result<Vec<&str, 32>> { Ok(Vec::new()) }  // No-op stub
 
 ### Implementing Traits
 
-**CommandHandler** - Maps command IDs to functions:
+**`CommandHandler`** - Maps command IDs to functions:
 ```rust
 impl CommandHandler<MyConfig> for MyHandlers {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
@@ -77,13 +77,13 @@ impl CommandHandler<MyConfig> for MyHandlers {
 }
 ```
 
-**AccessLevel** - Use derive macro:
+**`AccessLevel`** - Use derive macro:
 ```rust
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, AccessLevel)]
 pub enum MyAccessLevel { Guest = 0, User = 1, Admin = 2 }
 ```
 
-**CharIo** - Platform I/O abstraction:
+**`CharIo`** - Platform I/O abstraction:
 ```rust
 impl CharIo for MyIo {
     type Error = MyError;
@@ -234,7 +234,7 @@ See DEVELOPMENT.md for complete workflows and CI configuration.
 | **[DESIGN.md](docs/DESIGN.md)** | Architecture decisions and design rationale |
 | **[SECURITY.md](docs/SECURITY.md)** | Authentication and access control patterns |
 | **[PHILOSOPHY.md](docs/PHILOSOPHY.md)** | Design philosophy and feature criteria |
-| **[CHAR_IO.md](docs/CHAR_IO.md)** | CharIo trait and platform adapters |
+| **[CHAR_IO.md](docs/CHAR_IO.md)** | `CharIo` trait and platform adapters |
 | **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Build workflows, testing, CI |
 | **`cargo doc --open`** | Complete API reference |
 

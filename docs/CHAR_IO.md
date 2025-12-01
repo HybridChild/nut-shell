@@ -38,7 +38,7 @@ loop {
 
 ### Core Principle
 
-CharIo implementations handle output based on platform constraints:
+`CharIo` implementations handle output based on platform constraints:
 
 - **Bare-metal:** Write directly to hardware (blocking acceptable, no buffering needed)
 - **Async runtimes:** Buffer to memory, flush externally (batches output)
@@ -129,10 +129,10 @@ The trait solves the async output problem by **separating write semantics from I
 
 **Async:**
 - Memory buffer replaces blocking I/O
-- Shell outputs immediately (to buffer), task `.await`s only on flush
+- `Shell` outputs immediately (to buffer), task `.await`s only on flush
 - Batched writes reduce I/O overhead
 
-**Result:** Same Shell code works in both environments without feature flags in the core logic.
+**Result:** Same `Shell` code works in both environments without feature flags in the core logic.
 
 **Architecture rationale:** See [DESIGN.md](DESIGN.md) for design decision and rejected alternatives.
 
@@ -155,15 +155,15 @@ Async implementations must buffer output. **Minimum size:** `MAX_RESPONSE + MAX_
 - Error prefix: `"\r\n  Error: "` (11 bytes)
 - Worst case: 16 bytes total
 
-**Buffer smaller than recommended:** Shell output may overflow on error messages or verbose responses.
+**Buffer smaller than recommended:** `Shell` output may overflow on error messages or verbose responses.
 
-**On overflow:** `put_char()` returns error, Shell propagates to user.
+**On overflow:** `put_char()` returns error, `Shell` propagates to user.
 
 **Bare-metal:** No output buffer needed (immediate flush).
 
-### Input Buffer (Shell Configuration)
+### Input Buffer (`Shell` Configuration)
 
-The input buffer stores the current command line being edited. It is **managed by Shell**, not `CharIo`.
+The input buffer stores the current command line being edited. It is **managed by `Shell`**, not `CharIo`.
 
 **Configuration:**
 
@@ -175,8 +175,8 @@ The input buffer stores the current command line being edited. It is **managed b
 
 **Key points:**
 - `CharIo` only handles single-character I/O (`get_char()`/`put_char()`)
-- Shell accumulates input characters into `MAX_INPUT`-sized buffer
-- When user presses Enter, Shell parses the buffered command
+- `Shell` accumulates input characters into `MAX_INPUT`-sized buffer
+- When user presses Enter, `Shell` parses the buffered command
 - Input buffer overflow triggers error (command rejected)
 
 **See:** [EXAMPLES.md](EXAMPLES.md#custom-configuration) for custom `ShellConfig` implementation
