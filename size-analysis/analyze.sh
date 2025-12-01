@@ -75,6 +75,13 @@ for feat in "${FEATURES[@]}"; do
 
     # Build
     echo "  Building..."
+
+    # Verify memory.x exists (required for linking)
+    if [ ! -f "memory.x" ]; then
+        echo "  Warning: memory.x not found in $(pwd)"
+        ls -la memory.x 2>&1 || true
+    fi
+
     if ! cargo build --release --target $TARGET $FEAT_FLAGS; then
         echo "  Error: Build failed for feature set: $feat"
         exit 1
@@ -135,6 +142,15 @@ for feat in "${FEATURES[@]}"; do
         echo "  Warning: Binary appears empty (text=$TEXT, data=$DATA, bss=$BSS)"
         echo "  This may indicate a linker or build issue"
         echo "  SIZE_OUTPUT: $SIZE_OUTPUT"
+
+        # Try to dump section headers to see what sections exist
+        if command -v rust-objdump &> /dev/null; then
+            echo "  Section headers (via rust-objdump):"
+            rust-objdump -h "$BINARY_PATH" 2>&1 | grep -E "^\s*[0-9]+\s+\." | head -10
+        elif command -v arm-none-eabi-objdump &> /dev/null; then
+            echo "  Section headers (via arm-none-eabi-objdump):"
+            arm-none-eabi-objdump -h "$BINARY_PATH" 2>&1 | grep -E "^\s*[0-9]+\s+\." | head -10
+        fi
     fi
 
     # Get detailed section breakdown using -A format for rodata
