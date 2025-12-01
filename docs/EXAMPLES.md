@@ -4,7 +4,7 @@ Practical implementation patterns for using nut-shell in your embedded projects.
 
 **For architecture and additional resources, see:**
 - **[DESIGN.md](DESIGN.md)** - Architecture decisions and patterns
-- **[CHAR_IO.md](CHAR_IO.md)** - CharIo trait design and reference implementations
+- **[CHAR_IO.md](CHAR_IO.md)** - `CharIo` trait design and reference implementations
 - **[SECURITY.md](SECURITY.md)** - Authentication and access control patterns
 
 ---
@@ -28,7 +28,7 @@ Complete working examples for specific platforms are in the `examples/` director
 | **Bare-metal** | `examples/pico_uart.rs` | Bare-metal UART with ISR-driven input queue |
 | **Embassy** | `examples/embassy_usb_cdc.rs` | Async USB-CDC with buffered output |
 
-**See each example for complete CharIo implementations and platform-specific setup.**
+**See each example for complete `CharIo` implementations and platform-specific setup.**
 
 ---
 
@@ -130,7 +130,7 @@ let handlers = MyHandlers {
 let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handlers, io);
 ```
 
-### Custom CharIo Implementation
+### Custom `CharIo` Implementation
 
 ```rust
 use nut_shell::CharIo;
@@ -156,7 +156,7 @@ impl CharIo for UartIo {
 
 **See [CHAR_IO.md](CHAR_IO.md) for buffering patterns, async implementations, and platform-specific guidance.**
 
-### Custom AccessLevel Implementation
+### Custom `AccessLevel` Implementation
 
 Define your own access level hierarchy using the `AccessLevel` derive macro:
 
@@ -218,7 +218,7 @@ impl nut_shell::auth::AccessLevel for MyAccessLevel {
 
 ## Custom Configuration
 
-### Custom ShellConfig
+### Custom `ShellConfig`
 
 Implement `ShellConfig` to customize buffer sizes and user-visible messages:
 
@@ -258,11 +258,11 @@ let mut shell: Shell<_, MyAccessLevel, UartIo, MyHandlers, MyAppConfig> =
 
 ### Pre-Defined Configurations
 
-**DefaultConfig** (recommended for most applications):
+**`DefaultConfig`** (recommended for most applications):
 - MAX_INPUT: 128, MAX_RESPONSE: 256, HISTORY_SIZE: 10
 - RAM usage: ~1.5 KB (with history enabled)
 
-**MinimalConfig** (RAM-constrained systems):
+**`MinimalConfig`** (RAM-constrained systems):
 - MAX_INPUT: 64, MAX_RESPONSE: 128, HISTORY_SIZE: 5
 - RAM usage: ~0.5 KB (with history enabled)
 
@@ -337,5 +337,5 @@ nut-shell = { version = "0.1", features = ["async"] }
 ---
 
 **For complete platform integration guides, see `examples/` directory.**
-**For CharIo implementation details, see [CHAR_IO.md](CHAR_IO.md).**
+**For `CharIo` implementation details, see [CHAR_IO.md](CHAR_IO.md).**
 **For authentication patterns, see [SECURITY.md](SECURITY.md).**

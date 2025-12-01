@@ -17,7 +17,7 @@ This will build a minimal reference binary with all feature combinations and gen
 The analysis uses `size-analysis/minimal/` - a bare-bones embedded binary with:
 
 - **Minimal command tree**: One sync command (`status`) and one async command (`info`) to prevent optimizer removal
-- **MinimalConfig**: Reduced buffers and message strings to isolate nut-shell overhead
+- **`MinimalConfig`**: Reduced buffers and message strings to isolate nut-shell overhead
 - **Minimal generics**: Stub implementations for `CharIo`, `CredentialProvider`, and `CommandHandler`
 - **Real embedded target**: `thumbv6m-none-eabi` (Cortex-M0/M0+)
 - **Size-optimized build**: `opt-level = "z"` with LTO enabled
