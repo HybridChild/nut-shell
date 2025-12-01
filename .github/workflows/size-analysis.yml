@@ -15,6 +15,9 @@ jobs:
   size-analysis:
     name: Analyze Binary Size
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -43,8 +46,10 @@ jobs:
           path: size-analysis/minimal/target
           key: ${{ runner.os }}-cargo-build-size-${{ hashFiles('size-analysis/minimal/Cargo.lock') }}
 
-      - name: Install cargo-bloat
-        run: cargo install cargo-bloat --locked
+      - name: Install cargo-bloat and cargo-binutils
+        run: |
+          cargo install cargo-bloat --locked
+          cargo install cargo-binutils --locked
 
       - name: Install ARM GCC toolchain
         run: |
