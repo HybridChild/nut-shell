@@ -89,6 +89,10 @@ for feat in "${FEATURES[@]}"; do
         exit 1
     fi
 
+    # Log binary info for debugging
+    BINARY_SIZE=$(ls -lh "$BINARY_PATH" | awk '{print $5}')
+    echo "  Binary file size: $BINARY_SIZE"
+
     # Extract size information using berkeley format
     echo "  Running size analysis..."
     SIZE_OUTPUT=$(cargo size --release --target $TARGET $FEAT_FLAGS 2>&1)
@@ -115,6 +119,13 @@ for feat in "${FEATURES[@]}"; do
     fi
     if ! [[ "$BSS" =~ ^[0-9]+$ ]]; then
         BSS=0
+    fi
+
+    # Log warning if binary has no code (helps debug CI issues)
+    if [ "$TEXT" = "0" ] && [ "$DATA" = "0" ] && [ "$BSS" = "0" ]; then
+        echo "  Warning: Binary appears empty (text=$TEXT, data=$DATA, bss=$BSS)"
+        echo "  This may indicate a linker or build issue"
+        echo "  SIZE_OUTPUT: $SIZE_OUTPUT"
     fi
 
     # Get detailed section breakdown using -A format for rodata
@@ -185,7 +196,7 @@ mv "$REPORT" "$TEMP_REPORT"
 cat > "$REPORT" <<EOF
 # nut-shell Memory Footprint Analysis
 
-**Generated:** $(TZ='Europe/Copenhagen' date)  
+**Generated:** $(date)  
 **Target:** $TARGET (ARMv6-M, Cortex-M0/M0+)  
 **Optimization:** \`opt-level = "z"\`, LTO enabled
 
