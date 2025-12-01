@@ -91,7 +91,12 @@ for feat in "${FEATURES[@]}"; do
 
     # Extract size information using berkeley format
     echo "  Running size analysis..."
-    SIZE_OUTPUT=$(cargo size --release --target $TARGET $FEAT_FLAGS 2>/dev/null) || true
+    SIZE_OUTPUT=$(cargo size --release --target $TARGET $FEAT_FLAGS 2>&1)
+
+    if [ $? -ne 0 ]; then
+        echo "  Warning: cargo size failed"
+        echo "  Output: $SIZE_OUTPUT"
+    fi
 
     # Extract sections using berkeley format (shows text, data, bss)
     # Berkeley format output: "   text    data     bss     dec     hex filename"
@@ -99,21 +104,34 @@ for feat in "${FEATURES[@]}"; do
     DATA=$(echo "$SIZE_OUTPUT" | tail -1 | awk '{print $2}')
     BSS=$(echo "$SIZE_OUTPUT" | tail -1 | awk '{print $3}')
 
+    # Validate we got numeric values
+    if ! [[ "$TEXT" =~ ^[0-9]+$ ]]; then
+        echo "  Warning: TEXT is not numeric: '$TEXT'"
+        echo "  SIZE_OUTPUT was: $SIZE_OUTPUT"
+        TEXT=0
+    fi
+    if ! [[ "$DATA" =~ ^[0-9]+$ ]]; then
+        DATA=0
+    fi
+    if ! [[ "$BSS" =~ ^[0-9]+$ ]]; then
+        BSS=0
+    fi
+
     # Get detailed section breakdown using -A format for rodata
     SIZE_DETAIL=$(cargo size --release --target $TARGET $FEAT_FLAGS -- -A 2>/dev/null) || true
     RODATA=$(echo "$SIZE_DETAIL" | grep "^\.rodata" | awk '{print $2}' || echo "0")
 
-    # If rodata not found separately, it's included in text
-    if [ "$RODATA" = "0" ] || [ -z "$RODATA" ]; then
-        RODATA="(included in .text)"
-        TOTAL_FLASH=$TEXT
-    else
-        # Calculate total flash (text already includes rodata in berkeley format, so just use text + data)
-        TOTAL_FLASH=$((TEXT + DATA))
-    fi
+    # Calculate total flash (in berkeley format, text already includes rodata)
+    # text column = .text + .rodata + .vector_table in most cases
+    TOTAL_FLASH=$TEXT
 
     # Store for summary table
-    SUMMARY_ROWS+=("| $FEAT_NAME | ${TEXT}B | ${RODATA}B | ${DATA}B | ${BSS}B | ${TOTAL_FLASH}B |")
+    # Note: berkeley format combines .text + .rodata, show rodata separately if available
+    if [ -n "$RODATA" ] && [ "$RODATA" != "0" ]; then
+        SUMMARY_ROWS+=("| $FEAT_NAME | ${TEXT}B | ${RODATA}B | ${DATA}B | ${BSS}B | ${TOTAL_FLASH}B |")
+    else
+        SUMMARY_ROWS+=("| $FEAT_NAME | ${TEXT}B | (incl. in .text) | ${DATA}B | ${BSS}B | ${TOTAL_FLASH}B |")
+    fi
 
     # Detailed analysis section
     cat >> "$REPORT" <<EOF
