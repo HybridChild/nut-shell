@@ -95,10 +95,19 @@ for feat in "${FEATURES[@]}"; do
 
     # Extract size information using berkeley format
     echo "  Running size analysis..."
-    SIZE_OUTPUT=$(cargo size --release --target $TARGET $FEAT_FLAGS 2>&1)
+
+    # Try rust-size from llvm-tools first (more reliable in CI)
+    if command -v rust-size &> /dev/null; then
+        SIZE_OUTPUT=$(rust-size --format=berkeley "$BINARY_PATH" 2>&1)
+        SIZE_TOOL="rust-size"
+    else
+        # Fall back to cargo size
+        SIZE_OUTPUT=$(cargo size --release --target $TARGET $FEAT_FLAGS 2>&1)
+        SIZE_TOOL="cargo size"
+    fi
 
     if [ $? -ne 0 ]; then
-        echo "  Warning: cargo size failed"
+        echo "  Warning: $SIZE_TOOL failed"
         echo "  Output: $SIZE_OUTPUT"
     fi
 
