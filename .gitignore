@@ -6,7 +6,9 @@ target
 Cargo.lock
 
 !/examples/**/.cargo/
+!/size-analysis/**/.cargo/
 
 /logs
 /notes
 /scratch.md
+/TODO.md
