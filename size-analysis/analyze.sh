@@ -185,7 +185,7 @@ mv "$REPORT" "$TEMP_REPORT"
 cat > "$REPORT" <<EOF
 # nut-shell Memory Footprint Analysis
 
-**Generated:** $(date)  
+**Generated:** $(TZ='Europe/Copenhagen' date)  
 **Target:** $TARGET (ARMv6-M, Cortex-M0/M0+)  
 **Optimization:** \`opt-level = "z"\`, LTO enabled
 
