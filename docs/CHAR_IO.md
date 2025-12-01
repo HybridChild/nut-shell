@@ -1,11 +1,6 @@
-# CharIo Trait Design
+# `CharIo` Trait Design
 
-This document explains the CharIo trait design that enables nut-shell to work efficiently in both bare-metal and async runtime environments.
-
-**Related Documentation:**
-- **[DESIGN.md](DESIGN.md)**: Architecture decisions including CharIo buffering model (Section 1.5)
-- **[EXAMPLES.md](EXAMPLES.md)**: CharIo implementation examples
-- **[DEVELOPMENT.md](DEVELOPMENT.md)**: Build and testing workflows
+This document explains the `CharIo` trait design that enables nut-shell to work efficiently in both bare-metal and async runtime environments.
 
 ---
 
@@ -39,94 +34,31 @@ loop {
 
 ---
 
-## Solution: Explicit Buffering Model
+## Solution: Platform-Specific Output Handling
 
 ### Core Principle
 
-**All CharIo implementations MUST buffer output.** The difference is **when** they flush:
+CharIo implementations handle output based on platform constraints:
 
-- **Bare-metal:** Flushes immediately (blocking acceptable)
-- **Async runtimes:** Defers flush (batches output)
+- **Bare-metal:** Write directly to hardware (blocking acceptable, no buffering needed)
+- **Async runtimes:** Buffer to memory, flush externally (batches output)
 
-### CharIo Trait Design
+### `CharIo` Trait Design
 
 ```rust
-/// Character I/O abstraction for CLI.
-///
-/// # Buffering Model
-///
-/// All implementations MUST buffer output internally. The `put_char()` and
-/// `write_str()` methods write to a buffer and MUST NOT perform I/O that
-/// could await or block indefinitely.
-///
-/// ## For Bare-Metal Platforms
-///
-/// Bare-metal implementations may flush immediately in `put_char()`, as
-/// blocking is acceptable in single-threaded embedded systems:
-///
-/// ```rust
-/// impl CharIo for UartIo {
-///     fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
-///         self.uart.write_byte(c as u8);  // Blocking write - OK!
-///         Ok(())
-///     }
-/// }
-/// ```
-///
-/// ## For Async Runtimes (Embassy, RTIC, etc.)
-///
-/// Async implementations MUST buffer to memory only. Flushing happens
-/// externally after `process_char()` returns:
-///
-/// ```rust
-/// impl CharIo for EmbassyUsbIo {
-///     fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
-///         self.output_buffer.push(c as u8).ok();  // Memory only
-///         Ok(())
-///     }
-/// }
-///
-/// impl EmbassyUsbIo {
-///     pub async fn flush(&mut self) -> Result<()> {
-///         self.class.write_packet(&self.output_buffer).await
-///     }
-/// }
-/// ```
-///
 pub trait CharIo {
     type Error;
 
     /// Read a character if available (non-blocking).
-    ///
-    /// Returns:
-    /// - `Ok(Some(c))` - Character available
-    /// - `Ok(None)` - No character available (would block)
-    /// - `Err(e)` - I/O error
-    ///
-    /// # Implementation Notes
-    ///
-    /// - Bare-metal: Check UART FIFO, return immediately
-    /// - Async: Return `None` (reading happens externally via async)
+    /// Returns `Ok(None)` if no character ready.
     fn get_char(&mut self) -> Result<Option<char>, Self::Error>;
 
     /// Write a character to output buffer.
-    ///
-    /// This method MUST NOT block indefinitely. Implementations may:
-    /// - Write to memory buffer (async platforms)
-    /// - Write directly to hardware (bare-metal, blocking acceptable)
-    /// - Return error if buffer full
-    ///
-    /// # Errors
-    ///
-    /// Returns error if:
-    /// - Buffer is full (memory-buffered implementations)
-    /// - Hardware error (direct-write implementations)
+    /// MUST NOT block indefinitely.
     fn put_char(&mut self, c: char) -> Result<(), Self::Error>;
 
     /// Write a string to output buffer.
-    ///
     /// Default implementation calls `put_char()` for each character.
-    /// Implementations may override for efficiency.
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
         for c in s.chars() {
             self.put_char(c)?;
@@ -136,28 +68,73 @@ pub trait CharIo {
 }
 ```
 
+### How It Solves The Problem
+
+**Bare-metal implementation:**
+```rust
+impl CharIo for UartIo {
+    fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
+        self.uart.write_byte(c as u8);  // Blocks until TX ready - acceptable
+        Ok(())
+    }
+}
+
+// Main loop
+loop {
+    if uart.is_readable() {
+        let c = uart.read_byte();
+        shell.process_char(c)?;  // Output written immediately via put_char()
+    }
+}
+```
+
+**Async implementation:**
+```rust
+impl CharIo for EmbassyUsbIo {
+    fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
+        self.buffer.push(c as u8).map_err(|_| Error::BufferFull)  // Memory only
+    }
+}
+
+impl EmbassyUsbIo {
+    pub async fn flush(&mut self) -> Result<()> {
+        self.class.write_packet(&self.buffer).await  // Async I/O happens here
+    }
+}
+
+// Main loop
+loop {
+    let c = uart.read().await;
+    shell.process_char_async(c).await?;  // Output buffered to memory
+    io.flush().await?;                   // Async I/O happens outside shell
+}
+```
+
+**Key insight:** `put_char()` never blocks indefinitely. Bare-metal blocks briefly (hardware-limited), async writes to memory (error if full).
+
 ---
 
 ## Why This Design Works
 
-### Single Codebase, Platform-Specific Behavior
+The trait solves the async output problem by **separating write semantics from I/O timing**:
 
-Same `Shell` code works everywhere:
-- No `#[cfg(async)]` feature flags in core
-- CharIo trait is platform-agnostic
-- Implementations handle platform-specific details
+- `put_char()` writes output (immediate for bare-metal, buffered for async)
+- Actual I/O timing is platform-specific (blocking vs deferred flush)
+- `Shell` doesn't need to know which approach is used
 
-**Bare-metal benefits:**
-- No output buffer allocation needed
-- Direct UART writes
-- Compiler optimizes away abstraction
+**Bare-metal:**
+- Zero abstraction overhead - `put_char()` compiles to direct UART writes
+- No buffer allocation required
+- Blocking is acceptable in single-threaded loop
 
-**Async benefits:**
-- Single buffer (~256 bytes)
-- Batched I/O transactions
-- Task suspends only on read/flush
+**Async:**
+- Memory buffer replaces blocking I/O
+- Shell outputs immediately (to buffer), task `.await`s only on flush
+- Batched writes reduce I/O overhead
 
-**Architecture rationale:** See [DESIGN.md](DESIGN.md) Section 1.5 for design decision and rejected alternatives.
+**Result:** Same Shell code works in both environments without feature flags in the core logic.
+
+**Architecture rationale:** See [DESIGN.md](DESIGN.md) for design decision and rejected alternatives.
 
 ---
 
@@ -165,24 +142,44 @@ Same `Shell` code works everywhere:
 
 ### Output Buffer Sizing (Async Only)
 
-Async implementations must buffer output. Recommended sizes:
+Async implementations must buffer output. **Minimum size:** `MAX_RESPONSE + MAX_PROMPT + Overhead`
 
-| Buffer Size | Use Case |
-|-------------|----------|
-| 256 bytes | Standard (handles prompts + directory listings) |
-| 512 bytes | Verbose command responses |
-| 1024 bytes | Maximum safety margin |
+| ShellConfig | MAX_RESPONSE | MAX_PROMPT | Overhead | Recommended Buffer |
+|-------------|--------------|------------|----------|-------------------|
+| `DefaultConfig` | 256 | 128 | 16 | **400 bytes** |
+| `MinimalConfig` | 128 | 64 | 16 | **208 bytes** |
+| Custom config | Variable | Variable | 16 | Use formula |
 
-**On overflow:** Return error from `put_char()`, Shell propagates to user.
+**Overhead (constant 16 bytes):**
+- Response formatting: `"\r\n"` prefix/postfix, `"  "` indentation (~6 bytes)
+- Error prefix: `"\r\n  Error: "` (11 bytes)
+- Worst case: 16 bytes total
+
+**Buffer smaller than recommended:** Shell output may overflow on error messages or verbose responses.
+
+**On overflow:** `put_char()` returns error, Shell propagates to user.
 
 **Bare-metal:** No output buffer needed (immediate flush).
 
 ### Input Buffer (Shell Configuration)
 
-Configured via `ShellConfig` trait (not CharIo):
-- Default: 128 bytes (`DefaultConfig::MAX_INPUT`)
-- Minimal: 64 bytes (`MinimalConfig::MAX_INPUT`)
-- See [EXAMPLES.md](EXAMPLES.md#custom-configuration) for custom sizing
+The input buffer stores the current command line being edited. It is **managed by Shell**, not `CharIo`.
+
+**Configuration:**
+
+| ShellConfig | MAX_INPUT | Use Case |
+|-------------|-----------|----------|
+| `DefaultConfig` | 128 bytes | Standard command lines |
+| `MinimalConfig` | 64 bytes | Constrained environments |
+| Custom config | Variable | Application-specific |
+
+**Key points:**
+- `CharIo` only handles single-character I/O (`get_char()`/`put_char()`)
+- Shell accumulates input characters into `MAX_INPUT`-sized buffer
+- When user presses Enter, Shell parses the buffered command
+- Input buffer overflow triggers error (command rejected)
+
+**See:** [EXAMPLES.md](EXAMPLES.md#custom-configuration) for custom `ShellConfig` implementation
 
 ---
 
@@ -192,28 +189,10 @@ Complete working implementations are in the `examples/` directory:
 
 | Platform | Example | Key Pattern |
 |----------|---------|-------------|
-| **Bare-metal UART** | `examples/pico_uart.rs` | ISR fills queue, blocking TX |
-| **Embassy USB-CDC** | `examples/embassy_usb_cdc.rs` | Buffer + flush, `\r` → `\r\n` |
-| **Embassy UART** | `examples/embassy_uart.rs` | DMA transfers, deferred flush |
-| **Native** | `examples/native_simple.rs` | Stdio with immediate flush |
+| **Bare-metal UART (STM32)** | `examples/stm32f072/bin/basic/` | Blocking UART writes (`io.rs`) |
+| **Bare-metal USB (RP2040)** | `examples/rp-pico/bin/basic/` | Blocking USB-CDC writes (`io.rs`) |
+| **Embassy USB (RP2040)** | `examples/rp-pico/bin/embassy/` | Buffered output with async flush (`io.rs`) |
+| **Native (sync)** | `examples/native/bin/basic/` | Stdio with immediate flush (`io.rs`) |
+| **Native (async)** | `examples/native/bin/async/` | Buffered stdio (`io.rs`) |
 
-**See each example for complete CharIo implementations and platform-specific setup.**
-
----
-
-## Summary
-
-**Design decision:** CharIo implementations MUST buffer output. Flush timing is platform-dependent.
-
-**Implementation:**
-- Bare-metal: `put_char()` writes to UART directly
-- Async: `put_char()` writes to buffer, `flush()` called externally
-
-**Benefits:**
-- Works in both bare-metal and async runtimes
-- Zero overhead for bare-metal
-- Efficient batching for async
-- No async trait complexity
-- Stable Rust compatible
-
-**For architecture rationale and rejected alternatives, see [DESIGN.md](DESIGN.md) Section 1.5.**
+**See `io.rs` in each example for complete `CharIo` implementations and platform-specific setup.**
