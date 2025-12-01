@@ -4,19 +4,20 @@ This document records architectural decisions for **nut-shell**. It explains why
 
 **When to use this document:**
 - Understanding why a design decision was made
-- Learning feature gating patterns for new features
+- Learning feature gating techniques for new features
 - Evaluating trade-offs between architectural alternatives
 
 ## Table of Contents
 
 1. [Core Architecture Decisions](#core-architecture-decisions)
    - Metadata/Execution Separation Pattern
-   - Unified Architecture (Authentication)
+   - Authentication: Opt-In Security
    - Completion/History: Opt-Out UX
    - Node Type System
    - CharIo Buffering Model
-2. [Feature Gating Patterns](#feature-gating-patterns)
-3. [Module Structure](#module-structure)
+2. [Feature Gating](#feature-gating)
+   - Stub Functions
+   - Conditional State
 
 ---
 
@@ -53,7 +54,7 @@ pub trait CommandHandler<C: ShellConfig> {
     async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 }
 
-// Shell generic over handlers and config
+// Shell generic over handler and config
 pub struct Shell<'tree, L, IO, H, C>
 where
     H: CommandHandler<C>,
@@ -72,10 +73,6 @@ where
 - ✅ Additional generics `H: CommandHandler<C>` → zero runtime cost via monomorphization
 - ✅ Manual match statements in handlers → future macro can reduce boilerplate
 
-**Code Size Impact (ARM Cortex-M0):**
-- Sync only: +200-300 bytes (dispatch logic)
-- Async enabled: +1.2-1.8KB (async machinery)
-
 ### 2. Authentication: Opt-In Security
 
 **Decision**: Optional authentication via unified architecture pattern
@@ -85,7 +82,7 @@ where
 - Production systems require explicit security choices (not hidden defaults)
 - Multiple credential storage backends needed (build-time, flash, external)
 
-**Implementation**: Uses **Pattern 1: Unified Architecture** (see below) - single code path for both modes. State and field values determine behavior, not `#[cfg]` branching. Core fields (`current_user`, `state`) always present; only credential provider is feature-gated.
+**Implementation**: Uses **conditional fields** technique (see Feature Gating below) - core state fields (`current_user`, `state`) always present; only credential provider is feature-gated.
 
 **Alternative Rejected**: Separate implementations for auth-enabled/disabled → code duplication, maintenance burden
 
@@ -97,10 +94,10 @@ where
 
 **Why**:
 - Better default user experience for interactive use
-- Small cost (~2.5-3KB flash, ~1.3KB RAM for both)
+- Minimal overhead (see `size-analysis/` for measurements)
 - Can be disabled individually for constrained environments
 
-**Implementation**: Uses **Pattern 2: Stub Function Pattern** (see below) - identical signatures, empty results when disabled
+**Implementation**: Uses **stub functions** technique (see Feature Gating below) - identical signatures, empty results when disabled
 
 ### 4. Node Type System
 
@@ -132,166 +129,68 @@ where
 
 ---
 
-## Feature Gating Patterns
+## Feature Gating
 
-Two patterns used throughout the codebase for optional features. Follow these when adding new features.
+Optional features minimize overhead when disabled through conditional compilation. Two techniques used:
 
-### Pattern 1: Unified Architecture (Authentication)
+### Stub Functions
 
-**Use when**: Feature affects core state machine behavior
+**When to use**: Feature adds functionality without affecting core state machine.
 
-**Principle**: Single code path for both modes. State values determine behavior, not `#[cfg]` branching.
+**Approach**: Provide identical function signatures for both enabled/disabled. Disabled version returns empty/no-op.
 
-**Key characteristics:**
-- Core fields (e.g., `current_user`, `state`) always present (not feature-gated)
-- Only feature-specific dependencies conditionally compiled
-- State variant determines behavior (e.g., `LoggedOut` vs `LoggedIn`)
-- Constructor and initial state differ between modes
-
-**Example:**
-```rust
-pub struct Shell<'tree, L, IO> {
-    current_user: Option<User<L>>,  // Always present
-    state: CliState,                // Always present
-
-    #[cfg(feature = "authentication")]
-    credential_provider: &'tree dyn CredentialProvider<L>,  // Conditional
-}
-
-pub enum CliState {
-    #[cfg(feature = "authentication")]
-    LoggedOut,  // Only when auth enabled
-    LoggedIn,   // Always available
-}
-
-// Constructor differs by feature
-#[cfg(feature = "authentication")]
-impl Shell {
-    pub fn new(tree, provider, io) -> Self {
-        Self { state: CliState::LoggedOut, current_user: None, ... }
-    }
-}
-
-#[cfg(not(feature = "authentication"))]
-impl Shell {
-    pub fn new(tree, io) -> Self {
-        Self { state: CliState::LoggedIn, current_user: None, ... }
-    }
-}
-```
-
-**Benefits**: Single state machine, minimal branching, behavior determined by state
-
-### Pattern 2: Stub Function Pattern (Completion, History)
-
-**Use when**: Feature is self-contained functionality
-
-**Principle**: Identical function signatures for both modes. Feature-disabled version returns empty/no-op results.
-
-**Key characteristics:**
-- Module always exists, contents conditionally compiled
-- Same function signature in both modes
-- Feature-disabled version returns empty (e.g., `Vec::new()`)
-- No feature-specific fields in main Shell
-- Zero `#[cfg]` in calling code
-
-**Example:**
+**Example** (completion):
 ```rust
 // src/tree/completion.rs
-#![cfg_attr(not(feature = "completion"), allow(unused_variables))]
 
-// Feature-enabled: Full implementation
 #[cfg(feature = "completion")]
 pub fn suggest_completions<'a, L>(node: &'a Node<L>, input: &str)
     -> Result<Vec<&'a str, 32>, CliError>
 {
-    // Real implementation
+    // Search tree, match prefixes, return suggestions
 }
 
-// Feature-disabled: Stub with identical signature
 #[cfg(not(feature = "completion"))]
-pub fn suggest_completions<'a, L>(node: &'a Node<L>, input: &str)
+pub fn suggest_completions<'a, L>(_node: &'a Node<L>, _input: &str)
     -> Result<Vec<&'a str, 32>, CliError>
 {
-    Ok(Vec::new())  // Empty result
+    Ok(Vec::new())  // Empty - no completions available
 }
 
-// src/shell/mod.rs - NO feature gates needed!
-impl Shell {
-    fn handle_tab(&mut self) -> Result<(), CliError> {
-        let suggestions = completion::suggest_completions(node, input)?;
+// Caller in shell/mod.rs needs no #[cfg]:
+let suggestions = completion::suggest_completions(node, input)?;
+if suggestions.is_empty() { /* naturally handles disabled case */ }
+```
 
-        // Behavior adapts naturally
-        if suggestions.len() == 1 {
-            self.complete_input(suggestions[0])?;
-        }
-        Ok(())
-    }
+**Why this works**: Caller adapts naturally to empty results. Compiler eliminates stub bodies entirely.
+
+### Conditional State
+
+**When to use**: Feature fundamentally changes control flow or requires external dependencies.
+
+**Approach**: Keep state-tracking fields unconditional (e.g., `current_user`, `state`). Gate only feature-specific dependencies (e.g., `credential_provider`) and state variants.
+
+**Example** (authentication):
+```rust
+pub struct Shell<'tree, L, IO> {
+    current_user: Option<User<L>>,  // Always present (None when disabled)
+    state: CliState,                // Always present
+
+    #[cfg(feature = "authentication")]
+    credential_provider: &'tree dyn CredentialProvider<L>,  // Only dependency gated
+}
+
+pub enum CliState {
+    Inactive,
+    #[cfg(feature = "authentication")]
+    LoggedOut,  // State variant only exists when needed
+    LoggedIn,
 }
 ```
 
-**Benefits**: Zero `#[cfg]` in main code path, compiler optimizes away stub calls
+**Why this works**: Core state machine remains intact. When auth disabled, `Shell::new()` has different signature (no provider) and `activate()` transitions directly to `LoggedIn`. Compiler eliminates `LoggedOut` branches entirely.
 
-### Feature Overview
-
-| Feature | Pattern | Default | Flash | RAM | Dependencies |
-|---------|---------|---------|-------|-----|--------------|
-| async | Metadata/Execution | disabled | +1.2-1.8KB | 0 | none |
-| authentication | Unified Architecture | disabled | +~2KB | 0 | sha2, subtle |
-| completion | Stub Function | enabled | +~2KB | 0 | none |
-| history | Stub Function | enabled | +~0.5-0.8KB | ~1.3KB | none |
-
-**Build examples:**
-```bash
-# Default (completion + history)
-cargo build
-
-# All features
-cargo build --all-features
-
-# Minimal (no optional features)
-cargo build --no-default-features
-
-# Specific combination
-cargo build --no-default-features --features async,authentication
-```
-
----
-
-## Module Structure
-
-**Organized structure (~15 modules with all features):**
-
-```
-src/
-├── lib.rs              # Public API and feature gates
-├── shell/
-│   ├── mod.rs          # Shell + Request enum + CliState enum
-│   ├── parser.rs       # InputParser (escape sequences, line editing)
-│   ├── history.rs      # CommandHistory (circular buffer)
-│   └── handlers.rs     # CommandHandler trait definition
-├── tree/
-│   ├── mod.rs          # Node enum + Directory + CommandMeta structs
-│   ├── path.rs         # Path type + resolution methods
-│   └── completion.rs   # Tab completion logic (optional, feature-gated)
-├── auth/               # Authentication module (optional, feature-gated)
-│   ├── mod.rs          # User + AccessLevel trait + CredentialProvider trait
-│   ├── password.rs     # Password hashing (SHA-256)
-│   └── providers/      # Credential storage backends
-│       ├── buildtime.rs    # Build-time environment variables
-│       ├── flash.rs        # Flash storage (MCU-specific)
-│       └── const_provider.rs  # Hardcoded (examples/testing only)
-├── response.rs         # Response type + formatting
-└── io.rs               # CharIo trait (see CHAR_IO.md for details)
-```
-
-**Design rationale:**
-- **Request types**: Single enum provides type-safe dispatch via pattern matching
-- **State management**: Inline in shell/mod.rs (small, tightly coupled with Shell)
-- **Command metadata**: `CommandMeta` in tree/mod.rs (metadata-only, const-init)
-- **Command execution**: `CommandHandler` trait in shell/handlers.rs (user-implemented)
-- **Authentication**: Trait-based system in auth/ module (optional, pluggable backends)
-- **Completion**: Free functions in tree/completion.rs (optional, stateless logic)
+**Trade-off**: Requires `#[cfg]` blocks in constructors, activation, and state matching. Accepted because alternative (duplicate state machine implementations) creates maintenance burden.
 
 ---
 
