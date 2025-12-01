@@ -2,8 +2,6 @@
 
 This document explains the `CharIo` trait design that enables nut-shell to work efficiently in both bare-metal and async runtime environments.
 
----
-
 ## Design Problem
 
 The CLI needs to work in two very different environments:
