@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code when working with this repository.
 
-## Project Status
+## Development Approach
 
 **nut-shell** is a **production-ready** embedded CLI library. All core features are complete and fully tested.
 

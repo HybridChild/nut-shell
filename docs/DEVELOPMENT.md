@@ -1,8 +1,6 @@
 # DEVELOPMENT
 
-**Status**: Production-ready library ✅
-
----
+Build workflows, testing strategies, and contribution guidelines.
 
 ## Quick Reference
 
