@@ -89,22 +89,28 @@ for feat in "${FEATURES[@]}"; do
         exit 1
     fi
 
-    # Extract size information using size command
+    # Extract size information using berkeley format
     echo "  Running size analysis..."
-    SIZE_OUTPUT=$(arm-none-eabi-size "$BINARY_PATH" 2>/dev/null || size "$BINARY_PATH" 2>/dev/null || cargo size --release --target $TARGET $FEAT_FLAGS 2>/dev/null) || true
+    SIZE_OUTPUT=$(cargo size --release --target $TARGET $FEAT_FLAGS 2>/dev/null) || true
 
-    # Extract individual sections using cargo size -A format
-    # Parse .text, .rodata, .data, .bss sizes
+    # Extract sections using berkeley format (shows text, data, bss)
+    # Berkeley format output: "   text    data     bss     dec     hex filename"
+    TEXT=$(echo "$SIZE_OUTPUT" | tail -1 | awk '{print $1}')
+    DATA=$(echo "$SIZE_OUTPUT" | tail -1 | awk '{print $2}')
+    BSS=$(echo "$SIZE_OUTPUT" | tail -1 | awk '{print $3}')
+
+    # Get detailed section breakdown using -A format for rodata
     SIZE_DETAIL=$(cargo size --release --target $TARGET $FEAT_FLAGS -- -A 2>/dev/null) || true
-
-    TEXT=$(echo "$SIZE_DETAIL" | grep "^\.text" | awk '{print $2}' || echo "0")
     RODATA=$(echo "$SIZE_DETAIL" | grep "^\.rodata" | awk '{print $2}' || echo "0")
-    DATA=$(echo "$SIZE_DETAIL" | grep "^\.data" | awk '{print $2}' || echo "0")
-    BSS=$(echo "$SIZE_DETAIL" | grep "^\.bss" | awk '{print $2}' || echo "0")
-    VECTOR=$(echo "$SIZE_DETAIL" | grep "^\.vector_table" | awk '{print $2}' || echo "0")
 
-    # Calculate total flash (text + rodata + data + vector_table)
-    TOTAL_FLASH=$((TEXT + RODATA + DATA + VECTOR))
+    # If rodata not found separately, it's included in text
+    if [ "$RODATA" = "0" ] || [ -z "$RODATA" ]; then
+        RODATA="(included in .text)"
+        TOTAL_FLASH=$TEXT
+    else
+        # Calculate total flash (text already includes rodata in berkeley format, so just use text + data)
+        TOTAL_FLASH=$((TEXT + DATA))
+    fi
 
     # Store for summary table
     SUMMARY_ROWS+=("| $FEAT_NAME | ${TEXT}B | ${RODATA}B | ${DATA}B | ${BSS}B | ${TOTAL_FLASH}B |")
@@ -121,7 +127,16 @@ for feat in "${FEATURES[@]}"; do
 \`\`\`
 EOF
 
-    # Use cargo size for consistent output showing actual sections
+    # Use cargo size with berkeley format for memory sections
+    cargo size --release --target $TARGET $FEAT_FLAGS >> "$REPORT" 2>&1 || true
+
+    cat >> "$REPORT" <<EOF
+
+
+Detailed sections:
+EOF
+
+    # Also show detailed section breakdown
     cargo size --release --target $TARGET $FEAT_FLAGS -- -A >> "$REPORT" 2>&1 || true
 
     cat >> "$REPORT" <<EOF
