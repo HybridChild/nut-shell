@@ -95,7 +95,7 @@ impl<L: AccessLevel> User<L> {
     }
 }
 
-/// Credential provider trait (requires authentication feature).
+/// Credential provider trait.
 ///
 /// Implementations provide user lookup and password verification.
 /// See SECURITY.md for security requirements.
@@ -115,7 +115,7 @@ pub trait CredentialProvider<L: AccessLevel> {
     fn verify_password(&self, user: &User<L>, password: &str) -> bool;
 }
 
-/// Password hasher trait (requires authentication feature).
+/// Password hasher trait.
 ///
 /// Provides password hashing and verification with salt.
 /// Must use constant-time comparison for verification.
