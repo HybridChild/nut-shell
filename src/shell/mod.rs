@@ -887,7 +887,7 @@ where
                     #[cfg(feature = "async")]
                     CommandKind::Async => {
                         // Async tree command called from sync context
-                        Err(CliError::AsyncNotSupported)
+                        Err(CliError::AsyncInSyncContext)
                     }
                 }
             }
