@@ -124,10 +124,6 @@ impl nut_shell::auth::CredentialProvider<Level> for MinCredentials {
     fn verify_password(&self, _user: &nut_shell::auth::User<Level>, _password: &str) -> bool {
         false
     }
-
-    fn list_users(&self) -> Result<heapless::Vec<&str, 32>, Self::Error> {
-        Ok(heapless::Vec::new())
-    }
 }
 
 // Entry point

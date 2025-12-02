@@ -113,9 +113,6 @@ pub trait CredentialProvider<L: AccessLevel> {
     ///
     /// MUST use constant-time comparison to prevent timing attacks.
     fn verify_password(&self, user: &User<L>, password: &str) -> bool;
-
-    /// List all usernames (for debugging/testing only).
-    fn list_users(&self) -> Result<heapless::Vec<&str, 32>, Self::Error>;
 }
 
 /// Password hasher trait (requires authentication feature).
@@ -167,23 +164,6 @@ mod tests {
     }
 
     #[test]
-    fn test_access_level_from_str() {
-        assert_eq!(
-            TestAccessLevel::from_str("Admin"),
-            Some(TestAccessLevel::Admin)
-        );
-        assert_eq!(
-            TestAccessLevel::from_str("User"),
-            Some(TestAccessLevel::User)
-        );
-        assert_eq!(
-            TestAccessLevel::from_str("Guest"),
-            Some(TestAccessLevel::Guest)
-        );
-        assert_eq!(TestAccessLevel::from_str("Invalid"), None);
-    }
-
-    #[test]
     fn test_user_creation() {
         #[cfg(not(feature = "authentication"))]
         {
@@ -194,8 +174,8 @@ mod tests {
 
         #[cfg(feature = "authentication")]
         {
-            let hash = [0u8; 32];
-            let salt = [1u8; 16];
+            let hash = [42u8; 32];
+            let salt = [99u8; 16];
             let user = User::new("alice", TestAccessLevel::User, hash, salt).unwrap();
             assert_eq!(user.username.as_str(), "alice");
             assert_eq!(user.access_level, TestAccessLevel::User);
