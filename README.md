@@ -20,16 +20,16 @@ A lightweight command shell library for `no_std` Rust environments with optional
 ## Key Features
 
 ### Core Functionality (Always Present)
-- ✅ **Path-based navigation** - Unix-style hierarchical commands (`system/status`, `network/status`)
+- ✅ **Path-based navigation** - Unix-style hierarchical commands (`system/info`, `network/status`)
 - ✅ **Command execution** - Synchronous command support with structured argument parsing
 - ✅ **Input parsing** - Terminal I/O with line editing (backspace, double-ESC clear)
 - ✅ **Global commands** - `ls`, `?`, `clear`
 
 ### Optional Features
-- **Async commands** (`async` feature) - Supports async/await (Embassy compatible). Zero overhead when disabled. *(Default: disabled)*
-- **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement *(Default: disabled)*
-- **Tab completion** (`completion` feature) - Command and path prefix matching *(Default: enabled)*
-- **Command history** (`history` feature) - Arrow key navigation with configurable buffer *(Default: enabled)*
+- **Async commands** - Supports async/await (Embassy compatible). Zero overhead when disabled. *(Default: disabled)*
+- **Authentication** - SHA-256 password hashing, login flow, session management, and access control enforcement *(Default: disabled)*
+- **Tab completion** - Command and path prefix matching *(Default: enabled)*
+- **Command history** - Arrow key navigation with configurable buffer *(Default: enabled)*
 
 ### What We Explicitly Exclude
 - ❌ Shell scripting (piping, variables, conditionals, command substitution)

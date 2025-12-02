@@ -74,98 +74,38 @@ impl<C: ShellConfig> Response<C> {
         response
     }
 
-    /// Builder method to exclude response from history.
-    ///
-    /// Chainable method for excluding input from command history.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// Response::success("Logged in").without_history()
-    /// ```
+    /// Builder method to exclude command from history (chainable).
     #[cfg(feature = "history")]
     pub fn without_history(mut self) -> Self {
         self.exclude_from_history = true;
         self
     }
 
-    /// Builder method to make message appear inline (on same line as command).
-    ///
-    /// Suppresses the newline after command input, causing the response
-    /// to appear on the same line as the user's input.
-    ///
-    /// Useful for progress indicators, inline status updates, etc.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// Response::success("... processing").inline()
-    /// // User types: "process"
-    /// // Normal output:  "process\r\n... processing\r\n"
-    /// // Inline output:  "process... processing\r\n"
-    /// ```
+    /// Builder method for inline response (appears on same line as command).
     pub fn inline(mut self) -> Self {
         self.inline_message = true;
         self
     }
 
-    /// Builder method to add a blank line before the message.
-    ///
-    /// Adds visual spacing before the response output.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// Response::success("Important message").with_prefix_newline()
-    /// ```
+    /// Builder method to add blank line before response.
     pub fn with_prefix_newline(mut self) -> Self {
         self.prefix_newline = true;
         self
     }
 
-    /// Builder method to indent all lines of the message.
-    ///
-    /// Each line will be prefixed with 2 spaces. Useful for structured
-    /// output, nested information, or visual hierarchy.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// Response::success("Line 1\r\nLine 2").indented()
-    /// // Output:
-    /// //   Line 1
-    /// //   Line 2
-    /// ```
+    /// Builder method to indent response (2 spaces per line).
     pub fn indented(mut self) -> Self {
         self.indent_message = true;
         self
     }
 
-    /// Builder method to suppress the newline after the message.
-    ///
-    /// By default, responses add a newline after the message.
-    /// Use this to suppress it for continuous output or progress bars.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// Response::success("Loading...").without_postfix_newline()
-    /// ```
+    /// Builder method to suppress newline after response.
     pub fn without_postfix_newline(mut self) -> Self {
         self.postfix_newline = false;
         self
     }
 
-    /// Builder method to suppress the prompt after the response.
-    ///
-    /// By default, responses show the prompt after output.
-    /// Use this for multi-step operations or when chaining commands.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// Response::success("Step 1 complete").without_prompt()
-    /// ```
+    /// Builder method to suppress prompt after response.
     pub fn without_prompt(mut self) -> Self {
         self.show_prompt = false;
         self

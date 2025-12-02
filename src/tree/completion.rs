@@ -14,14 +14,7 @@ use crate::tree::Directory;
 #[cfg(feature = "completion")]
 use crate::tree::Node;
 
-/// Completion result containing the completed text and whether more matches exist.
-///
-/// # Fields
-///
-/// - `completion`: The completion text to insert (may be partial if multiple matches)
-/// - `is_complete`: True if this is a complete match (single result)
-/// - `is_directory`: True if the match is a directory (should append `/`)
-/// - `all_matches`: All matching names (for displaying to user)
+/// Completion result containing the completed text and match information.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompletionResult<const MAX_MATCHES: usize> {
     /// The completion text (common prefix if multiple matches)

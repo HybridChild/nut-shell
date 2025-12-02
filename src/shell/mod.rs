@@ -293,12 +293,7 @@ where
     /// Deactivate the shell (transition to Inactive state).
     ///
     /// Clears user session, input buffer, and returns to root directory.
-    /// The shell will ignore all input until `activate()` is called again.
-    ///
-    /// This is useful for:
-    /// - Clean shutdown sequences
-    /// - Temporarily suspending the shell
-    /// - Resetting to initial state
+    /// Shell ignores all input until `activate()` is called again.
     pub fn deactivate(&mut self) {
         self.state = CliState::Inactive;
         self.current_user = None;
@@ -362,20 +357,8 @@ where
 
     /// Process a single character of input - async version.
     ///
-    /// Main entry point for character-by-character processing in async contexts.
-    /// This version can execute both synchronous and asynchronous commands.
-    ///
-    /// Returns Ok(()) on success, Err on I/O error.
-    ///
-    /// # Usage
-    ///
-    /// ```rust,ignore
-    /// loop {
-    ///     if let Some(c) = io.get_char()? {
-    ///         shell.process_char_async(c).await?;
-    ///     }
-    /// }
-    /// ```
+    /// Async entry point for character-by-character processing.
+    /// Can execute both sync and async commands.
     #[cfg(feature = "async")]
     pub async fn process_char_async(&mut self, c: char) -> Result<(), IO::Error> {
         // Decode character into logical event
@@ -429,35 +412,8 @@ where
 
     /// Poll for incoming characters and process them.
     ///
-    /// This is a **convenience method** for simple polling loops where the Shell actively
-    /// reads from its I/O. For more control or better embedded patterns, use
-    /// [`process_char()`](Self::process_char) directly.
-    ///
-    /// # When to Use
-    ///
-    /// Use `poll()` for:
-    /// - Simple blocking UART in bare-metal systems
-    /// - Quick prototypes and examples
-    /// - Native applications with blocking stdio
-    ///
-    /// # When NOT to Use
-    ///
-    /// **Do not use `poll()` if you need:**
-    /// - **Interrupt-driven UART**: Read characters in an interrupt handler and buffer them,
-    ///   then call `process_char()` from your main loop
-    /// - **DMA-based I/O**: Use DMA circular buffers and call `process_char()` for each
-    ///   character from the buffer
-    /// - **Async/await patterns**: Use `process_char()` from within your async context
-    /// - **RTOS integration**: Read from RTOS queues and call `process_char()`
-    /// - **Low power modes**: Waking from sleep to read requires interrupt-based approach
-    ///
-    /// In these cases, your application should control **when** and **how** characters
-    /// are read, then feed them to the Shell via `process_char()`.
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(())` if no character available or character processed successfully
-    /// - `Err` on I/O error
+    /// Convenience method for simple polling loops. For interrupt-driven UART,
+    /// DMA, async, or RTOS integration, use `process_char()` directly instead.
     pub fn poll(&mut self) -> Result<(), IO::Error> {
         if let Some(c) = self.io.get_char()? {
             self.process_char(c)?;
@@ -467,22 +423,7 @@ where
 
     /// Determine what character to echo based on password masking rules.
     ///
-    /// When in LoggedOut state (login prompt), characters after the `:` delimiter
-    /// are masked with `*` for password privacy.
-    ///
-    /// # Masking Rules
-    ///
-    /// - Characters before first `:` are echoed normally (username)
-    /// - The first `:` character is echoed normally (delimiter)
-    /// - All characters after `:` are echoed as `*` (password)
-    ///
-    /// # Arguments
-    ///
-    /// * `ch` - The character that was just added to the input buffer
-    ///
-    /// # Returns
-    ///
-    /// The character to echo to the terminal (`*` for masked, or original char)
+    /// During login, masks characters after `:` delimiter with `*` for password privacy.
     fn get_echo_char(&self, ch: char) -> char {
         #[cfg(feature = "authentication")]
         {
@@ -538,16 +479,10 @@ where
         self.io.write_str(prompt.as_str())
     }
 
-    /// Write formatted response to I/O, applying all Response formatting flags.
+    /// Write formatted response to I/O, applying Response formatting flags.
     ///
-    /// This is the key method that makes Response flags functional.
-    /// It interprets and applies:
-    /// - `prefix_newline`: Adds blank line before message
-    /// - `indent_message`: Indents all lines with 2 spaces
-    /// - `postfix_newline`: Adds newline after message
-    ///
-    /// Note: `inline_message` is handled by the caller (handle_input_line at line 655-658)
-    /// and `show_prompt` is handled by the caller (handle_input_line at line 670-672).
+    /// Applies `prefix_newline`, `indent_message`, and `postfix_newline` flags.
+    /// Note: `inline_message` and `show_prompt` are handled by callers.
     fn write_formatted_response(&mut self, response: &Response<C>) -> Result<(), IO::Error> {
         // Prefix newline (blank line before output)
         if response.prefix_newline {

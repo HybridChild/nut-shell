@@ -55,30 +55,7 @@ pub enum InputEvent {
 /// for multi-character escape sequences (arrow keys, etc.) and supports
 /// double-ESC clear functionality.
 ///
-/// This is a pure state machine - it doesn't manage buffers or perform I/O.
-/// The Shell is responsible for buffer management and echoing based on events.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use nut_shell::shell::decoder::{InputDecoder, InputEvent};
-///
-/// let mut decoder = InputDecoder::new();
-///
-/// // Process regular character
-/// let event = decoder.decode_char('a');
-/// assert_eq!(event, InputEvent::Char('a'));
-///
-/// // Process backspace
-/// let event = decoder.decode_char('\x7f');
-/// assert_eq!(event, InputEvent::Backspace);
-///
-/// // Process up arrow (ESC [ A)
-/// decoder.decode_char('\x1b');  // ESC
-/// decoder.decode_char('[');      // [
-/// let event = decoder.decode_char('A');
-/// assert_eq!(event, InputEvent::UpArrow);
-/// ```
+/// Pure state machine - doesn't manage buffers or perform I/O.
 #[derive(Debug)]
 pub struct InputDecoder {
     /// Current decoder state
