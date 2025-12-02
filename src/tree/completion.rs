@@ -88,7 +88,6 @@ impl<const MAX_MATCHES: usize> CompletionResult<MAX_MATCHES> {
 /// assert_eq!(result.all_matches.len(), 2);  // "status", "system"
 /// ```
 #[cfg(feature = "completion")]
-#[allow(clippy::result_large_err)]
 pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
     dir: &Directory<L>,
     input: &str,

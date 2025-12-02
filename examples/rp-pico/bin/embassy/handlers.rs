@@ -103,7 +103,7 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
                 })?;
 
                 if seconds > 60 {
-                    let mut msg = heapless::String::<256>::new();
+                    let mut msg = heapless::String::<128>::new();
                     write!(msg, "Maximum delay is 60 seconds").ok();
                     return Err(CliError::CommandFailed(msg));
                 }
