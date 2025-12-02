@@ -61,7 +61,6 @@ pub struct User<L: AccessLevel> {
 impl<L: AccessLevel> User<L> {
     /// Create a new user without authentication (auth feature disabled).
     #[cfg(not(feature = "authentication"))]
-    #[allow(clippy::result_large_err)]
     pub fn new(username: &str, access_level: L) -> Result<Self, crate::error::CliError> {
         let mut user_str = heapless::String::new();
         user_str
@@ -76,7 +75,6 @@ impl<L: AccessLevel> User<L> {
 
     /// Create a new user with authentication (auth feature enabled).
     #[cfg(feature = "authentication")]
-    #[allow(clippy::result_large_err)]
     pub fn new(
         username: &str,
         access_level: L,

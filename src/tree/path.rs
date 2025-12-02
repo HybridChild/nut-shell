@@ -77,7 +77,6 @@ impl<'a, const MAX_DEPTH: usize> Path<'a, MAX_DEPTH> {
     /// let path = Path::<4>::parse("../network")?;  // MinimalConfig depth
     /// assert!(!path.is_absolute());
     /// ```
-    #[allow(clippy::result_large_err)]
     pub fn parse(input: &'a str) -> Result<Self, CliError> {
         // Handle empty path
         if input.is_empty() {

@@ -11,7 +11,6 @@ use core::fmt;
 /// Error messages are designed to be user-friendly while maintaining security
 /// (e.g., `InvalidPath` for both non-existent and inaccessible paths).
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(clippy::result_large_err)]
 pub enum CliError {
     /// Command not found in tree
     CommandNotFound,
@@ -64,12 +63,10 @@ pub enum CliError {
     Timeout,
 
     /// Command executed but reported failure
-    // TODO: Use C::MAX_RESPONSE when const generics stabilize
-    CommandFailed(heapless::String<256>),
+    CommandFailed(heapless::String<128>),
 
     /// Generic error with message
-    // TODO: Use C::MAX_RESPONSE when const generics stabilize
-    Other(heapless::String<256>),
+    Other(heapless::String<128>),
 }
 
 impl fmt::Display for CliError {

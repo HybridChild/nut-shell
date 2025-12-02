@@ -62,7 +62,7 @@ impl CommandHandler<DefaultConfig> for ExampleHandlers {
         _args: &[&str],
     ) -> Result<Response<DefaultConfig>, CliError> {
         // This example doesn't use async commands
-        let mut msg = heapless::String::<256>::new();
+        let mut msg = heapless::String::<128>::new();
         write!(msg, "Async command '{}' not supported in this example", id).ok();
         Err(CliError::Other(msg))
     }

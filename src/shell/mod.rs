@@ -527,7 +527,6 @@ where
     }
 
     /// Get current directory node.
-    #[allow(clippy::result_large_err)]
     fn get_current_dir(&self) -> Result<&'tree Directory<L>, CliError> {
         let mut current: &Directory<L> = self.tree;
 
@@ -543,7 +542,6 @@ where
 
     /// Get current path as string (for prompt).
     // TODO: Use C::MAX_INPUT when const generics stabilize
-    #[allow(clippy::result_large_err)]
     fn get_current_path_string(&self) -> Result<heapless::String<128>, CliError> {
         let mut path_str = heapless::String::new();
         let mut current: &Directory<L> = self.tree;
@@ -833,7 +831,6 @@ where
     ///
     /// Note: "command" here refers specifically to Node::Command,
     /// not generic user input.
-    #[allow(clippy::result_large_err)]
     fn execute_tree_path(&mut self, input: &str) -> Result<Response<C>, CliError> {
         // Parse path and arguments
         // TODO: Use C::MAX_ARGS + 1 when const generics stabilize (command + args)
@@ -970,7 +967,6 @@ where
     /// Returns (node, path_stack) where path_stack is the navigation path.
     /// Node is None when path resolves to root directory.
     // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
-    #[allow(clippy::result_large_err)]
     fn resolve_path(
         &self,
         path_str: &str,
@@ -1057,7 +1053,6 @@ where
 
     /// Get directory at specific path.
     // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
-    #[allow(clippy::result_large_err)]
     fn get_dir_at_path(
         &self,
         path: &heapless::Vec<usize, 8>,
@@ -1076,7 +1071,6 @@ where
 
     /// Get node at specific path.
     // TODO: Use C::MAX_PATH_DEPTH when const generics stabilize
-    #[allow(clippy::result_large_err)]
     fn get_node_at_path(&self, path: &heapless::Vec<usize, 8>) -> Result<&'tree Node<L>, CliError> {
         if path.is_empty() {
             // Root directory - need to find a way to return it as a Node
@@ -1284,7 +1278,6 @@ where
     /// Allows tests to manually set authentication state.
     #[doc(hidden)]
     #[cfg(feature = "authentication")]
-    #[allow(clippy::result_large_err)]
     pub fn __test_set_authenticated_user(&mut self, user: Option<User<L>>) -> Result<(), CliError> {
         let is_some = user.is_some();
         self.current_user = user;
