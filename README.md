@@ -145,7 +145,7 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 ## Interactive Session with authentication feature disabled
 
 ```console
-Welcome to nut-shell!
+Welcome to nut-shell! Type '?' for help.
 @/> ?
   ?        - List global commands
   ls       - List directory contents
@@ -227,18 +227,20 @@ Optional `authentication` feature provides:
 ### Interactive session with authentication feature enabled
 
 ```console
-Welcome to nut-shell!
+Welcome to nut-shell! Type '?' for help.
 Login> admin:********
-  Logged in. Type '?' for help.
+  Logged in.
 admin@/> ls
   system/  - Directory
   echo  - Echo arguments back
-admin@/> echo hello world!
-hello world!
+admin@/> system/version
+Firmware version 3.4.5
 admin@/> logout
   Logged out.
+Login> admin:******
+  Login failed. Try again.
 Login> user:*******
-  Logged in. Type '?' for help.
+  Logged in.
 user@/> ls
   echo  - Echo arguments back
 user@/>

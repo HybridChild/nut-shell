@@ -297,7 +297,7 @@ impl CredentialProvider<MyAccessLevel> for FlashCredentialProvider {
 When authentication is enabled, users must log in before accessing commands:
 
 1. **Activation** - Call `activate()` to transition from `Inactive` to `LoggedOut` state
-2. **Login prompt** - Shell displays `login: ` prompt
+2. **Login prompt** - Shell displays `Login> ` prompt
 3. **Input format** - User enters `username:password` (colon-separated)
 4. **User lookup** - Shell calls `CredentialProvider::find_user(username)`
 5. **Password verification** - If user found, `verify_password()` checks credentials using constant-time comparison
