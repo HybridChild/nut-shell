@@ -53,14 +53,6 @@ impl<L: AccessLevel, H: PasswordHasher, const N: usize> CredentialProvider<L>
         self.hasher
             .verify(password, &user.salt, &user.password_hash)
     }
-
-    fn list_users(&self) -> Result<heapless::Vec<&str, 32>, Self::Error> {
-        let mut usernames = heapless::Vec::new();
-        for user in &self.users {
-            usernames.push(user.username.as_str()).map_err(|_| ())?;
-        }
-        Ok(usernames)
-    }
 }
 
 #[cfg(test)]
@@ -154,32 +146,12 @@ mod tests {
     }
 
     #[test]
-    fn test_list_users() {
-        let users = [
-            create_test_user("alice", "pass123", TestAccessLevel::Admin),
-            create_test_user("bob", "pass456", TestAccessLevel::User),
-            create_test_user("charlie", "pass789", TestAccessLevel::Guest),
-        ];
-
-        let provider = ConstCredentialProvider::new(users, Sha256Hasher::new());
-
-        let usernames = provider.list_users().unwrap();
-        assert_eq!(usernames.len(), 3);
-        assert!(usernames.contains(&"alice"));
-        assert!(usernames.contains(&"bob"));
-        assert!(usernames.contains(&"charlie"));
-    }
-
-    #[test]
     fn test_empty_provider() {
         let users: [User<TestAccessLevel>; 0] = [];
         let provider = ConstCredentialProvider::new(users, Sha256Hasher::new());
 
         let result = provider.find_user("anyone").unwrap();
         assert!(result.is_none());
-
-        let usernames = provider.list_users().unwrap();
-        assert_eq!(usernames.len(), 0);
     }
 
     #[test]

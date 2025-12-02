@@ -1493,9 +1493,6 @@ mod tests {
                 ) -> bool {
                     false
                 }
-                fn list_users(&self) -> Result<heapless::Vec<&str, 32>, ()> {
-                    Ok(heapless::Vec::new())
-                }
             }
             let provider = MockProvider;
             let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =

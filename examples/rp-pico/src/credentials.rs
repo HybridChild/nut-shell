@@ -60,12 +60,4 @@ impl nut_shell::auth::CredentialProvider<PicoAccessLevel> for PicoCredentialProv
         self.hasher
             .verify(password, &user.salt, &user.password_hash)
     }
-
-    fn list_users(&self) -> Result<heapless::Vec<&str, 32>, Self::Error> {
-        let mut list = heapless::Vec::new();
-        for user in &self.users {
-            list.push(user.username.as_str()).ok();
-        }
-        Ok(list)
-    }
 }
