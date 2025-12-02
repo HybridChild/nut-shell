@@ -10,12 +10,12 @@
 
 use heapless::{Deque, String as HString, Vec as HVec};
 use nut_shell::CharIo;
-use nut_shell::auth::AccessLevel;
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
 use nut_shell::shell::handlers::CommandHandler;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
+use nut_shell_macros::AccessLevel;
 
 // ============================================================================
 // MockIo - Test I/O Implementation
@@ -131,7 +131,7 @@ impl CharIo for MockIo {
 /// Simple access level for testing.
 ///
 /// Three-level hierarchy: Guest < User < Admin
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, AccessLevel)]
 pub enum MockAccessLevel {
     /// Guest access (lowest)
     Guest = 0,
@@ -141,25 +141,6 @@ pub enum MockAccessLevel {
 
     /// Admin access (highest)
     Admin = 2,
-}
-
-impl AccessLevel for MockAccessLevel {
-    fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "Guest" => Some(Self::Guest),
-            "User" => Some(Self::User),
-            "Admin" => Some(Self::Admin),
-            _ => None,
-        }
-    }
-
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::Guest => "Guest",
-            Self::User => "User",
-            Self::Admin => "Admin",
-        }
-    }
 }
 
 // ============================================================================
@@ -656,6 +637,7 @@ pub fn io_with_commands(cmds: &[&str]) -> MockIo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nut_shell::auth::AccessLevel;
 
     #[test]
     fn test_mock_io_basic() {

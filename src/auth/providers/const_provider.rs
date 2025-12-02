@@ -66,6 +66,7 @@ impl<L: AccessLevel, H: PasswordHasher, const N: usize> CredentialProvider<L>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::AccessLevel;
     use crate::auth::password::Sha256Hasher;
 
     #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]

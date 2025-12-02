@@ -131,6 +131,7 @@ impl<L: AccessLevel> Directory<L> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::AccessLevel;
 
     // Mock access level for testing
     #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
