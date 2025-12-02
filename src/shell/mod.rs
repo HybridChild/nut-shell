@@ -1246,47 +1246,25 @@ where
     }
 
     // ========================================
-    // Test-only accessors
+    // I/O Access
     // ========================================
 
-    /// Get reference to I/O interface (test-only).
+    /// Get reference to I/O interface.
     ///
-    /// Available in both unit tests and integration tests.
-    #[doc(hidden)]
-    pub fn __test_io(&self) -> &IO {
+    /// Provides access to the underlying I/O for inspection or manipulation.
+    /// Commonly used in tests to check output, but also useful for debugging
+    /// or advanced I/O control in embedded systems.
+    pub fn io(&self) -> &IO {
         &self.io
     }
 
-    /// Get mutable reference to I/O interface (test-only).
+    /// Get mutable reference to I/O interface.
     ///
-    /// Available in both unit tests and integration tests.
-    #[doc(hidden)]
-    pub fn __test_io_mut(&mut self) -> &mut IO {
+    /// Provides mutable access to the underlying I/O for manipulation.
+    /// Commonly used in tests to clear output buffers or inject input,
+    /// but also useful for I/O control in embedded systems.
+    pub fn io_mut(&mut self) -> &mut IO {
         &mut self.io
-    }
-
-    /// Get reference to input buffer (test-only).
-    ///
-    /// Available in both unit tests and integration tests.
-    #[doc(hidden)]
-    pub fn __test_get_input_buffer(&self) -> &str {
-        self.input_buffer.as_str()
-    }
-
-    /// Set authenticated user (test-only, requires authentication feature).
-    ///
-    /// Allows tests to manually set authentication state.
-    #[doc(hidden)]
-    #[cfg(feature = "authentication")]
-    pub fn __test_set_authenticated_user(&mut self, user: Option<User<L>>) -> Result<(), CliError> {
-        let is_some = user.is_some();
-        self.current_user = user;
-        if is_some {
-            self.state = CliState::LoggedIn;
-        } else {
-            self.state = CliState::LoggedOut;
-        }
-        Ok(())
     }
 }
 
