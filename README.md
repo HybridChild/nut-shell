@@ -31,7 +31,7 @@ A lightweight command shell library for `no_std` Rust environments with optional
 - **Tab completion** - Command and path prefix matching *(Default: enabled)*
 - **Command history** - Arrow key navigation with configurable buffer *(Default: enabled)*
 
-### What We Explicitly Exclude
+### What This Library Excludes
 - ❌ Shell scripting (piping, variables, conditionals, command substitution)
 - ❌ Command aliases
 - ❌ Job control (background jobs, fg/bg)
