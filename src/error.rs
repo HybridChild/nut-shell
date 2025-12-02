@@ -56,9 +56,9 @@ pub enum CliError {
     /// I/O error occurred
     IoError,
 
-    /// Async command called in sync mode
+    /// Async command called from sync context
     #[cfg(feature = "async")]
-    AsyncNotSupported,
+    AsyncInSyncContext,
 
     /// Operation timed out
     Timeout,
@@ -106,7 +106,7 @@ impl fmt::Display for CliError {
             CliError::NotAuthenticated => write!(f, "Not authenticated"),
             CliError::IoError => write!(f, "I/O error"),
             #[cfg(feature = "async")]
-            CliError::AsyncNotSupported => write!(f, "Async not supported"),
+            CliError::AsyncInSyncContext => write!(f, "Async command requires async context"),
             CliError::Timeout => write!(f, "Timeout"),
             CliError::CommandFailed(msg) => write!(f, "{}", msg),
             CliError::Other(msg) => write!(f, "{}", msg),
