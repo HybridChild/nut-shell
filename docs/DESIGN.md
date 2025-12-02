@@ -41,7 +41,7 @@ pub struct CommandMeta<L: AccessLevel> {
     pub name: &'static str,        // Display name (can duplicate)
     pub description: &'static str,
     pub access_level: L,
-    pub kind: CommandKind,          // Sync or Async marker
+    pub kind: CommandKind,         // Sync or Async marker
     pub min_args: usize,
     pub max_args: usize,
 }
@@ -65,7 +65,7 @@ where
 **Alternatives Rejected:**
 - Function pointers only → can't store async functions (each has unique `impl Future` type)
 - Enum with Async variant → can't const-initialize `impl Future` types
-- Async trait with Pin<Box> → requires heap allocation (unavailable in no_std)
+- Async trait with Pin<Box> → requires heap allocation (unavailable in `no_std`)
 - Two separate libraries → 90%+ code duplication, maintenance burden
 
 **Trade-offs:**
