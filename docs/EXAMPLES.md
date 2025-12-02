@@ -183,7 +183,7 @@ let mut shell: Shell<_, _, _, _, MyConfig> = Shell::new(&ROOT, handlers, io);
 | `completion` | ✅ Enabled | Tab completion for interactive use |
 | `history` | ✅ Enabled | Arrow key command recall |
 | `authentication` | ❌ Disabled | User login and access control |
-| `async` | ❌ Disabled | Async command execution (Embassy, RTIC) |
+| `async` | ❌ Disabled | Async command execution (Embassy, etc.) |
 
 ```toml
 # Default (completion + history)

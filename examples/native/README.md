@@ -9,7 +9,7 @@ Examples demonstrating **nut-shell** CLI framework on native platforms (Linux, m
 
 ### basic
 
-Complete interactive CLI demonstrating all nut-shell features on native platforms.
+Complete interactive CLI demonstrating all **nut-shell** features on native platforms.
 
 **Commands Available:**
 
@@ -107,4 +107,4 @@ Available features: `authentication`, `completion`, `history`, `async`
 
 ## License
 
-Same as parent nut-shell project (MIT OR Apache-2.0).
+Same as parent **nut-shell** project (MIT OR Apache-2.0).

@@ -4,7 +4,6 @@
 
 A lightweight command shell library for `no_std` Rust environments with optional async and authentication support.
 
-[![Status](https://img.shields.io/badge/status-production--ready-brightgreen)](https://github.com/HybridChild/nut-shell)
 [![Platform](https://img.shields.io/badge/platform-no_std-blue)](https://github.com/HybridChild/nut-shell)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)](https://github.com/HybridChild/nut-shell)
 
@@ -12,25 +11,25 @@ A lightweight command shell library for `no_std` Rust environments with optional
 
 ## Overview
 
-**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers, it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support for long-running operations (Embassy, RTIC compatible), authentication, tab completion, and command history.
+**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers, it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support, authentication, tab completion and command history.
 
-**Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat. See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for our feature decision framework.
+**Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat.
 
 ---
 
 ## Key Features
 
 ### Core Functionality (Always Present)
-- **Path-based navigation** - Unix-style hierarchical commands (`system/status`, `network/status`)
-- **Command execution** - Synchronous command support with structured argument parsing
-- **Input parsing** - Terminal I/O with line editing (backspace, double-ESC clear)
-- **Global commands** - `ls`, `?`, `clear`
+- ✅ **Path-based navigation** - Unix-style hierarchical commands (`system/status`, `network/status`)
+- ✅ **Command execution** - Synchronous command support with structured argument parsing
+- ✅ **Input parsing** - Terminal I/O with line editing (backspace, double-ESC clear)
+- ✅ **Global commands** - `ls`, `?`, `clear`
 
 ### Optional Features
-- **Tab completion** (`completion` feature) - Command and path prefix matching (~2KB flash) *(Default: enabled)*
-- **Command history** (`history` feature) - Arrow key navigation with configurable buffer (~0.5-1.3KB RAM) *(Default: enabled)*
-- **Async commands** (`async` feature) - Natural async/await for long-running operations like network requests, flash I/O, and timers. Compatible with Embassy, RTIC, and other async runtimes. Zero overhead when disabled. *(Default: disabled)*
-- **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement (~2KB flash) *(Default: disabled - opt-in)*
+- **Async commands** (`async` feature) - Supports async/await (Embassy compatible). Zero overhead when disabled. *(Default: disabled)*
+- **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement *(Default: disabled)*
+- **Tab completion** (`completion` feature) - Command and path prefix matching *(Default: enabled)*
+- **Command history** (`history` feature) - Arrow key navigation with configurable buffer *(Default: enabled)*
 
 ### What We Explicitly Exclude
 - ❌ Shell scripting (piping, variables, conditionals, command substitution)
@@ -141,8 +140,6 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 }
 ```
 
-**See [docs/EXAMPLES.md](docs/EXAMPLES.md) for complete working examples with full code.**
-
 ---
 
 ## Platform Support
@@ -153,27 +150,36 @@ Built for `no_std` embedded systems:
 
 **Runtime compatibility:**
 - Bare-metal (polling loop)
-- Embassy (async runtime)
-- RTIC and other async runtimes
+- Embassy (async runtime) and other async runtimes
 
-**I/O abstraction:** Platform-agnostic `CharIo` trait for UART, USB-CDC, or custom adapters. See [docs/CHAR_IO.md](docs/CHAR_IO.md) for implementation guide.
+**I/O abstraction:** Platform-agnostic `CharIo` trait for UART, USB-CDC, or custom adapters.
 
 ---
 
 ## Memory Footprint
 
-**Typical footprint** (measured on ARMv6-M with default features):
-- **Flash:** ~4-6KB (core + completion + history)
-- **RAM:** ~1.5KB (128-byte input buffer + 10-entry history)
+Measured on ARMv6-M (Cortex-M0/M0+) with `opt-level = "z"` and LTO enabled:
 
-**Minimal configuration:**
-- **Flash:** ~1.6KB (no optional features)
-- **RAM:** ~0.2KB (no history, minimal buffers)
+| Feature Set | Flash (.text + .rodata) | RAM (.bss) |
+|-------------|------------------------|------------|
+| None (minimal) | ~1.5KB | 0B |
+| All features | ~1.2KB | 0B |
 
-**Your actual size** will be larger due to:
-- Command implementations (simple GPIO ~50 bytes, network ~2-5KB each)
-- Directory tree metadata (names, descriptions)
+**These measurements use zero-size stubs and minimal command tree** to isolate nut-shell's code overhead. Your actual footprint will also include:
+
+**Flash costs:**
+- Command implementations
+- Directory tree metadata (command names, descriptions)
 - `CharIo`/`CredentialProvider`/`CommandHandler` trait implementations
+
+**RAM costs (allocated in Shell instance):**
+- Input buffer: `MAX_INPUT` bytes (default 128B)
+- History buffer: `HISTORY_SIZE × MAX_INPUT` bytes (default 10 × 128 = 1.3KB)
+- Path tracking and internal state: ~100B
+
+**Typical total footprint** (with default config and features):
+- **Flash:** ~4-6KB (nut-shell + basic commands + trait implementations)
+- **RAM:** ~2KB (buffers on stack)
 
 **For detailed analysis:** See [size-analysis/README.md](size-analysis/README.md) for methodology and complete breakdown across all feature combinations.
 
@@ -187,8 +193,6 @@ Optional `authentication` feature provides:
 - Password masking during input
 - Access control enforced at every path segment
 - Pluggable credential providers (build-time, flash storage, custom)
-
-**See [docs/SECURITY.md](docs/SECURITY.md) for security architecture, threat model, and implementation patterns.**
 
 ---
 
@@ -211,7 +215,7 @@ Optional `authentication` feature provides:
 
 Contributions welcome! Review [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for feature criteria and [docs/DESIGN.md](docs/DESIGN.md) for architectural patterns before implementing features.
 
-**Before submitting:** Run `./scripts/ci-local` to verify all CI checks pass. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for build workflows.
+**Before submitting:** Run `./scripts/ci-local` to verify all CI checks pass.
 
 ---
 
@@ -236,6 +240,6 @@ Designed for the Rust embedded ecosystem, with inspiration from:
 - Unix shell navigation and commands
 - Embedded CLI best practices
 - `no_std` Rust patterns
-- Embassy async runtime architecture
+- [Embassy](https://github.com/embassy-rs/embassy) async runtime architecture
 
 **Maintained by:** Esben Dueholm Nørgaard ([HybridChild](https://github.com/HybridChild))

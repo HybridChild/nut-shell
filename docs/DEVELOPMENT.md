@@ -12,14 +12,14 @@ Build workflows, testing strategies, and contribution guidelines.
 cargo fmt                                              # Format code
 cargo clippy --all-features --all-targets -- -D warnings  # Lint
 cargo test --all-features                              # Test all features
-cargo check --target thumbv6m-none-eabi --release     # Verify no_std
+cargo check --target thumbv6m-none-eabi --release      # Verify `no_std`
 
 # Feature testing (test graceful degradation)
 cargo test --all-features
 cargo test --no-default-features
 cargo test --features authentication
 
-# Embedded verification (no_std compliance)
+# Embedded verification (`no_std` compliance)
 cargo check --target thumbv6m-none-eabi
 cargo size --target thumbv6m-none-eabi --release -- -A
 ```

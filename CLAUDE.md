@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Development Approach
 
-**nut-shell** is a **production-ready** embedded CLI library. All core features are complete and fully tested.
+**nut-shell** is an embedded CLI library. All core features are complete and fully tested.
 
 **Maintenance Philosophy:**
 - **Stability over features** - Avoid unnecessary changes to working code
@@ -98,11 +98,11 @@ See EXAMPLES.md for complete patterns and usage.
 
 ## Critical Constraints
 
-### no_std Environment
+### `no_std` Environment
 - **No heap allocation** - Use `heapless::Vec<T, N>`, `heapless::String<N>`
 - **Fixed sizes at compile time** - Specify maximum capacity
 - **Core dependencies only** - Check `default-features = false`
-- **Tests are also no_std** - Test fixtures use `heapless` types to maintain consistency
+- **Tests are also `no_std`** - Test fixtures use `heapless` types to maintain consistency
 
 ### Static Allocation
 - **Everything const-initializable** - Trees, commands, directories must be `const`
@@ -167,7 +167,7 @@ Let `CliState` drive behavior, not feature flags. See DESIGN.md for complete pat
 
 ## Common Pitfalls
 
-### ❌ Using std Types in no_std
+### ❌ Using std Types in `no_std`
 ```rust
 // WRONG
 fn parse(input: String) -> Vec<&str> { }
@@ -216,7 +216,7 @@ type History = CommandHistory<0, 128>;  // Stub
 cargo check                              # Fast check
 cargo test --all-features                # Test all features
 cargo test --no-default-features         # Test minimal
-cargo check --target thumbv6m-none-eabi  # Verify no_std
+cargo check --target thumbv6m-none-eabi  # Verify `no_std`
 cargo fmt && cargo clippy --all-features -- -D warnings  # Lint
 ```
 
@@ -254,7 +254,7 @@ See DEVELOPMENT.md for complete workflows and CI configuration.
 
 ## Contributing Workflow
 
-**Library Status:** Production-ready (maintenance mode)
+**Library Status:** Maintenance mode
 
 **For contributions:**
 1. Review PHILOSOPHY.md for feature criteria (default answer is NO)
@@ -271,4 +271,4 @@ See DEVELOPMENT.md for complete workflows and CI configuration.
 
 ---
 
-**This repository is maintained as a professional, production-ready library. Stability and clarity are priorities.**
+**This repository is maintained as a professional library. Stability and clarity are priorities.**

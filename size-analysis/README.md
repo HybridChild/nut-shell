@@ -1,6 +1,6 @@
 # Memory Footprint Analysis
 
-This directory contains tools for analyzing the memory footprint of the nut-shell library across different feature combinations.
+This directory contains tools for analyzing the memory footprint of the **nut-shell** library across different feature combinations.
 
 ## Quick Start
 
@@ -17,7 +17,7 @@ This will build a minimal reference binary with all feature combinations and gen
 The analysis uses `size-analysis/minimal/` - a bare-bones embedded binary with:
 
 - **Minimal command tree**: One sync command (`status`) and one async command (`info`) to prevent optimizer removal
-- **`MinimalConfig`**: Reduced buffers and message strings to isolate nut-shell overhead
+- **`MinimalConfig`**: Reduced buffers and message strings to isolate **nut-shell** overhead
 - **Minimal generics**: Stub implementations for `CharIo`, `CredentialProvider`, and `CommandHandler`
 - **Real embedded target**: `thumbv6m-none-eabi` (Cortex-M0/M0+)
 - **Size-optimized build**: `opt-level = "z"` with LTO enabled
@@ -61,7 +61,7 @@ The report's **Interpretation Guide** provides complete details on:
 
 ### Key Insights from the Report
 
-- **Baseline overhead**: Check the "none" configuration for minimum nut-shell footprint
+- **Baseline overhead**: Check the "none" configuration for minimum **nut-shell** footprint
 - **Feature costs**: Compare each feature against baseline to see incremental cost
 - **Symbol analysis**: Identify which functions consume the most Flash
 - **Your actual costs**: The report explains how your trait implementations add to these numbers

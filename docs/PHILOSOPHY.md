@@ -49,7 +49,7 @@ Design for resource-constrained microcontrollers, not Linux:
 - **Serial:** 9600-115200 baud (slow connections)
 - **No heap allocation** - Pure stack + static only
 - **Single-threaded** - Deterministic execution
-- **no_std compatible** - No standard library dependencies
+- **`no_std` compatible** - No standard library dependencies
 
 ### 2. Path-Based Philosophy
 
@@ -96,7 +96,7 @@ Users learn through interaction, not documentation:
 2. **Host-side tools handle it better** - Scripting, batch commands, automation
 3. **Application layer concern** - Logging, business logic, application-specific behavior
 4. **Desktop shell behavior** - Feature doesn't translate to embedded constraints
-5. **Requires dynamic allocation** - Breaks no_std compatibility
+5. **Requires dynamic allocation** - Breaks `no_std` compatibility
 6. **Cost exceeds value** - Flash/RAM cost without proportional benefit
 
 ### Key Questions
@@ -106,7 +106,7 @@ Before adding a feature, ask:
 2. Why can't the terminal emulator or host-side script handle this?
 3. What are real embedded systems that need this?
 4. How many bytes will this cost?
-5. Does it work in no_std with static allocation only?
+5. Does it work in `no_std` with static allocation only?
 
 ---
 
