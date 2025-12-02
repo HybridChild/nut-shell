@@ -4,7 +4,6 @@
 
 A lightweight command shell library for `no_std` Rust environments with optional async and authentication support.
 
-[![Status](https://img.shields.io/badge/status-production--ready-brightgreen)](https://github.com/HybridChild/nut-shell)
 [![Platform](https://img.shields.io/badge/platform-no_std-blue)](https://github.com/HybridChild/nut-shell)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)](https://github.com/HybridChild/nut-shell)
 
@@ -14,7 +13,7 @@ A lightweight command shell library for `no_std` Rust environments with optional
 
 **nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers, it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support for long-running operations (Embassy, RTIC compatible), authentication, tab completion, and command history.
 
-**Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat. See [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for our feature decision framework.
+**Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat.
 
 ---
 
@@ -141,8 +140,6 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 }
 ```
 
-**See [docs/EXAMPLES.md](docs/EXAMPLES.md) for complete working examples with full code.**
-
 ---
 
 ## Platform Support
@@ -156,7 +153,7 @@ Built for `no_std` embedded systems:
 - Embassy (async runtime)
 - RTIC and other async runtimes
 
-**I/O abstraction:** Platform-agnostic `CharIo` trait for UART, USB-CDC, or custom adapters. See [docs/CHAR_IO.md](docs/CHAR_IO.md) for implementation guide.
+**I/O abstraction:** Platform-agnostic `CharIo` trait for UART, USB-CDC, or custom adapters.
 
 ---
 
@@ -188,8 +185,6 @@ Optional `authentication` feature provides:
 - Access control enforced at every path segment
 - Pluggable credential providers (build-time, flash storage, custom)
 
-**See [docs/SECURITY.md](docs/SECURITY.md) for security architecture, threat model, and implementation patterns.**
-
 ---
 
 ## Documentation
@@ -211,7 +206,7 @@ Optional `authentication` feature provides:
 
 Contributions welcome! Review [docs/PHILOSOPHY.md](docs/PHILOSOPHY.md) for feature criteria and [docs/DESIGN.md](docs/DESIGN.md) for architectural patterns before implementing features.
 
-**Before submitting:** Run `./scripts/ci-local` to verify all CI checks pass. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for build workflows.
+**Before submitting:** Run `./scripts/ci-local` to verify all CI checks pass.
 
 ---
 

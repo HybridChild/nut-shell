@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Development Approach
 
-**nut-shell** is a **production-ready** embedded CLI library. All core features are complete and fully tested.
+**nut-shell** is an embedded CLI library. All core features are complete and fully tested.
 
 **Maintenance Philosophy:**
 - **Stability over features** - Avoid unnecessary changes to working code
@@ -254,7 +254,7 @@ See DEVELOPMENT.md for complete workflows and CI configuration.
 
 ## Contributing Workflow
 
-**Library Status:** Production-ready (maintenance mode)
+**Library Status:** Maintenance mode
 
 **For contributions:**
 1. Review PHILOSOPHY.md for feature criteria (default answer is NO)
@@ -271,4 +271,4 @@ See DEVELOPMENT.md for complete workflows and CI configuration.
 
 ---
 
-**This repository is maintained as a professional, production-ready library. Stability and clarity are priorities.**
+**This repository is maintained as a professional library. Stability and clarity are priorities.**
