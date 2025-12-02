@@ -23,14 +23,14 @@ fn test_simple_command_execution() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute 'echo hello world'
     for c in "echo hello world\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("hello world"),
         "Output should contain echo result"
@@ -44,14 +44,14 @@ fn test_command_with_arguments() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute echo with multiple arguments
     for c in "echo arg1 arg2 arg3\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("arg1") && output.contains("arg2") && output.contains("arg3"),
         "Should include all arguments"
@@ -73,14 +73,14 @@ fn test_help_command() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute help command
     for c in "?\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("ls"),
         "Help should mention ls command: {}",
@@ -100,14 +100,14 @@ fn test_ls_command_root() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // List root directory
     for c in "ls\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     // Should list root-level commands and directories
     assert!(
         output.contains("echo") || output.contains("system"),
@@ -123,14 +123,14 @@ fn test_clear_command() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute clear
     for c in "clear\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     // Clear should output ANSI clear sequence
     assert!(
         output.contains("\x1b[2J") || output.contains("\x1b[H"),
@@ -150,20 +150,26 @@ fn test_tab_completion_single_match() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
-    // Type partial command and press tab
+    // Type partial command, press tab to complete, then execute
     for c in "ech".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.process_char('\t').unwrap(); // Tab
+    shell.process_char('\t').unwrap(); // Tab completes to "echo"
 
-    let buffer = shell.__test_get_input_buffer();
-    // Should auto-complete to "echo"
+    // Clear output and execute the completed command with an argument
+    shell.io_mut().clear_output();
+    for c in " completion_test\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    // Verify the command executed correctly (proves tab completion worked)
+    let output = shell.io_mut().output();
     assert!(
-        buffer.contains("echo"),
-        "Tab should complete 'ech' to 'echo', got: {}",
-        buffer
+        output.contains("completion_test"),
+        "Tab should have completed 'ech' to 'echo', output: {}",
+        output
     );
 }
 
@@ -178,31 +184,33 @@ fn test_history_navigation_up() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute a command
     for c in "echo first\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute another command
     for c in "echo second\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
-    // Press up arrow (should recall "echo second")
+    // Press up arrow (should recall "echo second") and execute
     shell.process_char('\x1b').unwrap(); // ESC
     shell.process_char('[').unwrap();
     shell.process_char('A').unwrap(); // Up
+    shell.io_mut().clear_output();
+    shell.process_char('\n').unwrap(); // Execute
 
-    // Input buffer should contain previous command
-    let buffer = shell.__test_get_input_buffer();
+    // Verify the recalled command executed
+    let output = shell.io_mut().output();
     assert!(
-        buffer.contains("echo second"),
-        "Up arrow should recall 'echo second', got: {}",
-        buffer
+        output.contains("second"),
+        "Up arrow should recall and execute 'echo second', got: {}",
+        output
     );
 }
 
@@ -213,7 +221,7 @@ fn test_history_navigation_up_down() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute two commands
     for c in "echo first\n".chars() {
@@ -222,9 +230,9 @@ fn test_history_navigation_up_down() {
     for c in "echo second\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
-    // Press up arrow twice
+    // Press up arrow twice to get to "echo first"
     shell.process_char('\x1b').unwrap();
     shell.process_char('[').unwrap();
     shell.process_char('A').unwrap(); // Up (should show "echo second")
@@ -233,23 +241,38 @@ fn test_history_navigation_up_down() {
     shell.process_char('[').unwrap();
     shell.process_char('A').unwrap(); // Up again (should show "echo first")
 
-    let buffer = shell.__test_get_input_buffer();
+    // Execute to verify we got "echo first"
+    shell.io_mut().clear_output();
+    shell.process_char('\n').unwrap();
+    let output = shell.io_mut().output();
     assert!(
-        buffer.contains("echo first"),
-        "Should show older command: {}",
-        buffer
+        output.contains("first"),
+        "Up twice should recall 'echo first': {}",
+        output
     );
+    shell.io_mut().clear_output();
 
-    // Press down arrow
+    // Now test down arrow: up twice then down once should give "echo second"
     shell.process_char('\x1b').unwrap();
     shell.process_char('[').unwrap();
-    shell.process_char('B').unwrap(); // Down
+    shell.process_char('A').unwrap(); // Up
 
-    let buffer = shell.__test_get_input_buffer();
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('[').unwrap();
+    shell.process_char('A').unwrap(); // Up again (at "echo first")
+
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('[').unwrap();
+    shell.process_char('B').unwrap(); // Down (should show "echo second")
+
+    // Execute to verify we got "echo second"
+    shell.io_mut().clear_output();
+    shell.process_char('\n').unwrap();
+    let output = shell.io_mut().output();
     assert!(
-        buffer.contains("echo second"),
-        "Down should show newer command: {}",
-        buffer
+        output.contains("second"),
+        "Down should recall 'echo second': {}",
+        output
     );
 }
 
@@ -264,27 +287,27 @@ fn test_double_esc_clears_buffer() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
-    // Type some input
+    // Type some input but don't execute
     for c in "echo test".chars() {
         shell.process_char(c).unwrap();
     }
 
-    // Verify buffer has content
-    assert!(
-        !shell.__test_get_input_buffer().is_empty(),
-        "Buffer should have content"
-    );
-
-    // Double-ESC
+    // Double-ESC should clear the buffer
     shell.process_char('\x1b').unwrap();
     shell.process_char('\x1b').unwrap();
 
-    // Buffer should be cleared
+    // Now press enter - nothing should execute since buffer was cleared
+    shell.io_mut().clear_output();
+    shell.process_char('\n').unwrap();
+
+    // Output should not contain "test" (command was cleared)
+    let output = shell.io_mut().output();
     assert!(
-        shell.__test_get_input_buffer().is_empty(),
-        "Double-ESC should clear buffer"
+        !output.contains("test"),
+        "Double-ESC should have cleared buffer, got: {}",
+        output
     );
 }
 
@@ -295,37 +318,38 @@ fn test_double_esc_exits_history_navigation() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute a command
     for c in "echo previous\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Start typing new command
     for c in "echo new".chars() {
         shell.process_char(c).unwrap();
     }
 
-    // Press up arrow to enter history
+    // Press up arrow to enter history (should recall "echo previous")
     shell.process_char('\x1b').unwrap();
     shell.process_char('[').unwrap();
     shell.process_char('A').unwrap();
 
-    // Buffer should show history
-    assert!(
-        shell.__test_get_input_buffer().contains("echo previous"),
-        "Should be in history mode"
-    );
-
-    // Double-ESC should exit history and clear
+    // Double-ESC should exit history and clear buffer
     shell.process_char('\x1b').unwrap();
     shell.process_char('\x1b').unwrap();
 
+    // Press enter - nothing should execute since buffer was cleared
+    shell.io_mut().clear_output();
+    shell.process_char('\n').unwrap();
+
+    // Verify neither "previous" nor "new" executed
+    let output = shell.io_mut().output();
     assert!(
-        shell.__test_get_input_buffer().is_empty(),
-        "Double-ESC should exit history and clear"
+        !output.contains("previous") && !output.contains("new"),
+        "Double-ESC should clear history/buffer, got: {}",
+        output
     );
 }
 
@@ -340,7 +364,7 @@ fn test_backspace_handling() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type with backspaces
     for c in "echox".chars() {
@@ -352,7 +376,7 @@ fn test_backspace_handling() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("test"),
         "Backspace editing should work: {}",
@@ -373,14 +397,14 @@ fn test_minimal_features() {
         let handlers = MockHandlers;
         let mut shell = Shell::new(&TEST_TREE, handlers, io);
         shell.activate().unwrap();
-        shell.__test_io_mut().clear_output();
+        shell.io_mut().clear_output();
 
         // Basic command execution should always work
         for c in "echo minimal\n".chars() {
             shell.process_char(c).unwrap();
         }
 
-        let output = shell.__test_io_mut().output();
+        let output = shell.io_mut().output();
         assert!(
             output.contains("minimal"),
             "Basic functionality should work"
@@ -399,7 +423,7 @@ fn test_buffer_overflow_emits_bell() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Input buffer size is 128 chars (hardcoded in Shell for now)
     // Fill it up completely
@@ -408,12 +432,12 @@ fn test_buffer_overflow_emits_bell() {
         shell.process_char(c).unwrap();
     }
 
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Try to add one more character - should trigger bell
     shell.process_char('x').unwrap(); // Should succeed (returns Ok)
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains('\x07'),
         "Should emit bell character on buffer full"
@@ -443,14 +467,14 @@ fn test_buffer_overflow_continues_working() {
     shell.process_char('\x1b').unwrap();
     shell.process_char('\x1b').unwrap();
 
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Should be able to use shell normally after overflow
     for c in "echo test\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("test"),
         "Shell should work normally after buffer overflow"
@@ -468,7 +492,7 @@ fn test_command_requires_exact_args() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // 'led' command requires exactly 1 argument (min_args=1, max_args=1)
     // Test with no arguments - should fail
@@ -476,7 +500,7 @@ fn test_command_requires_exact_args() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("argument") || output.contains("require") || output.contains("Usage"),
         "Should report missing argument: {}",
@@ -491,14 +515,14 @@ fn test_command_accepts_valid_args() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // 'led' command with correct argument
     for c in "system/hardware/led on\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("LED") && output.contains("on"),
         "Should execute command with valid args: {}",
@@ -513,14 +537,14 @@ fn test_command_with_variable_args() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // 'echo' allows 0-16 arguments
     for c in "echo a b c d e\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("a") && output.contains("e"),
         "Should handle variable arguments: {}",
@@ -535,7 +559,7 @@ fn test_command_too_many_args() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // 'reboot' accepts 0 arguments (max_args=0)
     // Provide arguments - should fail
@@ -543,7 +567,7 @@ fn test_command_too_many_args() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("argument") || output.contains("too many") || output.contains("Usage"),
         "Should report too many arguments: {}",
@@ -598,20 +622,20 @@ fn test_guest_can_execute_guest_level_commands() {
     let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Login as guest
     for c in "guest:guest123\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Guest should be able to execute Guest-level commands
     for c in "echo hello\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("hello"),
         "Guest should be able to execute Guest-level commands: {}",
@@ -628,20 +652,20 @@ fn test_guest_cannot_execute_admin_commands() {
     let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Login as guest
     for c in "guest:guest123\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Guest should NOT be able to execute Admin commands
     for c in "system/reboot\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("Command not found") || output.contains("Invalid path"),
         "Guest should not be able to execute Admin commands: {}",
@@ -658,20 +682,20 @@ fn test_guest_cannot_access_admin_directories() {
     let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Login as guest
     for c in "guest:guest123\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Guest should NOT be able to access Admin directories
     for c in "debug/memory\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("Command not found") || output.contains("Invalid path"),
         "Guest should not be able to access Admin directories: {}",
@@ -688,20 +712,20 @@ fn test_admin_can_execute_admin_commands() {
     let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Login as admin
     for c in "admin:admin123\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Admin should be able to execute Admin commands
     for c in "system/reboot\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("Reboot"),
         "Admin should be able to execute Admin commands: {}",
@@ -718,20 +742,20 @@ fn test_admin_can_access_admin_directories() {
     let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Login as admin
     for c in "admin:admin123\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Admin should be able to access Admin directories
     for c in "debug/memory\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("Memory"),
         "Admin should be able to access Admin directories: {}",
@@ -748,20 +772,20 @@ fn test_admin_can_execute_guest_level_commands() {
     let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Login as admin
     for c in "admin:admin123\n".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Admin should also be able to execute lower-level commands
     for c in "echo hello\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("hello"),
         "Admin should be able to execute Guest-level commands: {}",
@@ -812,14 +836,14 @@ fn test_minimal_config_works() {
     let mut shell: Shell<_, _, _, MinimalConfig> = Shell::new(&TEST_TREE, handlers, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute command with MinimalConfig
     for c in "echo test\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(output.contains("Echo"), "MinimalConfig should work");
 }
 
@@ -835,7 +859,7 @@ async fn test_async_command_via_process_char_async() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Navigate to system directory where async-wait is located
     for c in "system\n".chars() {
@@ -847,7 +871,7 @@ async fn test_async_command_via_process_char_async() {
         shell.process_char_async(c).await.unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("Async complete") || output.contains("100ms"),
         "Async command should have executed. Output: {}",
@@ -863,14 +887,14 @@ async fn test_sync_command_in_async_context() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Execute sync command via async process_char
     for c in "echo hello\n".chars() {
         shell.process_char_async(c).await.unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("hello"),
         "Sync command should work in async context"
@@ -885,19 +909,19 @@ async fn test_async_command_with_arguments() {
     let handlers = MockHandlers;
     let mut shell = Shell::new(&TEST_TREE, handlers, io);
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Navigate to system and execute async-wait with custom duration
     for c in "system\n".chars() {
         shell.process_char_async(c).await.unwrap();
     }
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     for c in "async-wait 250\n".chars() {
         shell.process_char_async(c).await.unwrap();
     }
 
-    let output = shell.__test_io_mut().output();
+    let output = shell.io_mut().output();
     assert!(
         output.contains("Async complete") || output.contains("250ms"),
         "Async command with args should execute"

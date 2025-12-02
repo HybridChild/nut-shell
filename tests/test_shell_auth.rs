@@ -46,35 +46,35 @@ fn test_password_masking_basic() {
     shell.activate().unwrap();
 
     // Clear initial output
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type username
     for c in "admin".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io().output();
+    let output = shell.io().output();
     assert!(
         output.contains("admin"),
         "Username should be echoed normally"
     );
     assert!(!output.contains("*"), "No masking before colon");
 
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type colon delimiter
     shell.process_char(':').unwrap();
-    let output = shell.__test_io().output();
+    let output = shell.io().output();
     assert_eq!(output, ":", "Colon should be echoed normally");
 
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type password
     for c in "pass".chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io().output();
+    let output = shell.io().output();
     assert_eq!(output, "****", "Password should be masked with asterisks");
 }
 
@@ -88,7 +88,7 @@ fn test_password_masking_full_sequence() {
     let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type "admin:pass123"
     let input = "admin:pass123";
@@ -96,7 +96,7 @@ fn test_password_masking_full_sequence() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io().output();
+    let output = shell.io().output();
 
     // Should contain "admin:" echoed normally
     assert!(
@@ -127,7 +127,7 @@ fn test_password_with_special_chars() {
     let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type username with @ and password with special characters
     let input = "user@example.com:P@ss!";
@@ -135,7 +135,7 @@ fn test_password_with_special_chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io().output();
+    let output = shell.io().output();
 
     // Username should be visible (including @)
     assert!(
@@ -166,7 +166,7 @@ fn test_password_with_multiple_colons() {
     let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type password with additional colons (as per spec, they're part of password)
     let input = "admin:P:a:s:s";
@@ -174,7 +174,7 @@ fn test_password_with_multiple_colons() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io().output();
+    let output = shell.io().output();
 
     // First part should be visible
     assert!(
@@ -207,7 +207,7 @@ fn test_password_masking_with_backspace() {
     let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type "admin:pass"
     for c in "admin:pass".chars() {
@@ -215,15 +215,15 @@ fn test_password_masking_with_backspace() {
     }
 
     // Verify password is masked (4 asterisks for "pass")
-    let output_before = shell.__test_io().output();
+    let output_before = shell.io().output();
     assert!(output_before.contains("****"), "Password should be masked");
 
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Backspace once (should remove one character)
     shell.process_char('\x7f').unwrap(); // DEL character
 
-    let output_after = shell.__test_io().output();
+    let output_after = shell.io().output();
     // Backspace sequence is "\x08 \x08" (backspace, space, backspace)
     assert!(
         output_after.contains("\x08"),
@@ -241,7 +241,7 @@ fn test_password_masking_empty_username() {
     let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type just colon and password (empty username per spec is invalid, but masking should work)
     let input = ":password";
@@ -249,7 +249,7 @@ fn test_password_masking_empty_username() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io().output();
+    let output = shell.io().output();
 
     // Colon should be visible
     assert!(output.starts_with(":"), "Colon should be visible");
@@ -271,7 +271,7 @@ fn test_password_masking_unicode_chars() {
     let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type password with unicode characters
     let input = "admin:päss";
@@ -279,7 +279,7 @@ fn test_password_masking_unicode_chars() {
         shell.process_char(c).unwrap();
     }
 
-    let output = shell.__test_io().output();
+    let output = shell.io().output();
 
     // Should have 4 asterisks (one per character: p, ä, s, s)
     let asterisk_count = output.matches('*').count();
@@ -305,20 +305,20 @@ fn test_double_esc_clears_masked_input() {
     let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
 
     shell.activate().unwrap();
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Type partial login
     for c in "admin:pass".chars() {
         shell.process_char(c).unwrap();
     }
 
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
 
     // Double ESC to clear
     shell.process_char('\x1b').unwrap(); // First ESC
     shell.process_char('\x1b').unwrap(); // Second ESC
 
-    let output = shell.__test_io().output();
+    let output = shell.io().output();
 
     // Should trigger ClearAndRedraw (sends CR and clear sequence)
     assert!(output.contains("\r"), "Should redraw after double ESC");
@@ -336,50 +336,50 @@ fn test_character_by_character_masking() {
     shell.activate().unwrap();
 
     // Type username
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
     shell.process_char('a').unwrap();
     assert_eq!(
-        shell.__test_io().output(),
+        shell.io().output(),
         "a",
         "First char of username visible"
     );
 
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
     shell.process_char('d').unwrap();
     assert_eq!(
-        shell.__test_io().output(),
+        shell.io().output(),
         "d",
         "Second char of username visible"
     );
 
     // Type colon
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
     shell.process_char(':').unwrap();
-    assert_eq!(shell.__test_io().output(), ":", "Colon visible");
+    assert_eq!(shell.io().output(), ":", "Colon visible");
 
     // Type first password char
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
     shell.process_char('p').unwrap();
     assert_eq!(
-        shell.__test_io().output(),
+        shell.io().output(),
         "*",
         "First password char masked"
     );
 
     // Type second password char
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
     shell.process_char('a').unwrap();
     assert_eq!(
-        shell.__test_io().output(),
+        shell.io().output(),
         "*",
         "Second password char masked"
     );
 
     // Type third password char
-    shell.__test_io_mut().clear_output();
+    shell.io_mut().clear_output();
     shell.process_char('s').unwrap();
     assert_eq!(
-        shell.__test_io().output(),
+        shell.io().output(),
         "*",
         "Third password char masked"
     );
