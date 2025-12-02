@@ -98,26 +98,24 @@ for feat in "${FEATURES[@]}"; do
         exit 1
     fi
 
-    # Extract size information using berkeley format
+    # Extract size information using detailed section breakdown
     echo "  Running size analysis..."
 
-    # Use rust-size from llvm-tools (more reliable than cargo-binutils)
-    if command -v rust-size &> /dev/null; then
-        SIZE_OUTPUT=$(rust-size --format=berkeley "$BINARY_PATH" 2>&1)
-    else
-        # Fall back to cargo size
-        SIZE_OUTPUT=$(cargo size --release --target $TARGET $FEAT_FLAGS 2>&1)
-    fi
+    # Get detailed section breakdown using -A format
+    SIZE_DETAIL=$(cargo size --release --target $TARGET $FEAT_FLAGS -- -A 2>/dev/null) || true
 
-    # Extract sections using berkeley format (shows text, data, bss)
-    # Berkeley format output: "   text    data     bss     dec     hex filename"
-    TEXT=$(echo "$SIZE_OUTPUT" | tail -1 | awk '{print $1}')
-    DATA=$(echo "$SIZE_OUTPUT" | tail -1 | awk '{print $2}')
-    BSS=$(echo "$SIZE_OUTPUT" | tail -1 | awk '{print $3}')
+    # Extract individual sections
+    TEXT=$(echo "$SIZE_DETAIL" | grep "^\.text" | awk '{print $2}' || echo "0")
+    RODATA=$(echo "$SIZE_DETAIL" | grep "^\.rodata" | awk '{print $2}' || echo "0")
+    DATA=$(echo "$SIZE_DETAIL" | grep "^\.data" | awk '{print $2}' || echo "0")
+    BSS=$(echo "$SIZE_DETAIL" | grep "^\.bss" | awk '{print $2}' || echo "0")
 
     # Validate we got numeric values
     if ! [[ "$TEXT" =~ ^[0-9]+$ ]]; then
         TEXT=0
+    fi
+    if ! [[ "$RODATA" =~ ^[0-9]+$ ]]; then
+        RODATA=0
     fi
     if ! [[ "$DATA" =~ ^[0-9]+$ ]]; then
         DATA=0
@@ -127,25 +125,15 @@ for feat in "${FEATURES[@]}"; do
     fi
 
     # Warn if binary has no loadable sections
-    if [ "$TEXT" = "0" ] && [ "$DATA" = "0" ] && [ "$BSS" = "0" ]; then
+    if [ "$TEXT" = "0" ] && [ "$RODATA" = "0" ] && [ "$DATA" = "0" ] && [ "$BSS" = "0" ]; then
         echo "  Warning: Binary has no loadable sections (check .cargo/config.toml and memory.x)"
     fi
 
-    # Get detailed section breakdown using -A format for rodata
-    SIZE_DETAIL=$(cargo size --release --target $TARGET $FEAT_FLAGS -- -A 2>/dev/null) || true
-    RODATA=$(echo "$SIZE_DETAIL" | grep "^\.rodata" | awk '{print $2}' || echo "0")
-
-    # Calculate total flash (in berkeley format, text already includes rodata)
-    # text column = .text + .rodata + .vector_table in most cases
-    TOTAL_FLASH=$TEXT
+    # Calculate total flash: .text + .rodata + .data
+    TOTAL_FLASH=$((TEXT + RODATA + DATA))
 
     # Store for summary table
-    # Note: berkeley format combines .text + .rodata, show rodata separately if available
-    if [ -n "$RODATA" ] && [ "$RODATA" != "0" ]; then
-        SUMMARY_ROWS+=("| $FEAT_NAME | ${TEXT}B | ${RODATA}B | ${DATA}B | ${BSS}B | ${TOTAL_FLASH}B |")
-    else
-        SUMMARY_ROWS+=("| $FEAT_NAME | ${TEXT}B | (incl. in .text) | ${DATA}B | ${BSS}B | ${TOTAL_FLASH}B |")
-    fi
+    SUMMARY_ROWS+=("| $FEAT_NAME | ${TEXT}B | ${RODATA}B | ${DATA}B | ${BSS}B | ${TOTAL_FLASH}B |")
 
     # Detailed analysis section
     cat >> "$REPORT" <<EOF
