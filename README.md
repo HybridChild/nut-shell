@@ -140,6 +140,8 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 }
 ```
 
+**See [docs/EXAMPLES.md](docs/EXAMPLES.md) for further implementation patterns.**
+
 ---
 
 ## Interactive Session with authentication feature disabled
