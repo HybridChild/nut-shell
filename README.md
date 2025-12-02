@@ -142,6 +142,34 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 
 ---
 
+## Interactive Session with authentication feature disabled
+
+```console
+Welcome to nut-shell!
+@/> ?
+  ?        - List global commands
+  ls       - List directory contents
+  clear    - Clear screen
+  ESC ESC  - Clear input buffer
+@/> ls
+  system/  - Directory
+  echo  - Echo arguments back
+@/> echo hello world!
+hello world!
+@/> system/
+@/system> ls
+  status  - Show system status
+  version  - Show version information
+@/system> status
+System Status:
+  CPU Usage: 23%
+  Uptime: 42 hours
+@/system> ..
+@/>
+```
+
+---
+
 ## Platform Support
 
 Built for `no_std` embedded systems:
@@ -153,6 +181,8 @@ Built for `no_std` embedded systems:
 - Embassy (async runtime) and other async runtimes
 
 **I/O abstraction:** Platform-agnostic `CharIo` trait for UART, USB-CDC, or custom adapters.
+
+**See [examples/](examples/)** for complete working implementations on real hardware.
 
 ---
 
@@ -193,6 +223,26 @@ Optional `authentication` feature provides:
 - Password masking during input
 - Access control enforced at every path segment
 - Pluggable credential providers (build-time, flash storage, custom)
+
+### Interactive session with authentication feature enabled
+
+```console
+Welcome to nut-shell!
+Login> admin:********
+  Logged in. Type '?' for help.
+admin@/> ls
+  system/  - Directory
+  echo  - Echo arguments back
+admin@/> echo hello world!
+hello world!
+admin@/> logout
+  Logged out.
+Login> user:*******
+  Logged in. Type '?' for help.
+user@/> ls
+  echo  - Echo arguments back
+user@/>
+```
 
 ---
 
