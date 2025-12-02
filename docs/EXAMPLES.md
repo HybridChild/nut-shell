@@ -1,6 +1,6 @@
 # EXAMPLES
 
-Practical implementation patterns for using nut-shell in your embedded projects.
+Practical implementation patterns for using **nut-shell** in your embedded projects.
 
 ## Table of Contents
 

@@ -20,7 +20,7 @@ cargo install probe-rs --features cli  # or elf2uf2-rs for UF2 bootloader
 
 ### basic
 
-Complete interactive CLI over USB CDC demonstrating nut-shell on embedded hardware.
+Complete interactive CLI over USB CDC demonstrating **nut-shell** on embedded hardware.
 
 **Commands Available:**
 
@@ -143,4 +143,4 @@ These examples have been tested and verified working on physical Raspberry Pi Pi
 
 ## License
 
-Same as parent nut-shell project (MIT OR Apache-2.0).
+Same as parent **nut-shell** project (MIT OR Apache-2.0).

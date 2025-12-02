@@ -165,7 +165,7 @@ Measured on ARMv6-M (Cortex-M0/M0+) with `opt-level = "z"` and LTO enabled:
 | None (minimal) | ~1.5KB | 0B |
 | All features | ~1.2KB | 0B |
 
-**These measurements use zero-size stubs and minimal command tree** to isolate nut-shell's code overhead. Your actual footprint will also include:
+**These measurements use zero-size stubs and minimal command tree** to isolate **nut-shell**'s code overhead. Your actual footprint will also include:
 
 **Flash costs:**
 - Command implementations
