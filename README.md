@@ -11,7 +11,7 @@ A lightweight command shell library for `no_std` Rust environments with optional
 
 ## Overview
 
-**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers, it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support for long-running operations (Embassy, RTIC compatible), authentication, tab completion, and command history.
+**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers, it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support, authentication, tab completion and command history.
 
 **Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat.
 
@@ -28,7 +28,7 @@ A lightweight command shell library for `no_std` Rust environments with optional
 ### Optional Features
 - **Tab completion** (`completion` feature) - Command and path prefix matching (~2KB flash) *(Default: enabled)*
 - **Command history** (`history` feature) - Arrow key navigation with configurable buffer (~0.5-1.3KB RAM) *(Default: enabled)*
-- **Async commands** (`async` feature) - Natural async/await for long-running operations like network requests, flash I/O, and timers. Compatible with Embassy, RTIC, and other async runtimes. Zero overhead when disabled. *(Default: disabled)*
+- **Async commands** (`async` feature) - Natural async/await for long-running operations like network requests, flash I/O, and timers. Compatible with Embassy and other async runtimes. Zero overhead when disabled. *(Default: disabled)*
 - **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement (~2KB flash) *(Default: disabled - opt-in)*
 
 ### What We Explicitly Exclude
@@ -150,8 +150,7 @@ Built for `no_std` embedded systems:
 
 **Runtime compatibility:**
 - Bare-metal (polling loop)
-- Embassy (async runtime)
-- RTIC and other async runtimes
+- Embassy (async runtime) and other async runtimes
 
 **I/O abstraction:** Platform-agnostic `CharIo` trait for UART, USB-CDC, or custom adapters.
 
