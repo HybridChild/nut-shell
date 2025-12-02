@@ -6,7 +6,8 @@ Practical implementation patterns for using nut-shell in your embedded projects.
 
 1. [Complete Platform Examples](#complete-platform-examples)
 2. [Command Patterns](#command-patterns)
-3. [Configuration](#configuration)
+3. [Trait Implementations](#trait-implementations)
+4. [Configuration](#configuration)
 
 ---
 
@@ -130,6 +131,79 @@ impl<'a> CommandHandler<MyConfig> for MyHandlers<'a> {
     }
 }
 ```
+
+---
+
+## Trait Implementations
+
+### `AccessLevel`
+
+Define access hierarchy using the derive macro:
+
+```rust
+use nut_shell_macros::AccessLevel;
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, AccessLevel)]
+pub enum MyAccessLevel {
+    Guest = 0,
+    User = 1,
+    Admin = 2,
+}
+```
+
+The macro generates `from_str` and `as_str` methods for string conversion. Higher numeric values inherit permissions from lower levels due to `PartialOrd`.
+
+**See [SECURITY.md](SECURITY.md#access-control-system) for access control patterns.**
+
+### `CommandHandler`
+
+Maps command IDs to execution functions:
+
+```rust
+struct MyHandlers;
+
+impl CommandHandler<MyConfig> for MyHandlers {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
+        match id {
+            "status" => status_fn::<MyConfig>(args),
+            "info" => info_fn::<MyConfig>(args),
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+
+    #[cfg(feature = "async")]
+    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
+        match id {
+            "fetch" => fetch_fn::<MyConfig>(args).await,
+            _ => Err(CliError::CommandNotFound),
+        }
+    }
+}
+```
+
+**See [Command Patterns](#command-patterns) for complete examples.**
+
+### `CharIo`
+
+Platform I/O abstraction for character input/output:
+
+```rust
+struct MyIo { /* platform-specific fields */ }
+
+impl CharIo for MyIo {
+    type Error = MyError;
+
+    fn get_char(&mut self) -> Result<Option<char>, Self::Error> {
+        // Return Some(char) if available, None if no input ready
+    }
+
+    fn put_char(&mut self, c: char) -> Result<(), Self::Error> {
+        // Write character to output
+    }
+}
+```
+
+**See [CHAR_IO.md](CHAR_IO.md) for platform adapter patterns and buffering strategies.**
 
 ---
 

@@ -15,6 +15,8 @@ This document describes the security architecture for authentication and access 
 5. [Security Requirements](#security-requirements)
 6. [Threat Model & Assumptions](#threat-model--assumptions)
 7. [Deployment Guidance](#deployment-guidance)
+8. [Testing & Validation](#testing--validation)
+9. [See Also](#see-also)
 
 ---
 

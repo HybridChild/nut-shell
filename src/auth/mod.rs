@@ -26,37 +26,7 @@ pub use providers::ConstCredentialProvider;
 /// Access level trait for hierarchical permissions.
 ///
 /// Implement this trait to define your application's access hierarchy.
-/// Types implementing this trait must be `Copy`, `Clone`, `PartialOrd`, and `Ord`.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-/// pub enum MyAccessLevel {
-///     Guest = 0,
-///     User = 1,
-///     Admin = 2,
-/// }
-///
-/// impl AccessLevel for MyAccessLevel {
-///     fn from_str(s: &str) -> Option<Self> {
-///         match s {
-///             "Guest" => Some(Self::Guest),
-///             "User" => Some(Self::User),
-///             "Admin" => Some(Self::Admin),
-///             _ => None,
-///         }
-///     }
-///
-///     fn as_str(&self) -> &'static str {
-///         match self {
-///             Self::Guest => "Guest",
-///             Self::User => "User",
-///             Self::Admin => "Admin",
-///         }
-///     }
-/// }
-/// ```
+/// See EXAMPLES.md for implementation patterns.
 pub trait AccessLevel: Copy + Clone + PartialOrd + Ord + 'static {
     /// Parse access level from string.
     fn from_str(s: &str) -> Option<Self>
@@ -130,7 +100,7 @@ impl<L: AccessLevel> User<L> {
 /// Credential provider trait (requires authentication feature).
 ///
 /// Implementations provide user lookup and password verification.
-/// See [SECURITY.md](../../docs/SECURITY.md) for security requirements.
+/// See SECURITY.md for security requirements.
 #[cfg(feature = "authentication")]
 pub trait CredentialProvider<L: AccessLevel> {
     /// Provider-specific error type
@@ -138,10 +108,7 @@ pub trait CredentialProvider<L: AccessLevel> {
 
     /// Find user by username.
     ///
-    /// Returns:
-    /// - `Ok(Some(user))` if user found
-    /// - `Ok(None)` if user not found
-    /// - `Err(Self::Error)` on provider error
+    /// Returns `Ok(Some(user))` if found, `Ok(None)` if not found.
     fn find_user(&self, username: &str) -> Result<Option<User<L>>, Self::Error>;
 
     /// Verify password for user.
