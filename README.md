@@ -20,16 +20,16 @@ A lightweight command shell library for `no_std` Rust environments with optional
 ## Key Features
 
 ### Core Functionality (Always Present)
-- **Path-based navigation** - Unix-style hierarchical commands (`system/status`, `network/status`)
-- **Command execution** - Synchronous command support with structured argument parsing
-- **Input parsing** - Terminal I/O with line editing (backspace, double-ESC clear)
-- **Global commands** - `ls`, `?`, `clear`
+- ✅ **Path-based navigation** - Unix-style hierarchical commands (`system/status`, `network/status`)
+- ✅ **Command execution** - Synchronous command support with structured argument parsing
+- ✅ **Input parsing** - Terminal I/O with line editing (backspace, double-ESC clear)
+- ✅ **Global commands** - `ls`, `?`, `clear`
 
 ### Optional Features
-- **Tab completion** (`completion` feature) - Command and path prefix matching (~2KB flash) *(Default: enabled)*
-- **Command history** (`history` feature) - Arrow key navigation with configurable buffer (~0.5-1.3KB RAM) *(Default: enabled)*
-- **Async commands** (`async` feature) - Natural async/await for long-running operations like network requests, flash I/O, and timers. Compatible with Embassy and other async runtimes. Zero overhead when disabled. *(Default: disabled)*
-- **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement (~2KB flash) *(Default: disabled - opt-in)*
+- **Async commands** (`async` feature) - Supports async/await (Embassy compatible). Zero overhead when disabled. *(Default: disabled)*
+- **Authentication** (`authentication` feature) - SHA-256 password hashing, login flow, session management, and access control enforcement *(Default: disabled)*
+- **Tab completion** (`completion` feature) - Command and path prefix matching *(Default: enabled)*
+- **Command history** (`history` feature) - Arrow key navigation with configurable buffer *(Default: enabled)*
 
 ### What We Explicitly Exclude
 - ❌ Shell scripting (piping, variables, conditionals, command substitution)
@@ -158,18 +158,28 @@ Built for `no_std` embedded systems:
 
 ## Memory Footprint
 
-**Typical footprint** (measured on ARMv6-M with default features):
-- **Flash:** ~4-6KB (core + completion + history)
-- **RAM:** ~1.5KB (128-byte input buffer + 10-entry history)
+Measured on ARMv6-M (Cortex-M0/M0+) with `opt-level = "z"` and LTO enabled:
 
-**Minimal configuration:**
-- **Flash:** ~1.6KB (no optional features)
-- **RAM:** ~0.2KB (no history, minimal buffers)
+| Feature Set | Flash (.text + .rodata) | RAM (.bss) |
+|-------------|------------------------|------------|
+| None (minimal) | ~1.5KB | 0B |
+| All features | ~1.2KB | 0B |
 
-**Your actual size** will be larger due to:
-- Command implementations (simple GPIO ~50 bytes, network ~2-5KB each)
-- Directory tree metadata (names, descriptions)
+**These measurements use zero-size stubs and minimal command tree** to isolate nut-shell's code overhead. Your actual footprint will also include:
+
+**Flash costs:**
+- Command implementations
+- Directory tree metadata (command names, descriptions)
 - `CharIo`/`CredentialProvider`/`CommandHandler` trait implementations
+
+**RAM costs (allocated in Shell instance):**
+- Input buffer: `MAX_INPUT` bytes (default 128B)
+- History buffer: `HISTORY_SIZE × MAX_INPUT` bytes (default 10 × 128 = 1.3KB)
+- Path tracking and internal state: ~100B
+
+**Typical total footprint** (with default config and features):
+- **Flash:** ~4-6KB (nut-shell + basic commands + trait implementations)
+- **RAM:** ~2KB (buffers on stack)
 
 **For detailed analysis:** See [size-analysis/README.md](size-analysis/README.md) for methodology and complete breakdown across all feature combinations.
 
@@ -230,6 +240,6 @@ Designed for the Rust embedded ecosystem, with inspiration from:
 - Unix shell navigation and commands
 - Embedded CLI best practices
 - `no_std` Rust patterns
-- Embassy async runtime architecture
+- [Embassy](https://github.com/embassy-rs/embassy) async runtime architecture
 
 **Maintained by:** Esben Dueholm Nørgaard ([HybridChild](https://github.com/HybridChild))

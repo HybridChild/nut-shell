@@ -27,11 +27,16 @@ This document records architectural decisions for **nut-shell**. It explains why
 
 **Decision**: Separate command metadata (const in ROM) from execution logic (generic trait)
 
-**Why**: Solves the async command type system problem while maintaining const-initialization:
-- Command metadata (`CommandMeta`) is const-initializable and stored in ROM
-- Execution logic via `CommandHandler` trait can be async without heap allocation
-- Single codebase supports both sync and async commands
-- Zero-cost for sync-only builds via monomorphization
+**Why**: Solves the async command type system problem - function pointers can't store async functions because each async fn has a unique `impl Future` type that can't be const-initialized.
+
+**Benefits:**
+
+| Aspect | Implementation | Result |
+|--------|----------------|--------|
+| **Metadata** | `CommandMeta` const structs in ROM | Zero RAM usage, const-initializable |
+| **Async support** | `CommandHandler` trait with async methods | No heap allocation required |
+| **Codebase** | Single implementation for sync/async | No code duplication |
+| **Performance** | Monomorphization at compile time | Zero-cost abstraction |
 
 **Architecture:**
 ```rust
@@ -63,15 +68,18 @@ where
 ```
 
 **Alternatives Rejected:**
-- Function pointers only → can't store async functions (each has unique `impl Future` type)
-- Enum with Async variant → can't const-initialize `impl Future` types
-- Async trait with Pin<Box> → requires heap allocation (unavailable in `no_std`)
-- Two separate libraries → 90%+ code duplication, maintenance burden
+
+| Approach | Why Rejected |
+|----------|--------------|
+| Function pointers only | Can't store async functions (each has unique `impl Future` type) |
+| Enum with Async variant | Can't const-initialize `impl Future` types |
+| Async trait with `Pin<Box>` | Requires heap allocation (unavailable in `no_std`) |
+| Two separate libraries | 90%+ code duplication, maintenance burden |
 
 **Trade-offs:**
 - ✅ Command name duplication (tree metadata + handler match) → explicit, debuggable
 - ✅ Additional generics `H: CommandHandler<C>` → zero runtime cost via monomorphization
-- ✅ Manual match statements in handlers → future macro can reduce boilerplate
+- ✅ Manual match statements in handlers → explicit dispatch, clear control flow
 
 ### 2. Authentication: Opt-In Security
 
@@ -82,11 +90,11 @@ where
 - Production systems require explicit security choices (not hidden defaults)
 - Multiple credential storage backends needed (build-time, flash, external)
 
-**Implementation**: Uses **conditional fields** technique (see Feature Gating below) - core state fields (`current_user`, `state`) always present; only credential provider is feature-gated.
+**Implementation**: Uses **conditional state** technique (see Feature Gating below). Core state fields (`current_user`, `state`) remain unconditional to preserve state machine integrity. Only the credential provider dependency and the `LoggedOut` state variant are feature-gated. When auth is disabled, `activate()` transitions directly to `LoggedIn`.
 
 **Alternative Rejected**: Separate implementations for auth-enabled/disabled → code duplication, maintenance burden
 
-**See also**: [SECURITY.md](SECURITY.md) for security architecture details
+**See also**: [SECURITY.md](SECURITY.md) for complete security architecture, password hashing, and credential storage patterns
 
 ### 3. Completion/History: Opt-Out UX
 
@@ -114,24 +122,27 @@ where
 
 **Decision**: Non-async trait with explicit buffering contract
 
-**Why**:
-- Works in both bare-metal and async runtimes without trait complexity
-- Bare-metal can flush immediately (blocking acceptable)
-- Async implementations buffer and flush externally
-- No unstable features or async_trait dependencies required
+**Why**: Works in both bare-metal and async runtimes without trait complexity. Bare-metal implementations flush immediately (blocking acceptable), while async implementations buffer and flush externally. No unstable features or `async_trait` dependencies required.
 
 **Architecture**: See [CHAR_IO.md](CHAR_IO.md) for complete buffering model details.
 
 **Alternatives Rejected:**
 
-1. **Async `CharIo` trait** - Requires `async_trait` or unstable features, makes `process_char()` async, no benefit for bare-metal
-2. **Callback-based** - Can't propagate errors, lifetime issues in `no_std`, awkward API
+| Approach | Why Rejected |
+|----------|--------------|
+| Async `CharIo` trait | Requires `async_trait` or unstable features; makes `process_char()` async with no benefit for bare-metal |
+| Callback-based | Can't propagate errors; lifetime issues in `no_std`; awkward API |
 
 ---
 
 ## Feature Gating
 
 Optional features minimize overhead when disabled through conditional compilation. Two techniques used:
+
+| Technique | When to Use | Example Features |
+|-----------|-------------|------------------|
+| **Stub Functions** | Feature adds functionality without affecting core state machine | `completion`, `history` |
+| **Conditional State** | Feature fundamentally changes control flow or requires external dependencies | `authentication` |
 
 ### Stub Functions
 
@@ -162,7 +173,7 @@ let suggestions = completion::suggest_completions(node, input)?;
 if suggestions.is_empty() { /* naturally handles disabled case */ }
 ```
 
-**Why this works**: Caller adapts naturally to empty results. Compiler eliminates stub bodies entirely.
+**Benefits**: Single code path, caller adapts naturally to empty results, compiler eliminates stub bodies entirely.
 
 ### Conditional State
 
@@ -188,9 +199,9 @@ pub enum CliState {
 }
 ```
 
-**Why this works**: Core state machine remains intact. When auth disabled, `Shell::new()` has different signature (no provider) and `activate()` transitions directly to `LoggedIn`. Compiler eliminates `LoggedOut` branches entirely.
+**Benefits**: Core state machine remains intact. When auth disabled, `Shell::new()` has different signature (no provider) and `activate()` transitions directly to `LoggedIn`. Compiler eliminates `LoggedOut` branches entirely.
 
-**Trade-off**: Requires `#[cfg]` blocks in constructors, activation, and state matching. Accepted because alternative (duplicate state machine implementations) creates maintenance burden.
+**Trade-off**: Requires `#[cfg]` blocks in constructors and state matching. Accepted because the alternative (duplicate state machine implementations) creates maintenance burden.
 
 ---
 

@@ -1,6 +1,6 @@
 # `CharIo` Trait Design
 
-This document explains the `CharIo` trait design that enables nut-shell to work efficiently in both bare-metal and async runtime environments.
+This document explains the `CharIo` trait design that enables **nut-shell** to work efficiently in both bare-metal and async runtime environments.
 
 ## Design Problem
 

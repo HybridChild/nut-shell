@@ -22,7 +22,7 @@ cargo install probe-rs-tools  # or use OpenOCD
 
 ### basic
 
-Complete interactive CLI over UART demonstrating nut-shell on STM32 hardware.
+Complete interactive CLI over UART demonstrating **nut-shell** on STM32 hardware.
 
 **Commands Available:**
 
@@ -121,4 +121,4 @@ This example has been verified to build and run successfully on physical NUCLEO-
 
 ## License
 
-Same as parent nut-shell project (MIT OR Apache-2.0).
+Same as parent **nut-shell** project (MIT OR Apache-2.0).
