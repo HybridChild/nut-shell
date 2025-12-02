@@ -96,6 +96,7 @@ pub fn derive_access_level(input: TokenStream) -> TokenStream {
 
     // Generate the impl block
     let expanded = quote! {
+        #[automatically_derived]
         impl ::nut_shell::auth::AccessLevel for #name {
             fn from_str(s: &str) -> Option<Self> {
                 match s {

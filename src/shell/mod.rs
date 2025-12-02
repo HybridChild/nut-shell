@@ -1314,6 +1314,7 @@ mod tests {
     enum MockLevel {
         User = 0,
     }
+
     impl AccessLevel for MockLevel {
         fn from_str(s: &str) -> Option<Self> {
             match s {
@@ -1321,6 +1322,7 @@ mod tests {
                 _ => None,
             }
         }
+
         fn as_str(&self) -> &'static str {
             "User"
         }
