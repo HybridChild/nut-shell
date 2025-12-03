@@ -13,32 +13,40 @@ use crate::tree::Directory;
 use crate::tree::Node;
 
 /// Completion result containing the completed text and match information.
+///
+/// Uses enum to make illegal states unrepresentable - `is_directory` is only
+/// meaningful for single matches.
 #[derive(Debug, Clone, PartialEq)]
-pub struct CompletionResult<const MAX_MATCHES: usize> {
-    /// The completion text (common prefix if multiple matches)
-    // TODO: Use C::MAX_INPUT when const generics stabilize
-    pub completion: heapless::String<128>,
+pub enum CompletionResult<const MAX_MATCHES: usize> {
+    /// No matches found
+    None,
 
-    /// True if exactly one match found
-    pub is_complete: bool,
+    /// Exactly one match found
+    Single {
+        /// The completed name (with "/" appended for directories)
+        // TODO: Use C::MAX_INPUT when const generics stabilize
+        completion: heapless::String<128>,
 
-    /// True if the single match is a directory
-    pub is_directory: bool,
+        /// True if the match is a directory
+        is_directory: bool,
+    },
 
-    /// All matching node names (for display)
-    // TODO: Consider using C::MAX_INPUT or a separate config constant when const generics stabilize
-    pub all_matches: heapless::Vec<heapless::String<64>, MAX_MATCHES>,
+    /// Multiple matches found
+    Multiple {
+        /// Common prefix of all matches
+        // TODO: Use C::MAX_INPUT when const generics stabilize
+        common_prefix: heapless::String<128>,
+
+        /// All matching node names (for display)
+        // TODO: Consider using C::MAX_INPUT or a separate config constant when const generics stabilize
+        all_matches: heapless::Vec<heapless::String<64>, MAX_MATCHES>,
+    },
 }
 
 impl<const MAX_MATCHES: usize> CompletionResult<MAX_MATCHES> {
     /// Create empty completion result.
     pub fn empty() -> Self {
-        Self {
-            completion: heapless::String::new(),
-            is_complete: false,
-            is_directory: false,
-            all_matches: heapless::Vec::new(),
-        }
+        Self::None
     }
 }
 
@@ -65,14 +73,22 @@ impl<const MAX_MATCHES: usize> CompletionResult<MAX_MATCHES> {
 /// ```rust,ignore
 /// // Single match
 /// let result = suggest_completions(&dir, "sta", Some(&user))?;
-/// assert_eq!(result.completion.as_str(), "status");
-/// assert!(result.is_complete);
+/// match result {
+///     CompletionResult::Single { completion, .. } => {
+///         assert_eq!(completion.as_str(), "status");
+///     }
+///     _ => panic!("Expected single match"),
+/// }
 ///
 /// // Multiple matches (common prefix)
 /// let result = suggest_completions(&dir, "s", Some(&user))?;
-/// assert_eq!(result.completion.as_str(), "s");  // Common prefix
-/// assert!(!result.is_complete);
-/// assert_eq!(result.all_matches.len(), 2);  // "status", "system"
+/// match result {
+///     CompletionResult::Multiple { common_prefix, all_matches } => {
+///         assert_eq!(common_prefix.as_str(), "s");
+///         assert_eq!(all_matches.len(), 2);  // "status", "system"
+///     }
+///     _ => panic!("Expected multiple matches"),
+/// }
 /// ```
 #[cfg(feature = "completion")]
 pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
@@ -110,7 +126,7 @@ pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
 
     // No matches
     if matches.is_empty() {
-        return Ok(CompletionResult::empty());
+        return Ok(CompletionResult::None);
     }
 
     // Single match - complete!
@@ -126,27 +142,18 @@ pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
             completion.push('/').map_err(|_| CliError::BufferFull)?;
         }
 
-        let mut all_matches = heapless::Vec::new();
-        let mut match_str = heapless::String::new();
-        match_str.push_str(name).map_err(|_| CliError::BufferFull)?;
-        all_matches
-            .push(match_str)
-            .map_err(|_| CliError::BufferFull)?;
-
-        return Ok(CompletionResult {
+        return Ok(CompletionResult::Single {
             completion,
-            is_complete: true,
             is_directory: is_dir,
-            all_matches,
         });
     }
 
     // Multiple matches - find common prefix
-    let common_prefix = find_common_prefix(&matches);
+    let common_prefix_str = find_common_prefix(&matches);
 
-    let mut completion = heapless::String::new();
-    completion
-        .push_str(common_prefix)
+    let mut common_prefix = heapless::String::new();
+    common_prefix
+        .push_str(common_prefix_str)
         .map_err(|_| CliError::BufferFull)?;
 
     // Collect all match names for display
@@ -160,10 +167,8 @@ pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
             .map_err(|_| CliError::BufferFull)?;
     }
 
-    Ok(CompletionResult {
-        completion,
-        is_complete: false,
-        is_directory: false,
+    Ok(CompletionResult::Multiple {
+        common_prefix,
         all_matches,
     })
 }
@@ -323,11 +328,16 @@ mod tests {
     fn test_single_match_command() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "reb", None).unwrap();
 
-        assert_eq!(result.completion.as_str(), "reboot");
-        assert!(result.is_complete);
-        assert!(!result.is_directory);
-        assert_eq!(result.all_matches.len(), 1);
-        assert_eq!(result.all_matches[0].as_str(), "reboot");
+        match result {
+            CompletionResult::Single {
+                completion,
+                is_directory,
+            } => {
+                assert_eq!(completion.as_str(), "reboot");
+                assert!(!is_directory);
+            }
+            _ => panic!("Expected Single variant"),
+        }
     }
 
     #[test]
@@ -335,10 +345,16 @@ mod tests {
     fn test_single_match_directory() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "syst", None).unwrap();
 
-        assert_eq!(result.completion.as_str(), "system/");
-        assert!(result.is_complete);
-        assert!(result.is_directory);
-        assert_eq!(result.all_matches.len(), 1);
+        match result {
+            CompletionResult::Single {
+                completion,
+                is_directory,
+            } => {
+                assert_eq!(completion.as_str(), "system/");
+                assert!(is_directory);
+            }
+            _ => panic!("Expected Single variant"),
+        }
     }
 
     #[test]
@@ -346,20 +362,26 @@ mod tests {
     fn test_multiple_matches_with_common_prefix() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "st", None).unwrap();
 
-        // Common prefix is "st" for "status", "start", "stop"
-        assert_eq!(result.completion.as_str(), "st");
-        assert!(!result.is_complete);
-        assert!(!result.is_directory);
-        assert_eq!(result.all_matches.len(), 3);
+        match result {
+            CompletionResult::Multiple {
+                common_prefix,
+                all_matches,
+            } => {
+                // Common prefix is "st" for "status", "start", "stop"
+                assert_eq!(common_prefix.as_str(), "st");
+                assert_eq!(all_matches.len(), 3);
 
-        // Check all matches present (verify each is in the result)
-        let match_names: [&str; 3] = ["status", "start", "stop"];
-        for expected in &match_names {
-            assert!(
-                result.all_matches.iter().any(|m| m.as_str() == *expected),
-                "Expected to find '{}' in matches",
-                expected
-            );
+                // Check all matches present (verify each is in the result)
+                let match_names: [&str; 3] = ["status", "start", "stop"];
+                for expected in &match_names {
+                    assert!(
+                        all_matches.iter().any(|m| m.as_str() == *expected),
+                        "Expected to find '{}' in matches",
+                        expected
+                    );
+                }
+            }
+            _ => panic!("Expected Multiple variant"),
         }
     }
 
@@ -368,10 +390,17 @@ mod tests {
     fn test_multiple_matches_directories() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "s", None).unwrap();
 
-        // Should match: status, start, stop, system, services
-        assert_eq!(result.completion.as_str(), "s");
-        assert!(!result.is_complete);
-        assert_eq!(result.all_matches.len(), 5);
+        match result {
+            CompletionResult::Multiple {
+                common_prefix,
+                all_matches,
+            } => {
+                // Should match: status, start, stop, system, services
+                assert_eq!(common_prefix.as_str(), "s");
+                assert_eq!(all_matches.len(), 5);
+            }
+            _ => panic!("Expected Multiple variant"),
+        }
     }
 
     #[test]
@@ -379,10 +408,12 @@ mod tests {
     fn test_no_matches() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "xyz", None).unwrap();
 
-        assert_eq!(result.completion.as_str(), "");
-        assert!(!result.is_complete);
-        assert!(!result.is_directory);
-        assert_eq!(result.all_matches.len(), 0);
+        match result {
+            CompletionResult::None => {
+                // Expected - no matches
+            }
+            _ => panic!("Expected None variant"),
+        }
     }
 
     #[test]
@@ -390,10 +421,16 @@ mod tests {
     fn test_exact_match_command() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "status", None).unwrap();
 
-        assert_eq!(result.completion.as_str(), "status");
-        assert!(result.is_complete);
-        assert!(!result.is_directory);
-        assert_eq!(result.all_matches.len(), 1);
+        match result {
+            CompletionResult::Single {
+                completion,
+                is_directory,
+            } => {
+                assert_eq!(completion.as_str(), "status");
+                assert!(!is_directory);
+            }
+            _ => panic!("Expected Single variant"),
+        }
     }
 
     #[test]
@@ -401,10 +438,16 @@ mod tests {
     fn test_exact_match_directory() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "system", None).unwrap();
 
-        assert_eq!(result.completion.as_str(), "system/");
-        assert!(result.is_complete);
-        assert!(result.is_directory);
-        assert_eq!(result.all_matches.len(), 1);
+        match result {
+            CompletionResult::Single {
+                completion,
+                is_directory,
+            } => {
+                assert_eq!(completion.as_str(), "system/");
+                assert!(is_directory);
+            }
+            _ => panic!("Expected Single variant"),
+        }
     }
 
     #[test]
@@ -412,9 +455,13 @@ mod tests {
     fn test_empty_input_matches_all() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "", None).unwrap();
 
-        // Empty input matches everything
-        assert!(!result.is_complete);
-        assert_eq!(result.all_matches.len(), 6); // 4 commands + 2 directories
+        match result {
+            CompletionResult::Multiple { all_matches, .. } => {
+                // Empty input matches everything
+                assert_eq!(all_matches.len(), 6); // 4 commands + 2 directories
+            }
+            _ => panic!("Expected Multiple variant"),
+        }
     }
 
     #[test]
@@ -422,10 +469,12 @@ mod tests {
     fn test_case_sensitive_matching() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "ST", None).unwrap();
 
-        // No matches (case-sensitive)
-        assert_eq!(result.completion.as_str(), "");
-        assert!(!result.is_complete);
-        assert_eq!(result.all_matches.len(), 0);
+        match result {
+            CompletionResult::None => {
+                // Expected - no matches (case-sensitive)
+            }
+            _ => panic!("Expected None variant"),
+        }
     }
 
     #[test]
@@ -433,11 +482,12 @@ mod tests {
     fn test_stub_returns_empty() {
         let result = suggest_completions::<TestLevel, 16>(&TEST_DIR, "st", None).unwrap();
 
-        // Stub always returns empty
-        assert_eq!(result.completion.as_str(), "");
-        assert!(!result.is_complete);
-        assert!(!result.is_directory);
-        assert_eq!(result.all_matches.len(), 0);
+        match result {
+            CompletionResult::None => {
+                // Expected - stub always returns empty
+            }
+            _ => panic!("Expected None variant"),
+        }
     }
 
     #[test]
@@ -463,9 +513,12 @@ mod tests {
         let result =
             suggest_completions::<TestLevel, 16>(&TEST_DIR, "r", Some(&guest_user)).unwrap();
 
-        assert_eq!(result.completion.as_str(), "");
-        assert!(!result.is_complete);
-        assert_eq!(result.all_matches.len(), 0);
+        match result {
+            CompletionResult::None => {
+                // Expected - no access to reboot command
+            }
+            _ => panic!("Expected None variant"),
+        }
 
         // Create admin user
         let admin_user = User {
@@ -485,9 +538,12 @@ mod tests {
         let result =
             suggest_completions::<TestLevel, 16>(&TEST_DIR, "r", Some(&admin_user)).unwrap();
 
-        assert_eq!(result.completion.as_str(), "reboot");
-        assert!(result.is_complete);
-        assert_eq!(result.all_matches.len(), 1);
+        match result {
+            CompletionResult::Single { completion, .. } => {
+                assert_eq!(completion.as_str(), "reboot");
+            }
+            _ => panic!("Expected Single variant"),
+        }
     }
 
     #[test]
