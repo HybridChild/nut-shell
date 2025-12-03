@@ -1,6 +1,8 @@
 //! Shell orchestration and command processing.
 //!
-//! The `Shell` struct brings together all components to provide interactive CLI functionality.
+//! Brings together I/O, command trees, authentication, and history into interactive CLI.
+//! Follows unified architecture: single code path handles both auth-enabled and auth-disabled modes.
+//! Lifecycle: `Inactive` → `activate()` → (`LoggedOut` →) `LoggedIn` → `deactivate()`.
 
 use crate::auth::{AccessLevel, User};
 use crate::config::ShellConfig;
@@ -193,9 +195,8 @@ where
     H: CommandHandler<C>,
     C: ShellConfig,
 {
-    /// Create new Shell with credential provider for when authentication enabled.
-    ///
-    /// Starts in `Inactive` state. Call `activate()` to show welcome message and login prompt.
+    /// Create shell with authentication enabled (starts `Inactive`).
+    /// Call `activate()` to show welcome message and login prompt.
     pub fn new(
         tree: &'tree Directory<L>,
         handler: H,
@@ -278,10 +279,8 @@ where
         Ok(())
     }
 
-    /// Deactivate the shell (transition to Inactive state).
-    ///
-    /// Clears user session, input buffer, and returns to root directory.
-    /// Shell ignores all input until `activate()` is called again.
+    /// Deactivate shell (transition to `Inactive`).
+    /// Clears session and resets to root directory.
     pub fn deactivate(&mut self) {
         self.state = CliState::Inactive;
         self.current_user = None;
@@ -289,10 +288,7 @@ where
         self.current_path.clear();
     }
 
-    /// Process a single character of input.
-    ///
-    /// Main entry point for character-by-character processing.
-    /// Returns Ok(()) on success, Err on I/O error.
+    /// Process single character of input (main entry point for char-by-char processing).
     pub fn process_char(&mut self, c: char) -> Result<(), IO::Error> {
         // Decode character into logical event
         let event = self.decoder.decode_char(c);
@@ -343,9 +339,7 @@ where
         }
     }
 
-    /// Process a single character of input - async version.
-    ///
-    /// Async entry point for character-by-character processing.
+    /// Process single character of input (async version).
     /// Can execute both sync and async commands.
     #[cfg(feature = "async")]
     pub async fn process_char_async(&mut self, c: char) -> Result<(), IO::Error> {
@@ -399,9 +393,7 @@ where
     }
 
     /// Poll for incoming characters and process them.
-    ///
-    /// Convenience method for simple polling loops. For interrupt-driven UART,
-    /// DMA, async, or RTOS integration, use `process_char()` directly instead.
+    /// For interrupt-driven/DMA/async/RTOS use `process_char()` directly.
     pub fn poll(&mut self) -> Result<(), IO::Error> {
         if let Some(c) = self.io.get_char()? {
             self.process_char(c)?;
@@ -1198,20 +1190,12 @@ where
     // I/O Access
     // ========================================
 
-    /// Get reference to I/O interface.
-    ///
-    /// Provides access to the underlying I/O for inspection or manipulation.
-    /// Commonly used in tests to check output, but also useful for debugging
-    /// or advanced I/O control in embedded systems.
+    /// Get reference to I/O interface (for inspection or direct control).
     pub fn io(&self) -> &IO {
         &self.io
     }
 
-    /// Get mutable reference to I/O interface.
-    ///
-    /// Provides mutable access to the underlying I/O for manipulation.
-    /// Commonly used in tests to clear output buffers or inject input,
-    /// but also useful for I/O control in embedded systems.
+    /// Get mutable reference to I/O interface (for manipulation or direct control).
     pub fn io_mut(&mut self) -> &mut IO {
         &mut self.io
     }

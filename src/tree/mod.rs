@@ -10,8 +10,6 @@ pub mod completion;
 pub mod path;
 
 /// Command kind marker (sync or async).
-///
-/// Used in `CommandMeta` to indicate whether a command is synchronous or asynchronous.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum CommandKind {
     /// Synchronous command
@@ -23,20 +21,12 @@ pub enum CommandKind {
 }
 
 /// Command metadata (const-initializable, no execution logic).
-///
-/// Stores only metadata about the command. Execution logic is provided separately
-/// via the `CommandHandler` trait. This enables both sync and async commands while
-/// maintaining const-initialization.
-///
-/// The `id` field uniquely identifies the command for handler dispatch, allowing
-/// multiple commands with the same display name in different directories.
+/// Execution via `CommandHandler` trait enables sync and async commands with const-initialization.
+/// Unique `id` field allows duplicate names across directories.
 #[derive(Debug, Clone)]
 pub struct CommandMeta<L: AccessLevel> {
-    /// Unique identifier for handler dispatch
-    ///
-    /// This ID must be unique across the entire command tree. The handler uses this
-    /// to dispatch to the correct implementation. Convention: use path-like IDs
-    /// (e.g., "system_reboot", "network_reboot") to avoid collisions.
+    /// Unique identifier for handler dispatch (must be unique across entire tree).
+    /// Convention: use path-like IDs (e.g., "system_reboot", "network_reboot").
     pub id: &'static str,
 
     /// Command name (display name, can duplicate across directories)
@@ -58,10 +48,8 @@ pub struct CommandMeta<L: AccessLevel> {
     pub max_args: usize,
 }
 
-/// Directory node containing child nodes.
-///
-/// Directories organize commands hierarchically. All directories are const-initializable
-/// and stored in ROM.
+/// Directory node containing child nodes (const-initializable, stored in ROM).
+/// Organizes commands hierarchically.
 #[derive(Debug, Clone)]
 pub struct Directory<L: AccessLevel> {
     /// Directory name
@@ -115,10 +103,7 @@ impl<L: AccessLevel> Node<L> {
 }
 
 impl<L: AccessLevel> Directory<L> {
-    /// Find child node by name (without access control).
-    ///
-    /// Returns `None` if child not found.
-    /// Access control checks happen in Shell during path resolution.
+    /// Find child node by name (no access control, returns `None` if not found).
     pub fn find_child(&self, name: &str) -> Option<&Node<L>> {
         self.children.iter().find(|child| child.name() == name)
     }

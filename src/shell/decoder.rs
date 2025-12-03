@@ -1,10 +1,7 @@
 //! Input decoder for terminal character sequences.
 //!
-//! Provides state machine for interpreting ANSI escape sequences (arrow keys, etc.)
-//! and special key combinations (double-ESC clear).
-//!
-//! This is a pure decoder - it doesn't manage buffers or I/O. It simply converts
-//! raw terminal character sequences into logical input events.
+//! State machine for ANSI escape sequences (arrow keys) and double-ESC clear.
+//! Pure decoder: converts raw chars to logical events, no buffer or I/O management.
 
 /// Decoder state for escape sequence handling.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -47,13 +44,8 @@ pub enum InputEvent {
     DoubleEsc,
 }
 
-/// Terminal input decoder with escape sequence handling.
-///
-/// Decodes raw terminal characters into logical input events. Maintains state
-/// for multi-character escape sequences (arrow keys, etc.) and supports
-/// double-ESC clear functionality.
-///
-/// Pure state machine - doesn't manage buffers or perform I/O.
+/// Terminal input decoder with escape sequence state machine.
+/// Converts raw terminal chars to logical input events without managing buffers or I/O.
 #[derive(Debug)]
 pub struct InputDecoder {
     /// Current decoder state
@@ -68,10 +60,7 @@ impl InputDecoder {
         }
     }
 
-    /// Decode single character into input event.
-    ///
-    /// Updates state machine for escape sequences. Returns `InputEvent::None`
-    /// for incomplete sequences (e.g., first ESC of arrow key).
+    /// Decode single character into input event (returns `None` for incomplete sequences).
     pub fn decode_char(&mut self, c: char) -> InputEvent {
         match self.state {
             InputState::Normal => self.decode_normal(c),
@@ -80,7 +69,7 @@ impl InputDecoder {
         }
     }
 
-    /// Decode character in Normal state.
+    /// Decode character in Normal state (handle ESC, Enter, Tab, Backspace, or regular char).
     fn decode_normal(&mut self, c: char) -> InputEvent {
         match c {
             // ESC - start of escape sequence

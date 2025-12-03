@@ -1,17 +1,12 @@
 //! Response types for command execution.
 //!
-//! The `Response` type represents successful command execution with formatting flags
-//! and message content. Command failures are represented via `CliError::CommandFailed`.
-//! Generic over `ShellConfig` for buffer sizing.
+//! `Response` represents successful execution with message and formatting flags.
 
 use crate::config::ShellConfig;
 use core::marker::PhantomData;
 
-/// Command execution response.
-///
-/// Generic over `C: ShellConfig` to use configured buffer size for messages.
-/// Contains message and formatting flags. Represents successful command execution.
-/// Command failures should return `Err(CliError::CommandFailed(msg))`.
+/// Command execution response with message and formatting flags.
+/// Command failures return `Err(CliError::CommandFailed(msg))`, not `Response`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Response<C: ShellConfig> {
     /// Response message (uses C::MAX_RESPONSE buffer size)

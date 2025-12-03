@@ -51,9 +51,7 @@ impl<const MAX_MATCHES: usize> CompletionResult<MAX_MATCHES> {
 // Feature-enabled implementation
 // ============================================================================
 
-/// Suggest completions for a partial input.
-///
-/// Performs prefix matching against accessible nodes in the current directory.
+/// Suggest completions for partial input using prefix matching.
 /// Directories get "/" appended for single matches.
 #[cfg(feature = "completion")]
 pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
