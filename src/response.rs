@@ -118,59 +118,30 @@ mod tests {
     fn test_success_response() {
         let response = Response::<DefaultConfig>::success("OK");
         assert_eq!(response.message.as_str(), "OK");
-        assert!(response.show_prompt);
+        assert!(!response.inline_message);
+        assert!(!response.prefix_newline);
+        assert!(!response.indent_message);
         assert!(response.postfix_newline);
-    }
+        assert!(response.show_prompt);
 
-    #[test]
-    #[cfg(feature = "history")]
-    fn test_without_history() {
-        let response = Response::<DefaultConfig>::success("OK").without_history();
-        assert!(response.exclude_from_history);
-
-        let response = Response::<DefaultConfig>::success_no_history("OK");
-        assert!(response.exclude_from_history);
-    }
-
-    #[test]
-    fn test_inline_builder() {
-        let response = Response::<DefaultConfig>::success("OK").inline();
-        assert!(response.inline_message);
-    }
-
-    #[test]
-    fn test_with_prefix_newline_builder() {
-        let response = Response::<DefaultConfig>::success("OK").with_prefix_newline();
-        assert!(response.prefix_newline);
-    }
-
-    #[test]
-    fn test_indented_builder() {
-        let response = Response::<DefaultConfig>::success("OK").indented();
-        assert!(response.indent_message);
-    }
-
-    #[test]
-    fn test_without_postfix_newline_builder() {
-        let response = Response::<DefaultConfig>::success("OK").without_postfix_newline();
-        assert!(!response.postfix_newline);
-    }
-
-    #[test]
-    fn test_without_prompt_builder() {
-        let response = Response::<DefaultConfig>::success("OK").without_prompt();
-        assert!(!response.show_prompt);
+        #[cfg(feature = "history")]
+        assert!(!response.exclude_from_history);
     }
 
     #[test]
     fn test_builder_chaining() {
         let response = Response::<DefaultConfig>::success("OK")
             .inline()
+            .with_prefix_newline()
             .indented()
+            .without_postfix_newline()
             .without_prompt();
 
+        assert_eq!(response.message.as_str(), "OK");
         assert!(response.inline_message);
+        assert!(response.prefix_newline);
         assert!(response.indent_message);
+        assert!(!response.postfix_newline);
         assert!(!response.show_prompt);
     }
 
@@ -180,10 +151,17 @@ mod tests {
         let response = Response::<DefaultConfig>::success("OK")
             .inline()
             .with_prefix_newline()
+            .indented()
+            .without_postfix_newline()
+            .without_prompt()
             .without_history();
 
+        assert_eq!(response.message.as_str(), "OK");
         assert!(response.inline_message);
         assert!(response.prefix_newline);
+        assert!(response.indent_message);
+        assert!(!response.postfix_newline);
+        assert!(!response.show_prompt);
         assert!(response.exclude_from_history);
     }
 }
