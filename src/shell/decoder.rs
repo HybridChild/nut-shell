@@ -70,39 +70,8 @@ impl InputDecoder {
 
     /// Decode single character into input event.
     ///
-    /// Updates internal state machine and returns event representing the
-    /// logical input action. Does not manage buffers or perform I/O.
-    ///
-    /// # Arguments
-    ///
-    /// * `c` - Character to decode
-    ///
-    /// # Returns
-    ///
-    /// Event indicating what input occurred
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// // Normal character
-    /// let event = decoder.decode_char('h');
-    /// assert_eq!(event, InputEvent::Char('h'));
-    ///
-    /// // Backspace
-    /// let event = decoder.decode_char('\x7f');
-    /// assert_eq!(event, InputEvent::Backspace);
-    ///
-    /// // Up arrow (ESC [ A)
-    /// decoder.decode_char('\x1b');
-    /// decoder.decode_char('[');
-    /// let event = decoder.decode_char('A');
-    /// assert_eq!(event, InputEvent::UpArrow);
-    ///
-    /// // Double ESC
-    /// decoder.decode_char('\x1b');  // First ESC
-    /// let event = decoder.decode_char('\x1b');  // Second ESC
-    /// assert_eq!(event, InputEvent::DoubleEsc);
-    /// ```
+    /// Updates state machine for escape sequences. Returns `InputEvent::None`
+    /// for incomplete sequences (e.g., first ESC of arrow key).
     pub fn decode_char(&mut self, c: char) -> InputEvent {
         match self.state {
             InputState::Normal => self.decode_normal(c),
