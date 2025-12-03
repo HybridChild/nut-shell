@@ -38,10 +38,6 @@ use crate::error::CliError;
 ///
 /// Uses `MAX_DEPTH` const generic to limit nesting depth.
 /// All parsing is zero-allocation, working with string slices.
-///
-/// # Generic Parameters
-///
-/// - `MAX_DEPTH`: Maximum path depth (from ShellConfig::MAX_PATH_DEPTH)
 #[derive(Debug, PartialEq)]
 pub struct Path<'a, const MAX_DEPTH: usize> {
     /// Whether this is an absolute path (starts with `/`)

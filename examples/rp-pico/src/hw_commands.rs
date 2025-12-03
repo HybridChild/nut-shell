@@ -380,13 +380,10 @@ pub fn cmd_bootreason<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, Cli
 // GPIO Status Command
 // =============================================================================
 
-/// Display the status of a specific GPIO pin
+/// Display the status of a specific GPIO pin.
 ///
 /// Shows pin direction (input/output), current state, and pull-up/down configuration.
 /// Values are read directly from hardware registers.
-///
-/// # Arguments
-/// - `pin`: GPIO pin number (0-29)
 pub fn cmd_gpio<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError> {
     // Parse pin number
     let pin_num = match args[0].parse::<usize>() {
