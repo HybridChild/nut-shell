@@ -192,6 +192,7 @@ Credentials are hardcoded in source as const values. The password comes from an 
 **Complete example:**
 
 ```rust
+use nut_shell::auth::{CredentialProvider, User};
 use sha2::{Sha256, Digest};
 use subtle::ConstantTimeEq;
 
@@ -200,40 +201,49 @@ const ADMIN_SALT: [u8; 16] = *b"a3f9d2c8e1b4567a";
 
 // 2. Hash computed at build time from env var
 const ADMIN_HASH: [u8; 32] = {
-    // In reality, compute this offline and paste here
-    // This shows the concept: hash = SHA256(salt || password)
+    // Compute this offline and paste here
+    // hash = SHA256(salt || password)
     [0x5a, 0x2b, /* ... precomputed hash bytes ... */]
 };
 
-struct BuildTimeProvider;
+const USERS: &[User<MyAccessLevel>] = &[
+    User {
+        username: "admin",
+        password_hash: ADMIN_HASH,
+        salt: ADMIN_SALT,
+        level: MyAccessLevel::Admin,
+    },
+];
+
+pub struct BuildTimeProvider;
 
 impl CredentialProvider<MyAccessLevel> for BuildTimeProvider {
-    type Error = core::convert::Infallible;
-
-    fn find_user(&self, username: &str) -> Result<Option<User<MyAccessLevel>>, Self::Error> {
-        match username {
-            "admin" => Ok(Some(User {
-                username: heapless::String::from("admin"),
-                password_hash: ADMIN_HASH,
-                salt: ADMIN_SALT,
-                access_level: MyAccessLevel::Admin,
-            })),
-            _ => Ok(None),
-        }
+    fn get_user(&self, username: &str) -> Option<&User<MyAccessLevel>> {
+        USERS.iter().find(|u| u.username == username)
     }
 
-    fn verify_password(&self, user: &User<MyAccessLevel>, password: &str) -> bool {
-        let computed_hash = hash_password(password, &user.salt);
-        computed_hash.ct_eq(&user.password_hash).into()
+    fn list_users(&self) -> &[User<MyAccessLevel>] {
+        USERS
     }
 }
 ```
 
 **Workflow:**
-1. Generate random salt offline: `openssl rand -hex 16`
-2. Compute hash offline using `hash_password()` function from Password Hashing section
-3. Hardcode both salt and hash as const values
+1. Generate random salt: `openssl rand 16 | xxd -p` (produces 16 random bytes as hex)
+2. Create small Rust program using `nut_shell::auth::password::hash_password()` to compute hash
+3. Copy generated constants into your code
 4. Build and deploy
+
+**Example hash generator:**
+```rust
+use nut_shell::auth::password::hash_password;
+
+fn main() {
+    let salt = [0xa3, 0xf9, /* paste your 16 bytes */];
+    let hash = hash_password("your_password", &salt).expect("hash failed");
+    println!("const HASH: [u8; 32] = {:?};", hash);
+}
+```
 
 **Use cases:**
 - Development and testing environments
