@@ -3,7 +3,7 @@
 
 use core::fmt::Write;
 use nut_shell::config::MinimalConfig;
-use nut_shell::tree::{CommandMeta, CommandKind, Directory, Node};
+use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 use nut_shell::{CharIo, CliError, CommandHandler, Response, Shell};
 use panic_halt as _;
 
@@ -82,14 +82,10 @@ const ROOT: Directory<Level> = Directory {
 };
 
 // Minimal command handler
-struct MinHandlers;
+struct MinHandler;
 
-impl CommandHandler<MinimalConfig> for MinHandlers {
-    fn execute_sync(
-        &self,
-        id: &str,
-        args: &[&str],
-    ) -> Result<Response<MinimalConfig>, CliError> {
+impl CommandHandler<MinimalConfig> for MinHandler {
+    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MinimalConfig>, CliError> {
         match id {
             "status" => status_cmd::<MinimalConfig>(args),
             _ => Err(CliError::CommandNotFound),
@@ -117,7 +113,10 @@ struct MinCredentials;
 impl nut_shell::auth::CredentialProvider<Level> for MinCredentials {
     type Error = ();
 
-    fn find_user(&self, _username: &str) -> Result<Option<nut_shell::auth::User<Level>>, Self::Error> {
+    fn find_user(
+        &self,
+        _username: &str,
+    ) -> Result<Option<nut_shell::auth::User<Level>>, Self::Error> {
         Ok(None)
     }
 
@@ -130,16 +129,16 @@ impl nut_shell::auth::CredentialProvider<Level> for MinCredentials {
 #[cortex_m_rt::entry]
 fn main() -> ! {
     let io = MinimalIo;
-    let handlers = MinHandlers;
+    let handler = MinHandler;
 
     #[cfg(feature = "authentication")]
     let credentials = MinCredentials;
 
     #[cfg(feature = "authentication")]
-    let mut shell = Shell::new(&ROOT, handlers, &credentials, io);
+    let mut shell = Shell::new(&ROOT, handler, &credentials, io);
 
     #[cfg(not(feature = "authentication"))]
-    let mut shell = Shell::new(&ROOT, handlers, io);
+    let mut shell = Shell::new(&ROOT, handler, io);
 
     // Activate shell to ensure all code paths are included
     // Use black_box to prevent optimizer from removing the code

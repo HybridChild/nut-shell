@@ -1,13 +1,13 @@
-//! Command handlers for the basic example
+//! Command handler for the basic example
 
 use core::fmt::Write;
 use nut_shell::{
-    CliError, config::DefaultConfig, response::Response, shell::handlers::CommandHandler,
+    CliError, config::DefaultConfig, response::Response, shell::handler::CommandHandler,
 };
 
-pub struct ExampleHandlers;
+pub struct ExampleHandler;
 
-impl CommandHandler<DefaultConfig> for ExampleHandlers {
+impl CommandHandler<DefaultConfig> for ExampleHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
             "coffee_make" => Ok(Response::success("Brewing coffee...")),

@@ -14,10 +14,10 @@
 //! - user:user123 (User access)
 //! - guest:guest123 (Guest access)
 
-mod handlers;
+mod handler;
 mod tree;
 
-use handlers::AsyncHandlers;
+use handler::AsyncHandler;
 #[cfg(feature = "authentication")]
 use native_examples::ExampleCredentialProvider;
 use native_examples::{ExampleAccessLevel, RawModeGuard, StdioCharIo};
@@ -61,19 +61,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create I/O
     let io = StdioCharIo::new();
 
-    // Create handlers
-    let handlers = AsyncHandlers;
+    // Create handler
+    let handler = AsyncHandler;
 
     // Create shell (different constructors based on authentication feature)
     #[cfg(feature = "authentication")]
     let provider = ExampleCredentialProvider::new();
     #[cfg(feature = "authentication")]
-    let mut shell: Shell<ExampleAccessLevel, StdioCharIo, AsyncHandlers, DefaultConfig> =
-        Shell::new(&ROOT, handlers, &provider, io);
+    let mut shell: Shell<ExampleAccessLevel, StdioCharIo, AsyncHandler, DefaultConfig> =
+        Shell::new(&ROOT, handler, &provider, io);
 
     #[cfg(not(feature = "authentication"))]
-    let mut shell: Shell<ExampleAccessLevel, StdioCharIo, AsyncHandlers, DefaultConfig> =
-        Shell::new(&ROOT, handlers, io);
+    let mut shell: Shell<ExampleAccessLevel, StdioCharIo, AsyncHandler, DefaultConfig> =
+        Shell::new(&ROOT, handler, io);
 
     // Activate shell (shows welcome message and prompt)
     shell.activate()?;

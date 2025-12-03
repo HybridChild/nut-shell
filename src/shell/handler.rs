@@ -30,9 +30,9 @@ mod tests {
     use crate::config::DefaultConfig;
 
     // Mock handler for testing
-    struct TestHandlers;
+    struct TestHandler;
 
-    impl CommandHandler<DefaultConfig> for TestHandlers {
+    impl CommandHandler<DefaultConfig> for TestHandler {
         fn execute_sync(
             &self,
             id: &str,
@@ -59,24 +59,24 @@ mod tests {
 
     #[test]
     fn test_sync_handler() {
-        let handlers = TestHandlers;
-        let result = handlers.execute_sync("test", &[]);
+        let handler = TestHandler;
+        let result = handler.execute_sync("test", &[]);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().message.as_str(), "OK");
 
-        let result = handlers.execute_sync("unknown", &[]);
+        let result = handler.execute_sync("unknown", &[]);
         assert_eq!(result, Err(CliError::CommandNotFound));
     }
 
     #[cfg(feature = "async")]
     #[tokio::test]
     async fn test_async_handler() {
-        let handlers = TestHandlers;
-        let result = handlers.execute_async("async-test", &[]).await;
+        let handler = TestHandler;
+        let result = handler.execute_async("async-test", &[]).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().message.as_str(), "Async OK");
 
-        let result = handlers.execute_async("unknown", &[]).await;
+        let result = handler.execute_async("unknown", &[]).await;
         assert_eq!(result, Err(CliError::CommandNotFound));
     }
 }

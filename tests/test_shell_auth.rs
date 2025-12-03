@@ -8,7 +8,7 @@
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-use fixtures::{MockAccessLevel, MockHandlers, MockIo, TEST_TREE};
+use fixtures::{MockAccessLevel, MockHandler, MockIo, TEST_TREE};
 use nut_shell::auth::{ConstCredentialProvider, User, password::Sha256Hasher};
 use nut_shell::config::DefaultConfig;
 use nut_shell::shell::Shell;
@@ -39,8 +39,8 @@ fn test_password_masking_basic() {
     let hasher = Sha256Hasher::new();
     let provider = ConstCredentialProvider::new(users, hasher);
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
 
     // Activate shell (shows welcome and login prompt)
     shell.activate().unwrap();
@@ -84,8 +84,8 @@ fn test_password_masking_full_sequence() {
     let hasher = Sha256Hasher::new();
     let provider = ConstCredentialProvider::new(users, hasher);
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -123,8 +123,8 @@ fn test_password_with_special_chars() {
     let hasher = Sha256Hasher::new();
     let provider = ConstCredentialProvider::new(users, hasher);
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -162,8 +162,8 @@ fn test_password_with_multiple_colons() {
     let hasher = Sha256Hasher::new();
     let provider = ConstCredentialProvider::new(users, hasher);
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -203,8 +203,8 @@ fn test_password_masking_with_backspace() {
     let hasher = Sha256Hasher::new();
     let provider = ConstCredentialProvider::new(users, hasher);
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -237,8 +237,8 @@ fn test_password_masking_empty_username() {
     let hasher = Sha256Hasher::new();
     let provider = ConstCredentialProvider::new(users, hasher);
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -267,8 +267,8 @@ fn test_password_masking_unicode_chars() {
     let hasher = Sha256Hasher::new();
     let provider = ConstCredentialProvider::new(users, hasher);
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -301,8 +301,8 @@ fn test_double_esc_clears_masked_input() {
     let hasher = Sha256Hasher::new();
     let provider = ConstCredentialProvider::new(users, hasher);
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -330,27 +330,19 @@ fn test_character_by_character_masking() {
     let hasher = Sha256Hasher::new();
     let provider = ConstCredentialProvider::new(users, hasher);
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
 
     // Type username
     shell.io_mut().clear_output();
     shell.process_char('a').unwrap();
-    assert_eq!(
-        shell.io().output(),
-        "a",
-        "First char of username visible"
-    );
+    assert_eq!(shell.io().output(), "a", "First char of username visible");
 
     shell.io_mut().clear_output();
     shell.process_char('d').unwrap();
-    assert_eq!(
-        shell.io().output(),
-        "d",
-        "Second char of username visible"
-    );
+    assert_eq!(shell.io().output(), "d", "Second char of username visible");
 
     // Type colon
     shell.io_mut().clear_output();
@@ -360,27 +352,15 @@ fn test_character_by_character_masking() {
     // Type first password char
     shell.io_mut().clear_output();
     shell.process_char('p').unwrap();
-    assert_eq!(
-        shell.io().output(),
-        "*",
-        "First password char masked"
-    );
+    assert_eq!(shell.io().output(), "*", "First password char masked");
 
     // Type second password char
     shell.io_mut().clear_output();
     shell.process_char('a').unwrap();
-    assert_eq!(
-        shell.io().output(),
-        "*",
-        "Second password char masked"
-    );
+    assert_eq!(shell.io().output(), "*", "Second password char masked");
 
     // Type third password char
     shell.io_mut().clear_output();
     shell.process_char('s').unwrap();
-    assert_eq!(
-        shell.io().output(),
-        "*",
-        "Third password char masked"
-    );
+    assert_eq!(shell.io().output(), "*", "Third password char masked");
 }

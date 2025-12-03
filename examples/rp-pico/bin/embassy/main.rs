@@ -17,7 +17,7 @@
 #![no_std]
 #![no_main]
 
-mod handlers;
+mod handler;
 mod hw_setup;
 mod hw_state;
 mod io;
@@ -46,7 +46,7 @@ use rp_pico_examples::{PicoAccessLevel, init_boot_time, init_chip_id, init_reset
 #[cfg(feature = "authentication")]
 use rp_pico_examples::PicoCredentialProvider;
 
-use crate::handlers::{LedCommand, PicoHandlers};
+use crate::handler::{LedCommand, PicoHandler};
 use crate::io::BufferedCharIo;
 use crate::tree::ROOT;
 
@@ -73,8 +73,8 @@ async fn shell_task(
     let io = BufferedCharIo::new(output_buffer);
     let io_flush = BufferedCharIo::new(output_buffer); // Second reference for flushing
 
-    // Create handlers
-    let handlers = PicoHandlers { led_channel };
+    // Create handler
+    let handler = PicoHandler { led_channel };
 
     // Create credential provider (must live as long as shell)
     #[cfg(feature = "authentication")]
@@ -82,12 +82,12 @@ async fn shell_task(
 
     // Create shell (with or without authentication based on feature flag)
     #[cfg(feature = "authentication")]
-    let mut shell: Shell<PicoAccessLevel, BufferedCharIo, PicoHandlers, DefaultConfig> =
-        Shell::new(&ROOT, handlers, &provider, io);
+    let mut shell: Shell<PicoAccessLevel, BufferedCharIo, PicoHandler, DefaultConfig> =
+        Shell::new(&ROOT, handler, &provider, io);
 
     #[cfg(not(feature = "authentication"))]
-    let mut shell: Shell<PicoAccessLevel, BufferedCharIo, PicoHandlers, DefaultConfig> =
-        Shell::new(&ROOT, handlers, io);
+    let mut shell: Shell<PicoAccessLevel, BufferedCharIo, PicoHandler, DefaultConfig> =
+        Shell::new(&ROOT, handler, io);
 
     // Wait for USB connection
     usb_class.wait_connection().await;

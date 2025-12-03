@@ -19,7 +19,7 @@ pub type AdcType = Adc;
 // Global Hardware State
 // =============================================================================
 
-/// Global LED pin protected by a Mutex for safe access from command handlers
+/// Global LED pin protected by a Mutex for safe access from command handler
 static LED_PIN: Mutex<RefCell<Option<LedPin>>> = Mutex::new(RefCell::new(None));
 
 /// Global ADC for reading temperature sensor

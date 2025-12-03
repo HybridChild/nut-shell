@@ -11,7 +11,7 @@
 #![no_std]
 #![no_main]
 
-mod handlers;
+mod handler;
 mod hw_setup;
 mod hw_state;
 mod io;
@@ -28,7 +28,7 @@ use stm32_examples::Stm32AccessLevel;
 #[cfg(feature = "authentication")]
 use stm32_examples::Stm32CredentialProvider;
 
-use crate::handlers::Stm32Handlers;
+use crate::handler::Stm32Handler;
 use crate::io::UartCharIo;
 use crate::tree::ROOT;
 
@@ -55,8 +55,8 @@ fn main() -> ! {
     // Create CharIo wrapper
     let io = UartCharIo::new(hw_config.uart_tx, hw_config.uart_rx);
 
-    // Create handlers
-    let handlers = Stm32Handlers;
+    // Create handler
+    let handler = Stm32Handler;
 
     // Create shell with minimal configuration for resource-constrained STM32
     // MinimalConfig uses smaller buffers (64-byte input, 128-byte response)
@@ -64,12 +64,12 @@ fn main() -> ! {
     #[cfg(feature = "authentication")]
     let provider = Stm32CredentialProvider::new();
     #[cfg(feature = "authentication")]
-    let mut shell: Shell<Stm32AccessLevel, UartCharIo, Stm32Handlers, MinimalConfig> =
-        Shell::new(&ROOT, handlers, &provider, io);
+    let mut shell: Shell<Stm32AccessLevel, UartCharIo, Stm32Handler, MinimalConfig> =
+        Shell::new(&ROOT, handler, &provider, io);
 
     #[cfg(not(feature = "authentication"))]
-    let mut shell: Shell<Stm32AccessLevel, UartCharIo, Stm32Handlers, MinimalConfig> =
-        Shell::new(&ROOT, handlers, io);
+    let mut shell: Shell<Stm32AccessLevel, UartCharIo, Stm32Handler, MinimalConfig> =
+        Shell::new(&ROOT, handler, io);
 
     // Activate shell (show welcome and prompt)
     shell.activate().ok();

@@ -1,16 +1,16 @@
-//! Command handlers for the NUCLEO-F072RB example
+//! Command handler for the NUCLEO-F072RB example
 
 use core::fmt::Write;
 use nut_shell::{
-    CliError, config::ShellConfig, response::Response, shell::handlers::CommandHandler,
+    CliError, config::ShellConfig, response::Response, shell::handler::CommandHandler,
 };
 use stm32_examples::{hw_commands, system_commands};
 
 use crate::hw_state;
 
-pub struct Stm32Handlers;
+pub struct Stm32Handler;
 
-impl Stm32Handlers {
+impl Stm32Handler {
     fn system_info<C: ShellConfig>(&self) -> Result<Response<C>, CliError> {
         // Use a buffer size that fits within MinimalConfig's MAX_RESPONSE (128 bytes)
         let mut msg = heapless::String::<128>::new();
@@ -79,7 +79,7 @@ impl Stm32Handlers {
     }
 }
 
-impl<C: ShellConfig> CommandHandler<C> for Stm32Handlers {
+impl<C: ShellConfig> CommandHandler<C> for Stm32Handler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
         match id {
             "system_info" => self.system_info(),

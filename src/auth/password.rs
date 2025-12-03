@@ -139,5 +139,4 @@ mod tests {
         assert!(hasher.verify(password, &salt, &hash));
         assert!(!hasher.verify("different", &salt, &hash));
     }
-
 }

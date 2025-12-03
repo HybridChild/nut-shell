@@ -16,12 +16,12 @@ use crate::tree::completion::suggest_completions;
 
 // Sub-modules
 pub mod decoder;
-pub mod handlers;
+pub mod handler;
 pub mod history;
 
 // Re-export key types
 pub use decoder::{InputDecoder, InputEvent};
-pub use handlers::CommandHandler;
+pub use handler::CommandHandler;
 pub use history::CommandHistory;
 
 /// History navigation direction.
@@ -149,8 +149,8 @@ where
     /// I/O interface
     io: IO,
 
-    /// Command handlers
-    handlers: H,
+    /// Command handler
+    handler: H,
 
     /// Credential provider
     #[cfg(feature = "authentication")]
@@ -208,13 +208,13 @@ where
     /// Starts in `Inactive` state. Call `activate()` to show welcome message and prompt.
     pub fn new(
         tree: &'tree Directory<L>,
-        handlers: H,
+        handler: H,
         credential_provider: &'tree (dyn crate::auth::CredentialProvider<L, Error = ()> + 'tree),
         io: IO,
     ) -> Self {
         Self {
             tree,
-            handlers,
+            handler,
             current_user: None,
             state: CliState::Inactive,
             input_buffer: heapless::String::new(),
@@ -239,10 +239,10 @@ where
     /// Create new Shell
     ///
     /// Starts in `Inactive` state. Call `activate()` to show welcome message and prompt.
-    pub fn new(tree: &'tree Directory<L>, handlers: H, io: IO) -> Self {
+    pub fn new(tree: &'tree Directory<L>, handler: H, io: IO) -> Self {
         Self {
             tree,
-            handlers,
+            handler,
             current_user: None,
             state: CliState::Inactive,
             input_buffer: heapless::String::new(),
@@ -564,7 +564,7 @@ where
 
     /// Handle Enter key (submit command or login).
     fn handle_enter(&mut self) -> Result<(), IO::Error> {
-        // Note: Newline after input is written by the handlers
+        // Note: Newline after input is written by the handler
         // (conditionally based on Response.inline_message flag for commands)
 
         let input = self.input_buffer.clone();
@@ -585,7 +585,7 @@ where
     /// Dispatches to appropriate handler based on current state.
     #[cfg(feature = "async")]
     async fn handle_enter_async(&mut self) -> Result<(), IO::Error> {
-        // Note: Newline after input is written by the handlers
+        // Note: Newline after input is written by the handler
         // (conditionally based on Response.inline_message flag for commands)
 
         let input = self.input_buffer.clone();
@@ -873,11 +873,11 @@ where
                     });
                 }
 
-                // Dispatch to command handlers
+                // Dispatch to command handler
                 match cmd_meta.kind {
                     CommandKind::Sync => {
                         // Execute synchronous tree command (dispatch by unique ID)
-                        self.handlers.execute_sync(cmd_meta.id, args)
+                        self.handler.execute_sync(cmd_meta.id, args)
                     }
                     #[cfg(feature = "async")]
                     CommandKind::Async => {
@@ -945,15 +945,15 @@ where
                     });
                 }
 
-                // Dispatch to command handlers (handle both sync and async)
+                // Dispatch to command handler (handle both sync and async)
                 match cmd_meta.kind {
                     CommandKind::Sync => {
                         // Sync command in async context - call directly
-                        self.handlers.execute_sync(cmd_meta.id, args)
+                        self.handler.execute_sync(cmd_meta.id, args)
                     }
                     CommandKind::Async => {
                         // Async command - await execution
-                        self.handlers.execute_async(cmd_meta.id, args).await
+                        self.handler.execute_async(cmd_meta.id, args).await
                     }
                 }
             }
@@ -1326,9 +1326,9 @@ mod tests {
         }
     }
 
-    // Mock handlers
-    struct MockHandlers;
-    impl CommandHandler<DefaultConfig> for MockHandlers {
+    // Mock handler
+    struct MockHandler;
+    impl CommandHandler<DefaultConfig> for MockHandler {
         fn execute_sync(
             &self,
             _id: &str,
@@ -1447,7 +1447,7 @@ mod tests {
     #[test]
     fn test_activate_deactivate_lifecycle() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
+        let handler = MockHandler;
 
         // Create shell - should start in Inactive state
         #[cfg(feature = "authentication")]
@@ -1471,8 +1471,8 @@ mod tests {
                 }
             }
             let provider = MockProvider;
-            let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-                Shell::new(&TEST_TREE, handlers, &provider, io);
+            let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+                Shell::new(&TEST_TREE, handler, &provider, io);
 
             // Should start in Inactive state
             assert_eq!(shell.state, CliState::Inactive);
@@ -1492,8 +1492,8 @@ mod tests {
 
         #[cfg(not(feature = "authentication"))]
         {
-            let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-                Shell::new(&TEST_TREE, handlers, io);
+            let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+                Shell::new(&TEST_TREE, handler, io);
 
             // Should start in Inactive state
             assert_eq!(shell.state, CliState::Inactive);
@@ -1516,9 +1516,9 @@ mod tests {
     fn test_write_formatted_response_default() {
         // Test default formatting (no flags set)
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         let response = crate::response::Response::<DefaultConfig>::success("Test message");
         shell.write_formatted_response(&response).unwrap();
@@ -1531,9 +1531,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_write_formatted_response_with_prefix_newline() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         let response =
             crate::response::Response::<DefaultConfig>::success("Test").with_prefix_newline();
@@ -1547,9 +1547,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_write_formatted_response_indented() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         let response =
             crate::response::Response::<DefaultConfig>::success("Line 1\r\nLine 2").indented();
@@ -1563,9 +1563,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_write_formatted_response_indented_single_line() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         let response =
             crate::response::Response::<DefaultConfig>::success("Single line").indented();
@@ -1579,9 +1579,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_write_formatted_response_without_postfix_newline() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         let response = crate::response::Response::<DefaultConfig>::success("No newline")
             .without_postfix_newline();
@@ -1595,9 +1595,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_write_formatted_response_combined_flags() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         let response = crate::response::Response::<DefaultConfig>::success("Multi\r\nLine")
             .with_prefix_newline()
@@ -1612,9 +1612,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_write_formatted_response_all_flags_off() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         let response =
             crate::response::Response::<DefaultConfig>::success("Raw").without_postfix_newline();
@@ -1628,9 +1628,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_write_formatted_response_empty_message() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         let response = crate::response::Response::<DefaultConfig>::success("");
         shell.write_formatted_response(&response).unwrap();
@@ -1643,9 +1643,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_write_formatted_response_indented_multiline() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         let response = crate::response::Response::<DefaultConfig>::success("A\r\nB\r\nC\r\nD")
             .indented()
@@ -1678,9 +1678,9 @@ mod tests {
     fn test_resolve_path_cannot_navigate_through_command() {
         // Test that resolve_path returns InvalidPath when trying to navigate through a command
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         // Valid: Command as last segment should succeed
         let result = shell.resolve_path("test-cmd");
@@ -1723,9 +1723,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_resolve_path_comprehensive() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         // Test 1: Root level command
         let result = shell.resolve_path("test-cmd");
@@ -1825,9 +1825,9 @@ mod tests {
     #[cfg(not(feature = "authentication"))]
     fn test_resolve_path_parent_directory() {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let shell: Shell<MockLevel, MockIo, MockHandlers, DefaultConfig> =
-            Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
 
         // Test 1: Navigate into directory then back up with ..
         // First navigate to system/network/status
