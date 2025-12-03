@@ -4,8 +4,6 @@
 //! - `AccessLevel` trait for hierarchical permissions (always available)
 //! - `User` struct with username and access level (always available)
 //! - Password hashing and credential providers (feature-gated: `authentication`)
-//!
-//! See [SECURITY.md](../../docs/SECURITY.md) for security design and patterns.
 
 #![cfg_attr(not(feature = "authentication"), allow(unused_imports))]
 
@@ -24,9 +22,7 @@ pub use password::Sha256Hasher;
 pub use providers::ConstCredentialProvider;
 
 /// Access level trait for hierarchical permissions.
-///
 /// Implement this trait to define your application's access hierarchy.
-/// See EXAMPLES.md for implementation patterns.
 pub trait AccessLevel: Copy + Clone + PartialOrd + Ord + 'static {
     /// Parse access level from string.
     fn from_str(s: &str) -> Option<Self>
@@ -96,9 +92,7 @@ impl<L: AccessLevel> User<L> {
 }
 
 /// Credential provider trait.
-///
 /// Implementations provide user lookup and password verification.
-/// See SECURITY.md for security requirements.
 #[cfg(feature = "authentication")]
 pub trait CredentialProvider<L: AccessLevel> {
     /// Provider-specific error type

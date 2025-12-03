@@ -1,28 +1,6 @@
 //! Path parsing and navigation.
 //!
 //! Unix-style path resolution with `.` and `..` support.
-//! See [`Path`] for syntax details.
-//!
-//! # Example
-//!
-//! ```
-//! use nut_shell::tree::path::Path;
-//! use nut_shell::config::{DefaultConfig, ShellConfig};
-//! use nut_shell::error::CliError;
-//!
-//! # fn example() -> Result<(), CliError> {
-//! // Absolute path (using DefaultConfig depth of 8)
-//! let path = Path::<{DefaultConfig::MAX_PATH_DEPTH}>::parse("/system/reboot")?;
-//! assert!(path.is_absolute());
-//! assert_eq!(path.segments(), &["system", "reboot"]);
-//!
-//! // Relative path with parent navigation
-//! let path = Path::<{DefaultConfig::MAX_PATH_DEPTH}>::parse("../network/status")?;
-//! assert!(!path.is_absolute());
-//! assert_eq!(path.segments(), &["..", "network", "status"]);
-//! # Ok(())
-//! # }
-//! ```
 
 use crate::error::CliError;
 

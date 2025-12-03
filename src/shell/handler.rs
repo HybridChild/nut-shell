@@ -8,17 +8,13 @@ use crate::error::CliError;
 use crate::response::Response;
 
 /// Command execution handler trait.
-///
-/// Maps command IDs to execution functions. Dispatches on unique ID (not display name)
-/// to support duplicate command names in different directories.
+/// Maps command IDs to execution functions (dispatches on unique ID, not display name).
 pub trait CommandHandler<C: ShellConfig> {
     /// Execute synchronous command by unique ID.
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     /// Execute asynchronous command by unique ID (requires `async` feature).
-    ///
-    /// Uses `async fn` in trait without Send bounds to support both single-threaded
-    /// embedded executors (Embassy) and multi-threaded executors (Tokio).
+    /// Uses `async fn` without Send bounds for both single and multi-threaded executors.
     #[cfg(feature = "async")]
     #[allow(async_fn_in_trait)]
     async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;

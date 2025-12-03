@@ -1,13 +1,9 @@
-//! Credential provider implementations.
+//! Credential provider implementations for authentication.
 //!
-//! Provides various credential storage backends for authentication.
-//!
-//! ## Available Providers
-//!
-//! - `ConstCredentialProvider` - Hardcoded credentials (testing/examples only)
-//! - `buildtime` - Build-time environment variables (planned for production)
+//! `ConstCredentialProvider` for testing (hardcoded), `buildtime` for production (env vars, planned).
 
 pub mod buildtime;
 pub mod const_provider;
 
+/// Testing/demo provider with hardcoded credentials (not for production).
 pub use const_provider::ConstCredentialProvider;

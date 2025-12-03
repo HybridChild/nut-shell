@@ -7,10 +7,7 @@
 #[cfg(not(feature = "history"))]
 use core::marker::PhantomData;
 
-/// Command history storage.
-///
-/// When `history` feature is enabled, stores commands in a ring buffer.
-/// When disabled, zero-size stub that no-ops all operations.
+/// Command history storage (ring buffer when enabled, zero-size stub when disabled).
 #[derive(Debug)]
 pub struct CommandHistory<const N: usize, const INPUT_SIZE: usize> {
     #[cfg(feature = "history")]

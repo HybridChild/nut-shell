@@ -1,22 +1,13 @@
 //! Password hashing implementations.
 //!
 //! Provides SHA-256 based password hashing with constant-time verification.
-//! See [SECURITY.md](../../docs/SECURITY.md) for security design.
 
 use super::PasswordHasher;
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 /// SHA-256 password hasher with constant-time verification.
-///
-/// Uses SHA-256 for hashing and constant-time comparison for verification
-/// to prevent timing attacks.
-///
-/// # Security
-///
-/// - Salt is prepended to password before hashing
-/// - Verification uses `subtle::ConstantTimeEq` to prevent timing attacks
-/// - Hash output is always 32 bytes (SHA-256 digest size)
+/// Security: salted hashing, constant-time comparison to prevent timing attacks.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Sha256Hasher;
 
@@ -28,6 +19,7 @@ impl Sha256Hasher {
 }
 
 impl PasswordHasher for Sha256Hasher {
+    /// Hash password with salt using SHA-256.
     fn hash(&self, password: &str, salt: &[u8]) -> [u8; 32] {
         let mut hasher = Sha256::new();
 
@@ -42,6 +34,7 @@ impl PasswordHasher for Sha256Hasher {
         hash
     }
 
+    /// Verify password against hash using constant-time comparison.
     fn verify(&self, password: &str, salt: &[u8], hash: &[u8; 32]) -> bool {
         let computed_hash = self.hash(password, salt);
 

@@ -1,14 +1,9 @@
 //! Character I/O abstraction for platform-agnostic input/output.
 //!
 //! The `CharIo` trait provides non-blocking character-level I/O operations.
-//! See CHAR_IO.md for design rationale and platform adapter patterns.
 
 /// Platform-agnostic character I/O trait.
-///
-/// Implementations provide non-blocking character I/O. Output buffering strategy
-/// depends on platform: bare-metal may write immediately (blocking acceptable),
-/// async platforms must buffer to memory and flush externally.
-/// See CHAR_IO.md for requirements and examples.
+/// Implementations provide non-blocking character I/O with platform-specific buffering.
 pub trait CharIo {
     /// Platform-specific error type
     type Error;
@@ -18,9 +13,7 @@ pub trait CharIo {
     /// Returns `Ok(Some(char))` if available, `Ok(None)` otherwise.
     fn get_char(&mut self) -> Result<Option<char>, Self::Error>;
 
-    /// Write character to output buffer.
-    ///
-    /// Must not block indefinitely. See CHAR_IO.md for buffering requirements.
+    /// Write character to output buffer (must not block indefinitely).
     fn put_char(&mut self, c: char) -> Result<(), Self::Error>;
 
     /// Write string to output buffer.

@@ -1,16 +1,11 @@
-//! Constant credential provider with hardcoded users.
+//! Constant credential provider with hardcoded users for testing/examples.
 //!
-//! **WARNING**: For examples and testing ONLY. Never use in production.
-//!
-//! This provider stores credentials in const arrays, making them visible
-//! in the binary. Suitable for examples and testing, but not for
-//! production systems with security requirements.
+//! **WARNING**: Credentials visible in binary. Never use in production.
 
 use crate::auth::{AccessLevel, CredentialProvider, PasswordHasher, User};
 
 /// Constant credential provider with hardcoded users.
-///
-/// **WARNING**: Only for examples and testing. Credentials are visible in binary.
+/// **WARNING**: For testing/examples only, not production.
 #[derive(Debug)]
 pub struct ConstCredentialProvider<L: AccessLevel, H: PasswordHasher, const N: usize> {
     users: [User<L>; N],
@@ -18,9 +13,7 @@ pub struct ConstCredentialProvider<L: AccessLevel, H: PasswordHasher, const N: u
 }
 
 impl<L: AccessLevel, H: PasswordHasher, const N: usize> ConstCredentialProvider<L, H, N> {
-    /// Create a new const credential provider.
-    ///
-    /// Users' credentials must be pre-hashed.
+    /// Create provider with pre-hashed user credentials.
     pub const fn new(users: [User<L>; N], hasher: H) -> Self {
         Self { users, hasher }
     }
@@ -31,6 +24,7 @@ impl<L: AccessLevel, H: PasswordHasher, const N: usize> CredentialProvider<L>
 {
     type Error = ();
 
+    /// Find user by username (case-sensitive).
     fn find_user(&self, username: &str) -> Result<Option<User<L>>, Self::Error> {
         for user in &self.users {
             if user.username.as_str() == username {
@@ -40,6 +34,7 @@ impl<L: AccessLevel, H: PasswordHasher, const N: usize> CredentialProvider<L>
         Ok(None)
     }
 
+    /// Verify password against user's stored hash and salt.
     fn verify_password(&self, user: &User<L>, password: &str) -> bool {
         self.hasher
             .verify(password, &user.salt, &user.password_hash)
@@ -78,6 +73,7 @@ mod tests {
         }
     }
 
+    /// Create test user with pre-hashed credentials using fixed salt.
     fn create_test_user(
         username: &str,
         password: &str,
