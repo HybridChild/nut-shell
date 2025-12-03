@@ -1057,10 +1057,10 @@ where
             );
 
             match result {
-                Ok(completion) if completion.is_complete => {
+                Ok(crate::tree::completion::CompletionResult::Single { completion, .. }) => {
                     // Single match - replace buffer and update display
                     self.input_buffer.clear();
-                    match self.input_buffer.push_str(&completion.completion) {
+                    match self.input_buffer.push_str(&completion) {
                         Ok(()) => {
                             // Redraw line
                             self.io.write_str("\r")?; // Carriage return
@@ -1074,10 +1074,10 @@ where
                         }
                     }
                 }
-                Ok(completion) if !completion.all_matches.is_empty() => {
+                Ok(crate::tree::completion::CompletionResult::Multiple { all_matches, .. }) => {
                     // Multiple matches - show them
                     self.io.write_str("\r\n")?;
-                    for m in completion.all_matches.iter() {
+                    for m in all_matches.iter() {
                         self.io.write_str("  ")?; // 2-space indentation
                         self.io.write_str(m.as_str())?;
                         self.io.write_str("  ")?;
