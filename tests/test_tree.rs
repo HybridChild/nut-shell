@@ -9,11 +9,11 @@
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-use fixtures::{MockAccessLevel, MockHandlers, TEST_TREE};
+use fixtures::{MockAccessLevel, MockHandler, TEST_TREE};
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
-use nut_shell::shell::handlers::CommandHandler;
+use nut_shell::shell::handler::CommandHandler;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 
 // ============================================================================
@@ -81,66 +81,66 @@ fn test_const_tree_initialization() {
 // ============================================================================
 
 #[test]
-fn test_handlers_implementation_exists() {
-    // Validates that MockHandlers implements CommandHandler trait
-    let handlers = MockHandlers;
+fn test_handler_implementation_exists() {
+    // Validates that MockHandler implements CommandHandler trait
+    let handler = MockHandler;
 
     // CommandHandler is not dyn compatible due to async method,
     // but we can verify the implementation exists
-    let _result = handlers.execute_sync("help", &[]);
+    let _result = handler.execute_sync("help", &[]);
 }
 
 #[test]
 fn test_sync_command_execution() {
-    // Validates that sync commands execute correctly through handlers
-    let handlers = MockHandlers;
+    // Validates that sync commands execute correctly through handler
+    let handler = MockHandler;
 
     // Test help command
-    let result = handlers.execute_sync("help", &[]);
+    let result = handler.execute_sync("help", &[]);
     assert!(result.is_ok());
     let response = result.unwrap();
     assert_eq!(response.message.as_str(), "Help text here");
 
     // Test echo command with args
-    let result = handlers.execute_sync("echo", &["hello", "world"]);
+    let result = handler.execute_sync("echo", &["hello", "world"]);
     assert!(result.is_ok());
     let response = result.unwrap();
     assert_eq!(response.message.as_str(), "hello world");
 
     // Test echo with no args
-    let result = handlers.execute_sync("echo", &[]);
+    let result = handler.execute_sync("echo", &[]);
     assert!(result.is_ok());
     let response = result.unwrap();
     assert_eq!(response.message.as_str(), "");
 
     // Test reboot command
-    let result = handlers.execute_sync("reboot", &[]);
+    let result = handler.execute_sync("reboot", &[]);
     assert!(result.is_ok());
     let response = result.unwrap();
     assert_eq!(response.message.as_str(), "Rebooting...");
 
     // Test status command
-    let result = handlers.execute_sync("status", &[]);
+    let result = handler.execute_sync("status", &[]);
     assert!(result.is_ok());
     let response = result.unwrap();
     assert_eq!(response.message.as_str(), "System OK");
 
     // Test unknown command
-    let result = handlers.execute_sync("unknown", &[]);
+    let result = handler.execute_sync("unknown", &[]);
     assert_eq!(result, Err(CliError::CommandNotFound));
 }
 
 #[test]
-fn test_metadata_matches_handlers() {
+fn test_metadata_matches_handler() {
     // Validates that const metadata and handler implementations align
-    let handlers = MockHandlers;
+    let handler = MockHandler;
 
     // Find each command in TEST_TREE and verify handler exists
     if let Some(Node::Command(cmd)) = TEST_TREE.find_child("help") {
         assert_eq!(cmd.name, "help");
         assert_eq!(cmd.kind, CommandKind::Sync);
         // Verify handler exists
-        assert!(handlers.execute_sync("help", &[]).is_ok());
+        assert!(handler.execute_sync("help", &[]).is_ok());
     } else {
         panic!("help command not found in TEST_TREE");
     }
@@ -149,7 +149,7 @@ fn test_metadata_matches_handlers() {
         assert_eq!(cmd.name, "echo");
         assert_eq!(cmd.kind, CommandKind::Sync);
         // Verify handler exists
-        assert!(handlers.execute_sync("echo", &[]).is_ok());
+        assert!(handler.execute_sync("echo", &[]).is_ok());
     } else {
         panic!("echo command not found in TEST_TREE");
     }
@@ -205,11 +205,11 @@ fn test_async_command_in_tree() {
 #[cfg(feature = "async")]
 #[tokio::test]
 async fn test_async_command_execution() {
-    // Validates that async commands execute correctly through handlers
-    let handlers = MockHandlers;
+    // Validates that async commands execute correctly through handler
+    let handler = MockHandler;
 
     // Test async-wait with no args
-    let result = handlers.execute_async("async-wait", &[]).await;
+    let result = handler.execute_async("async-wait", &[]).await;
     assert!(result.is_ok());
     let response = result.unwrap();
     assert!(
@@ -218,7 +218,7 @@ async fn test_async_command_execution() {
     );
 
     // Test async-wait with custom duration
-    let result = handlers.execute_async("async-wait", &["250"]).await;
+    let result = handler.execute_async("async-wait", &["250"]).await;
     assert!(result.is_ok());
     let response = result.unwrap();
     assert!(
@@ -227,7 +227,7 @@ async fn test_async_command_execution() {
     );
 
     // Test unknown async command
-    let result = handlers.execute_async("unknown-async", &[]).await;
+    let result = handler.execute_async("unknown-async", &[]).await;
     assert_eq!(result, Err(CliError::CommandNotFound));
 }
 
@@ -236,7 +236,7 @@ async fn test_async_command_execution() {
 fn test_async_trait_method_compiles() {
     // Validates that async trait method signature compiles
     // This is a compile-time validation - if this test exists, the pattern works
-    let _handlers = MockHandlers;
+    let _handler = MockHandler;
 
     // If we got here, the async trait method compiled successfully
     // (CommandHandler is not dyn compatible due to async method, but that's expected)
@@ -342,10 +342,10 @@ fn test_generic_access_level_integration() {
 #[test]
 fn test_generic_config_integration() {
     // Validates that ShellConfig generic parameter works with Response
-    let handlers = MockHandlers;
+    let handler = MockHandler;
 
     // Response should be generic over DefaultConfig
-    let result: Result<Response<DefaultConfig>, CliError> = handlers.execute_sync("help", &[]);
+    let result: Result<Response<DefaultConfig>, CliError> = handler.execute_sync("help", &[]);
     assert!(result.is_ok());
 
     // Verify Response type is correct
@@ -551,8 +551,8 @@ fn test_tree_can_navigate_full_paths() {
 /// 2. ✅ Directory and Node types are const-initializable
 /// 3. ✅ TEST_TREE lives in ROM with zero runtime initialization
 /// 4. ✅ CommandHandler trait compiles with both sync and async methods
-/// 5. ✅ MockHandlers proves metadata/execution separation pattern works
-/// 6. ✅ Sync commands execute correctly through handlers
+/// 5. ✅ MockHandler proves metadata/execution separation pattern works
+/// 6. ✅ Sync commands execute correctly through handler
 /// 7. ✅ Async commands compile and execute when feature enabled
 /// 8. ✅ Generic parameters (L: AccessLevel, C: ShellConfig) integrate correctly
 /// 9. ✅ Node enum enables zero-cost dispatch via pattern matching

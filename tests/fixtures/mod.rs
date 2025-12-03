@@ -13,7 +13,7 @@ use nut_shell::CharIo;
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
-use nut_shell::shell::handlers::CommandHandler;
+use nut_shell::shell::handler::CommandHandler;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 use nut_shell_macros::AccessLevel;
 
@@ -459,15 +459,15 @@ pub const TEST_TREE: Directory<MockAccessLevel> = Directory {
 };
 
 // ============================================================================
-// MockHandlers - Command Execution Implementation
+// MockHandler - Command Execution Implementation
 // ============================================================================
 
-/// Mock command handlers for testing the metadata/execution separation pattern.
+/// Mock command handler for testing the metadata/execution separation pattern.
 ///
 /// Implements the execution side of the pattern, mapping command IDs to functions.
 /// This validates that CommandMeta (const metadata) and CommandHandler (runtime execution)
 /// work together correctly.
-pub struct MockHandlers;
+pub struct MockHandler;
 
 /// Helper to join string slices with spaces (no_std compatible).
 fn join_args(args: &[&str]) -> HString<256> {
@@ -490,7 +490,7 @@ fn format_msg(parts: &[&str]) -> HString<256> {
     result
 }
 
-impl CommandHandler<DefaultConfig> for MockHandlers {
+impl CommandHandler<DefaultConfig> for MockHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
             // Root commands

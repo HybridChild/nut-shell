@@ -9,7 +9,7 @@
 //! - All foundational types instantiate without compilation errors
 //! - Generic parameters (L, IO, H, C) work together correctly
 //! - Path parsing and tree navigation work end-to-end
-//! - Request/Response types integrate with tree and command handlers
+//! - Request/Response types integrate with tree and command handler
 //! - Both DefaultConfig and MinimalConfig work correctly
 //! - Feature combinations compile cleanly
 //! - Lifetime relationships between tree and runtime state are sound
@@ -17,13 +17,13 @@
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-use fixtures::{MockAccessLevel, MockHandlers, MockIo, TEST_TREE};
+use fixtures::{MockAccessLevel, MockHandler, MockIo, TEST_TREE};
 use nut_shell::CharIo;
 use nut_shell::auth::{AccessLevel, User};
 use nut_shell::config::{DefaultConfig, MinimalConfig, ShellConfig};
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
-use nut_shell::shell::handlers::CommandHandler;
+use nut_shell::shell::handler::CommandHandler;
 use nut_shell::shell::{CliState, HistoryDirection, Request};
 use nut_shell::tree::path::Path;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
@@ -117,8 +117,8 @@ fn test_all_types_instantiate_with_default_config() {
     }
 
     // CommandHandler trait
-    let handlers = MockHandlers;
-    let result = handlers.execute_sync("echo", &["hello", "world"]);
+    let handler = MockHandler;
+    let result = handler.execute_sync("echo", &["hello", "world"]);
     assert!(result.is_ok());
     let response = result.unwrap();
     assert_eq!(response.message.as_str(), "hello world");
@@ -252,12 +252,12 @@ fn test_path_depth_validation() {
 }
 
 // ============================================================================
-// Test 3: Request/Response Integration with Handlers
+// Test 3: Request/Response Integration with Handler
 // ============================================================================
 
 #[test]
-fn test_request_response_with_handlers() {
-    let handlers = MockHandlers;
+fn test_request_response_with_handler() {
+    let handler = MockHandler;
 
     // Create command request
     let request: Request<DefaultConfig> = Request::Command {
@@ -292,7 +292,7 @@ fn test_request_response_with_handlers() {
         let arg_refs: heapless::Vec<&str, 16> = args.iter().map(|s| s.as_str()).collect();
         let arg_slice: &[&str] = &arg_refs;
 
-        let result = handlers.execute_sync("echo", arg_slice);
+        let result = handler.execute_sync("echo", arg_slice);
         assert!(result.is_ok());
 
         let response = result.unwrap();
@@ -302,28 +302,28 @@ fn test_request_response_with_handlers() {
 
 #[test]
 fn test_command_not_found_error() {
-    let handlers = MockHandlers;
+    let handler = MockHandler;
 
-    let result = handlers.execute_sync("nonexistent", &[]);
+    let result = handler.execute_sync("nonexistent", &[]);
     assert!(matches!(result, Err(CliError::CommandNotFound)));
 }
 
 #[test]
-fn test_handlers_with_different_commands() {
-    let handlers = MockHandlers;
+fn test_handler_with_different_commands() {
+    let handler = MockHandler;
 
     // Test reboot command (ID: "reboot")
-    let result = handlers.execute_sync("reboot", &[]);
+    let result = handler.execute_sync("reboot", &[]);
     assert!(result.is_ok());
     assert_eq!(result.unwrap().message.as_str(), "Rebooting...");
 
     // Test status command (ID: "status")
-    let result = handlers.execute_sync("status", &[]);
+    let result = handler.execute_sync("status", &[]);
     assert!(result.is_ok());
     assert_eq!(result.unwrap().message.as_str(), "System OK");
 
     // Test led command with argument (ID: "hw_led")
-    let result = handlers.execute_sync("hw_led", &["on"]);
+    let result = handler.execute_sync("hw_led", &["on"]);
     assert!(result.is_ok());
     assert_eq!(result.unwrap().message.as_str(), "LED: on");
 }
@@ -340,9 +340,9 @@ fn test_generic_parameter_inference() {
     let response = Response::<DefaultConfig>::success("Test");
     assert!(!response.message.is_empty());
 
-    // Type inference for handlers
-    let handlers: MockHandlers = MockHandlers;
-    let _result: Result<Response<DefaultConfig>, CliError> = handlers.execute_sync("help", &[]);
+    // Type inference for handler
+    let handler: MockHandler = MockHandler;
+    let _result: Result<Response<DefaultConfig>, CliError> = handler.execute_sync("help", &[]);
 
     // Type inference for tree navigation
     let tree: &Directory<MockAccessLevel> = &TEST_TREE;
@@ -543,10 +543,10 @@ fn test_async_command_metadata() {
 #[cfg(feature = "async")]
 #[tokio::test]
 async fn test_async_handler_execution() {
-    let handlers = MockHandlers;
+    let handler = MockHandler;
 
     // Execute async command
-    let result = handlers.execute_async("async-wait", &[]).await;
+    let result = handler.execute_async("async-wait", &[]).await;
     assert!(result.is_ok());
 
     let response = result.unwrap();
@@ -593,8 +593,8 @@ fn test_complete_integration() {
     // 2. Setup tree
     let tree: &'static Directory<MockAccessLevel> = &TEST_TREE;
 
-    // 3. Setup handlers
-    let handlers = MockHandlers;
+    // 3. Setup handler
+    let handler = MockHandler;
 
     // 4. Create user
     let user = User {
@@ -625,7 +625,7 @@ fn test_complete_integration() {
             assert!(user.access_level >= cmd.access_level);
 
             // Execute command
-            let result = handlers.execute_sync(cmd.name, &[]);
+            let result = handler.execute_sync(cmd.name, &[]);
             assert!(result.is_ok());
 
             let response = result.unwrap();

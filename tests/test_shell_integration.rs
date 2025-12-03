@@ -9,7 +9,7 @@
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-use fixtures::{MockHandlers, MockIo, TEST_TREE};
+use fixtures::{MockHandler, MockIo, TEST_TREE};
 use nut_shell::Shell;
 
 // ============================================================================
@@ -20,8 +20,8 @@ use nut_shell::Shell;
 #[cfg(not(feature = "authentication"))]
 fn test_simple_command_execution() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -41,8 +41,8 @@ fn test_simple_command_execution() {
 #[cfg(not(feature = "authentication"))]
 fn test_command_with_arguments() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -70,8 +70,8 @@ fn test_command_with_arguments() {
 #[cfg(not(feature = "authentication"))]
 fn test_help_command() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -97,8 +97,8 @@ fn test_help_command() {
 #[cfg(not(feature = "authentication"))]
 fn test_ls_command_root() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -120,8 +120,8 @@ fn test_ls_command_root() {
 #[cfg(not(feature = "authentication"))]
 fn test_clear_command() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -147,8 +147,8 @@ fn test_clear_command() {
 #[cfg(all(feature = "completion", not(feature = "authentication")))]
 fn test_tab_completion_single_match() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -181,8 +181,8 @@ fn test_tab_completion_single_match() {
 #[cfg(all(feature = "history", not(feature = "authentication")))]
 fn test_history_navigation_up() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -218,8 +218,8 @@ fn test_history_navigation_up() {
 #[cfg(all(feature = "history", not(feature = "authentication")))]
 fn test_history_navigation_up_down() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -252,14 +252,19 @@ fn test_history_navigation_up_down() {
     );
     shell.io_mut().clear_output();
 
-    // Now test down arrow: up twice then down once should give "echo second"
+    // Now test down arrow: up three times then down once should give "echo second"
+    // History now contains: "echo first", "echo second", "echo first" (just executed)
     shell.process_char('\x1b').unwrap();
     shell.process_char('[').unwrap();
-    shell.process_char('A').unwrap(); // Up
+    shell.process_char('A').unwrap(); // Up (at "echo first" - most recent)
 
     shell.process_char('\x1b').unwrap();
     shell.process_char('[').unwrap();
-    shell.process_char('A').unwrap(); // Up again (at "echo first")
+    shell.process_char('A').unwrap(); // Up again (at "echo second")
+
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('[').unwrap();
+    shell.process_char('A').unwrap(); // Up again (at "echo first" - oldest)
 
     shell.process_char('\x1b').unwrap();
     shell.process_char('[').unwrap();
@@ -284,8 +289,8 @@ fn test_history_navigation_up_down() {
 #[cfg(not(feature = "authentication"))]
 fn test_double_esc_clears_buffer() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -315,8 +320,8 @@ fn test_double_esc_clears_buffer() {
 #[cfg(all(feature = "history", not(feature = "authentication")))]
 fn test_double_esc_exits_history_navigation() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -361,8 +366,8 @@ fn test_double_esc_exits_history_navigation() {
 #[cfg(not(feature = "authentication"))]
 fn test_backspace_handling() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -394,8 +399,8 @@ fn test_minimal_features() {
     #[cfg(not(feature = "authentication"))]
     {
         let io = MockIo::new();
-        let handlers = MockHandlers;
-        let mut shell = Shell::new(&TEST_TREE, handlers, io);
+        let handler = MockHandler;
+        let mut shell = Shell::new(&TEST_TREE, handler, io);
         shell.activate().unwrap();
         shell.io_mut().clear_output();
 
@@ -420,8 +425,8 @@ fn test_minimal_features() {
 #[cfg(not(feature = "authentication"))]
 fn test_buffer_overflow_emits_bell() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -448,8 +453,8 @@ fn test_buffer_overflow_emits_bell() {
 #[cfg(not(feature = "authentication"))]
 fn test_buffer_overflow_continues_working() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
 
     // Fill buffer to capacity
@@ -489,8 +494,8 @@ fn test_buffer_overflow_continues_working() {
 #[cfg(not(feature = "authentication"))]
 fn test_command_requires_exact_args() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -512,8 +517,8 @@ fn test_command_requires_exact_args() {
 #[cfg(not(feature = "authentication"))]
 fn test_command_accepts_valid_args() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -534,8 +539,8 @@ fn test_command_accepts_valid_args() {
 #[cfg(not(feature = "authentication"))]
 fn test_command_with_variable_args() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -556,8 +561,8 @@ fn test_command_with_variable_args() {
 #[cfg(not(feature = "authentication"))]
 fn test_command_too_many_args() {
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -618,8 +623,8 @@ fn create_test_provider() -> (
 fn test_guest_can_execute_guest_level_commands() {
     let (provider, _hasher) = create_test_provider();
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -648,8 +653,8 @@ fn test_guest_can_execute_guest_level_commands() {
 fn test_guest_cannot_execute_admin_commands() {
     let (provider, _hasher) = create_test_provider();
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -678,8 +683,8 @@ fn test_guest_cannot_execute_admin_commands() {
 fn test_guest_cannot_access_admin_directories() {
     let (provider, _hasher) = create_test_provider();
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -708,8 +713,8 @@ fn test_guest_cannot_access_admin_directories() {
 fn test_admin_can_execute_admin_commands() {
     let (provider, _hasher) = create_test_provider();
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -738,8 +743,8 @@ fn test_admin_can_execute_admin_commands() {
 fn test_admin_can_access_admin_directories() {
     let (provider, _hasher) = create_test_provider();
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -768,8 +773,8 @@ fn test_admin_can_access_admin_directories() {
 fn test_admin_can_execute_guest_level_commands() {
     let (provider, _hasher) = create_test_provider();
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, &provider, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -803,12 +808,12 @@ fn test_minimal_config_works() {
     use nut_shell::Response;
     use nut_shell::config::MinimalConfig;
     use nut_shell::error::CliError;
-    use nut_shell::shell::handlers::CommandHandler;
+    use nut_shell::shell::handler::CommandHandler;
 
-    // Implement handlers for MinimalConfig
-    struct MinimalHandlers;
+    // Implement handler for MinimalConfig
+    struct MinimalHandler;
 
-    impl CommandHandler<MinimalConfig> for MinimalHandlers {
+    impl CommandHandler<MinimalConfig> for MinimalHandler {
         fn execute_sync(
             &self,
             name: &str,
@@ -832,8 +837,8 @@ fn test_minimal_config_works() {
     }
 
     let io = MockIo::new();
-    let handlers = MinimalHandlers;
-    let mut shell: Shell<_, _, _, MinimalConfig> = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MinimalHandler;
+    let mut shell: Shell<_, _, _, MinimalConfig> = Shell::new(&TEST_TREE, handler, io);
 
     shell.activate().unwrap();
     shell.io_mut().clear_output();
@@ -856,8 +861,8 @@ fn test_minimal_config_works() {
 async fn test_async_command_via_process_char_async() {
     // Test that process_char_async can execute async commands end-to-end
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -884,8 +889,8 @@ async fn test_async_command_via_process_char_async() {
 async fn test_sync_command_in_async_context() {
     // Test that sync commands work fine in process_char_async
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
@@ -906,8 +911,8 @@ async fn test_sync_command_in_async_context() {
 async fn test_async_command_with_arguments() {
     // Test async command with custom arguments
     let io = MockIo::new();
-    let handlers = MockHandlers;
-    let mut shell = Shell::new(&TEST_TREE, handlers, io);
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 

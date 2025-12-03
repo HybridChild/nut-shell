@@ -85,7 +85,7 @@ pub use auth::{AccessLevel, User};
 pub use response::Response;
 
 // Shell types (Phase 6+)
-pub use shell::handlers::CommandHandler;
+pub use shell::handler::CommandHandler;
 pub use shell::{CliState, HistoryDirection, Request, Shell};
 
 // Optional feature re-exports (authentication-only types)

@@ -1,14 +1,14 @@
-//! Command handlers for the async example
+//! Command handler for the async example
 
 use core::fmt::Write;
 use nut_shell::{
-    CliError, config::DefaultConfig, response::Response, shell::handlers::CommandHandler,
+    CliError, config::DefaultConfig, response::Response, shell::handler::CommandHandler,
 };
 use tokio::time::{Duration, sleep};
 
-pub struct AsyncHandlers;
+pub struct AsyncHandler;
 
-impl CommandHandler<DefaultConfig> for AsyncHandlers {
+impl CommandHandler<DefaultConfig> for AsyncHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
             "sync_echo" => {

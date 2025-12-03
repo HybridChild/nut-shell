@@ -8,7 +8,7 @@ use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
 use embassy_sync::channel::Channel;
 use embassy_time::{Duration, Timer};
 
-use crate::handlers::LedCommand;
+use crate::handler::LedCommand;
 use crate::hw_state;
 
 // =============================================================================

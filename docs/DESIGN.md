@@ -79,7 +79,7 @@ where
 **Trade-offs:**
 - ✅ Command name duplication (tree metadata + handler match) → explicit, debuggable
 - ✅ Additional generics `H: CommandHandler<C>` → zero runtime cost via monomorphization
-- ✅ Manual match statements in handlers → explicit dispatch, clear control flow
+- ✅ Manual match statements in handler → explicit dispatch, clear control flow
 
 ### 2. Authentication: Opt-In Security
 

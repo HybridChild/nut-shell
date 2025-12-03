@@ -1,46 +1,36 @@
-//! Command handlers for the embassy example
+//! Command handler for the basic example
 
 use core::fmt::Write;
-use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
-use embassy_sync::channel::Channel;
-use embassy_time::{Duration, Timer};
 use heapless;
 use nut_shell::{
-    CliError, config::DefaultConfig, response::Response, shell::handlers::CommandHandler,
+    CliError, config::DefaultConfig, response::Response, shell::handler::CommandHandler,
 };
 use rp_pico_examples::{hw_commands, system_commands};
 
 use crate::hw_state;
 
-pub enum LedCommand {
-    On,
-    Off,
-}
+pub struct PicoHandler;
 
-pub struct PicoHandlers {
-    pub led_channel: &'static Channel<ThreadModeRawMutex, LedCommand, 1>,
-}
-
-impl PicoHandlers {
+impl PicoHandler {
     fn system_info(&self) -> Result<Response<DefaultConfig>, CliError> {
         let mut msg = heapless::String::<256>::new();
         write!(msg, "Device: Raspberry Pi Pico\r\n").ok();
         write!(msg, "Chip: RP2040\r\n").ok();
-        write!(msg, "Runtime: Embassy\r\n").ok();
         write!(msg, "Firmware: nut-shell v0.1.0 - UART CLI Example\r\n").ok();
         write!(msg, "UART: GP0(TX)/GP1(RX) @ 115200").ok();
         Ok(Response::success(&msg).indented())
     }
 
-    fn signal_led(&self, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
+    fn led_control(&self, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         let state = args[0];
+
         match state {
             "on" => {
-                self.led_channel.try_send(LedCommand::On).ok();
+                hw_state::set_led(true);
                 Ok(Response::success("LED turned on").indented())
             }
             "off" => {
-                self.led_channel.try_send(LedCommand::Off).ok();
+                hw_state::set_led(false);
                 Ok(Response::success("LED turned off").indented())
             }
             _ => {
@@ -57,12 +47,12 @@ impl PicoHandlers {
     fn temperature(&self) -> Result<Response<DefaultConfig>, CliError> {
         let celsius = hw_state::read_temperature();
         let mut msg = heapless::String::<64>::new();
-        write!(msg, "Temperature: {:.1}°C", celsius).ok();
+        write!(msg, "Temperature: {:.1} deg C", celsius).ok();
         Ok(Response::success(&msg).indented())
     }
 }
 
-impl CommandHandler<DefaultConfig> for PicoHandlers {
+impl CommandHandler<DefaultConfig> for PicoHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
             "system_info" => self.system_info(),
@@ -80,42 +70,18 @@ impl CommandHandler<DefaultConfig> for PicoHandlers {
             "hw_bootreason" => hw_commands::cmd_bootreason::<DefaultConfig>(args),
             "hw_gpio" => hw_commands::cmd_gpio::<DefaultConfig>(args),
             // Hardware control commands
-            "led" => self.signal_led(args),
+            "hw_led" => self.led_control(args),
             _ => Err(CliError::CommandNotFound),
         }
     }
 
+    #[cfg(feature = "async")]
     async fn execute_async(
         &self,
-        id: &str,
-        args: &[&str],
+        _id: &str,
+        _args: &[&str],
     ) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
-            "system_delay" => {
-                // Parse delay duration
-                let seconds = args[0].parse::<u64>().map_err(|_| {
-                    let mut expected = heapless::String::<32>::new();
-                    expected.push_str("positive integer").ok();
-                    CliError::InvalidArgumentFormat {
-                        arg_index: 0,
-                        expected,
-                    }
-                })?;
-
-                if seconds > 60 {
-                    let mut msg = heapless::String::<128>::new();
-                    write!(msg, "Maximum delay is 60 seconds").ok();
-                    return Err(CliError::CommandFailed(msg));
-                }
-
-                // Async delay using Embassy timer
-                Timer::after(Duration::from_secs(seconds)).await;
-
-                let mut msg = heapless::String::<64>::new();
-                write!(msg, "Delayed for {} second(s)", seconds).ok();
-                Ok(Response::success(&msg).indented().indented())
-            }
-            _ => Err(CliError::CommandNotFound),
-        }
+        // basic example is synchronous-only, no async commands
+        Err(CliError::CommandNotFound)
     }
 }

@@ -57,7 +57,7 @@ const SYSTEM: Directory<MyAccessLevel> = Directory {
 };
 
 // 4. Dispatch in handler
-impl CommandHandler<MyConfig> for MyHandlers {
+impl CommandHandler<MyConfig> for MyHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
             "status" => status_fn::<MyConfig>(args),
@@ -89,7 +89,7 @@ async fn fetch_fn<C: ShellConfig>(args: &[&str]) -> Result<Response<C>, CliError
 
 // 3. Dispatch in async handler
 #[cfg(feature = "async")]
-impl CommandHandler<MyConfig> for MyHandlers {
+impl CommandHandler<MyConfig> for MyHandler {
     async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
             "fetch" => fetch_fn::<MyConfig>(args).await,
@@ -110,12 +110,12 @@ loop {
 ### Stateful Handlers
 
 ```rust
-struct MyHandlers<'a> {
+struct MyHandler<'a> {
     system_state: &'a SystemState,
     config: &'a Config,
 }
 
-impl<'a> CommandHandler<MyConfig> for MyHandlers<'a> {
+impl<'a> CommandHandler<MyConfig> for MyHandler<'a> {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
             "status" => {
@@ -160,9 +160,9 @@ The macro generates `from_str` and `as_str` methods for string conversion. Highe
 Maps command IDs to execution functions:
 
 ```rust
-struct MyHandlers;
+struct MyHandler;
 
-impl CommandHandler<MyConfig> for MyHandlers {
+impl CommandHandler<MyConfig> for MyHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
             "status" => status_fn::<MyConfig>(args),
@@ -222,10 +222,10 @@ impl CharIo for MyIo {
 use nut_shell::{Shell, DefaultConfig, MinimalConfig};
 
 // Standard
-let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handlers, io);
+let mut shell: Shell<_, _, _, _, DefaultConfig> = Shell::new(&ROOT, handler, io);
 
 // Minimal
-let mut shell: Shell<_, _, _, _, MinimalConfig> = Shell::new(&ROOT, handlers, io);
+let mut shell: Shell<_, _, _, _, MinimalConfig> = Shell::new(&ROOT, handler, io);
 ```
 
 ### Custom `ShellConfig`
@@ -242,7 +242,7 @@ impl ShellConfig for MyConfig {
     // ... other buffer sizes and messages
 }
 
-let mut shell: Shell<_, _, _, _, MyConfig> = Shell::new(&ROOT, handlers, io);
+let mut shell: Shell<_, _, _, _, MyConfig> = Shell::new(&ROOT, handler, io);
 ```
 
 **Currently customizable:**

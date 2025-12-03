@@ -10,7 +10,7 @@
 #![no_std]
 #![no_main]
 
-mod handlers;
+mod handler;
 mod hw_setup;
 mod hw_state;
 mod io;
@@ -32,7 +32,7 @@ use rp_pico_examples::{PicoAccessLevel, init_boot_time, init_chip_id, init_reset
 #[cfg(feature = "authentication")]
 use rp_pico_examples::PicoCredentialProvider;
 
-use crate::handlers::PicoHandlers;
+use crate::handler::PicoHandler;
 use crate::io::UsbCharIo;
 use crate::tree::ROOT;
 
@@ -62,8 +62,8 @@ fn main() -> ! {
     // Initialize hardware status (chip ID must be read after HAL initialization)
     init_chip_id();
 
-    // Create handlers
-    let handlers = PicoHandlers;
+    // Create handler
+    let handler = PicoHandler;
 
     // Create credential provider (must live as long as shell)
     #[cfg(feature = "authentication")]
@@ -71,12 +71,12 @@ fn main() -> ! {
 
     // Create shell (with or without authentication based on feature flag)
     #[cfg(feature = "authentication")]
-    let mut shell: Shell<PicoAccessLevel, UsbCharIo, PicoHandlers, DefaultConfig> =
-        Shell::new(&ROOT, handlers, &provider, io);
+    let mut shell: Shell<PicoAccessLevel, UsbCharIo, PicoHandler, DefaultConfig> =
+        Shell::new(&ROOT, handler, &provider, io);
 
     #[cfg(not(feature = "authentication"))]
-    let mut shell: Shell<PicoAccessLevel, UsbCharIo, PicoHandlers, DefaultConfig> =
-        Shell::new(&ROOT, handlers, io);
+    let mut shell: Shell<PicoAccessLevel, UsbCharIo, PicoHandler, DefaultConfig> =
+        Shell::new(&ROOT, handler, io);
 
     // Activate shell (show welcome and prompt)
     shell.activate().ok();

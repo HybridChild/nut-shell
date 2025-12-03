@@ -67,7 +67,7 @@ pub fn do_something() -> Result<Vec<&str, 32>> { Ok(Vec::new()) }  // No-op stub
 
 **`CommandHandler`** - Maps command IDs to functions:
 ```rust
-impl CommandHandler<MyConfig> for MyHandlers {
+impl CommandHandler<MyConfig> for MyHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MyConfig>, CliError> {
         match id {
             "status" => status_fn::<MyConfig>(args),
