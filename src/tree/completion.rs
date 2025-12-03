@@ -60,17 +60,6 @@ impl<const MAX_MATCHES: usize> CompletionResult<MAX_MATCHES> {
 ///
 /// Returns empty CompletionResult (graceful degradation).
 ///
-/// # Parameters
-///
-/// - `dir`: Current directory to search within
-/// - `input`: Partial input to complete (e.g., "st" for "status")
-/// - `current_user`: Current user (for access control filtering)
-///
-/// # Returns
-///
-/// - `Ok(CompletionResult)` - Completion results (may be empty)
-/// - `Err(CliError)` - Error during completion processing
-///
 /// # Examples
 ///
 /// ```rust,ignore

@@ -11,12 +11,6 @@ use crate::auth::{AccessLevel, CredentialProvider, PasswordHasher, User};
 /// Constant credential provider with hardcoded users.
 ///
 /// **WARNING**: Only for examples and testing. Credentials are visible in binary.
-///
-/// # Type Parameters
-///
-/// * `L` - Access level type
-/// * `H` - Password hasher implementation
-/// * `N` - Number of users
 #[derive(Debug)]
 pub struct ConstCredentialProvider<L: AccessLevel, H: PasswordHasher, const N: usize> {
     users: [User<L>; N],
@@ -26,10 +20,7 @@ pub struct ConstCredentialProvider<L: AccessLevel, H: PasswordHasher, const N: u
 impl<L: AccessLevel, H: PasswordHasher, const N: usize> ConstCredentialProvider<L, H, N> {
     /// Create a new const credential provider.
     ///
-    /// # Arguments
-    ///
-    /// * `users` - Array of users (credentials must be pre-hashed)
-    /// * `hasher` - Password hasher for verification
+    /// Users' credentials must be pre-hashed.
     pub const fn new(users: [User<L>; N], hasher: H) -> Self {
         Self { users, hasher }
     }

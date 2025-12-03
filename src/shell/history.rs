@@ -9,10 +9,6 @@ use core::marker::PhantomData;
 
 /// Command history storage.
 ///
-/// Generic over:
-/// - `N`: Number of history entries to store
-/// - `INPUT_SIZE`: Maximum size of each history entry
-///
 /// When `history` feature is enabled, stores commands in a ring buffer.
 /// When disabled, zero-size stub that no-ops all operations.
 #[derive(Debug)]

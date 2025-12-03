@@ -107,13 +107,6 @@ pub enum Request<C: ShellConfig> {
 ///
 /// Brings together all components following the unified architecture pattern.
 /// Uses single code path for both auth-enabled and auth-disabled modes.
-///
-/// Generic over:
-/// - `'tree`: Lifetime of command tree (typically 'static)
-/// - `L`: AccessLevel implementation
-/// - `IO`: CharIo implementation
-/// - `H`: CommandHandler implementation
-/// - `C`: ShellConfig implementation
 pub struct Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,
@@ -202,7 +195,7 @@ where
 {
     /// Create new Shell with credential provider for when authentication enabled.
     ///
-    /// Starts in `Inactive` state. Call `activate()` to show welcome message and prompt.
+    /// Starts in `Inactive` state. Call `activate()` to show welcome message and login prompt.
     pub fn new(
         tree: &'tree Directory<L>,
         handler: H,
