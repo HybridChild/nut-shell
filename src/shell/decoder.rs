@@ -5,8 +5,6 @@
 //!
 //! This is a pure decoder - it doesn't manage buffers or I/O. It simply converts
 //! raw terminal character sequences into logical input events.
-//!
-//! See [INTERNALS.md](../../docs/INTERNALS.md) for state machine details.
 
 /// Decoder state for escape sequence handling.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -54,14 +54,6 @@ pub trait ShellConfig {
 }
 
 /// Default configuration for typical embedded systems.
-///
-/// Balanced buffer sizes suitable for most applications:
-/// - MAX_INPUT: 128 bytes
-/// - MAX_PATH_DEPTH: 8 levels
-/// - MAX_ARGS: 16 arguments
-/// - MAX_PROMPT: 64 bytes
-/// - MAX_RESPONSE: 256 bytes
-/// - HISTORY_SIZE: 10 commands (with `history` feature), 0 otherwise
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DefaultConfig;
 
@@ -87,14 +79,6 @@ impl ShellConfig for DefaultConfig {
 }
 
 /// Minimal configuration for resource-constrained systems.
-///
-/// Reduced buffer sizes for memory-limited devices:
-/// - MAX_INPUT: 64 bytes
-/// - MAX_PATH_DEPTH: 4 levels
-/// - MAX_ARGS: 8 arguments
-/// - MAX_PROMPT: 32 bytes
-/// - MAX_RESPONSE: 128 bytes
-/// - HISTORY_SIZE: 4 commands (with `history` feature), 0 otherwise
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct MinimalConfig;
 
