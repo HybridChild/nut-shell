@@ -144,7 +144,7 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 
 ---
 
-## Interactive Session with authentication feature disabled
+## Interactive Session (authentication disabled)
 
 ```console
 Welcome to nut-shell! Type '?' for help.
@@ -158,7 +158,7 @@ Welcome to nut-shell! Type '?' for help.
   echo  - Echo arguments back
 @/> echo hello world!
 hello world!
-@/> system/
+@/> system
 @/system> ls
   status  - Show system status
   version  - Show version information
@@ -226,7 +226,7 @@ Optional `authentication` feature provides:
 - Access control enforced at every path segment
 - Pluggable credential providers (build-time, flash storage, custom)
 
-### Interactive session with authentication feature enabled
+### Interactive Session (authentication enabled)
 
 ```console
 Welcome to nut-shell! Type '?' for help.
