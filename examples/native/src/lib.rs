@@ -11,5 +11,5 @@ pub mod io;
 // Re-export commonly used types for convenience
 pub use access_level::ExampleAccessLevel;
 #[cfg(feature = "authentication")]
-pub use credentials::ExampleCredentialProvider;
+pub use credentials::{ExampleCredentialProvider, create_example_provider};
 pub use io::{RawModeGuard, StdioCharIo};

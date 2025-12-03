@@ -14,7 +14,7 @@ pub mod system_commands;
 // Re-export commonly used types for convenience
 pub use access_level::PicoAccessLevel;
 #[cfg(feature = "authentication")]
-pub use credentials::PicoCredentialProvider;
+pub use credentials::{PicoCredentialProvider, create_pico_provider};
 
 // Re-export command initialization functions
 pub use hw_commands::{init_chip_id, init_reset_reason};

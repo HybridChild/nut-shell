@@ -14,7 +14,7 @@ pub mod system_commands;
 pub use access_level::Stm32AccessLevel;
 
 #[cfg(feature = "authentication")]
-pub use credentials::Stm32CredentialProvider;
+pub use credentials::{Stm32CredentialProvider, create_stm32_provider};
 
 // Re-export command initialization functions
 pub use system_commands::init_boot_time;
