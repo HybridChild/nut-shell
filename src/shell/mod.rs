@@ -1688,23 +1688,28 @@ mod tests {
             }
         }
 
-        // Test 2: First-level directory command (system/reboot)
+        // Test 2: Verify command metadata properties
         let result = shell.resolve_path("system/reboot");
         assert!(result.is_ok(), "Should resolve system/reboot");
         if let Ok((node, _)) = result {
             assert!(node.is_some());
             if let Some(Node::Command(cmd)) = node {
                 assert_eq!(cmd.name, "reboot");
+                assert_eq!(cmd.description, "Reboot the system");
+                assert_eq!(cmd.access_level, MockLevel::User);
+                assert_eq!(cmd.kind, CommandKind::Sync);
             }
         }
 
-        // Test 3: First-level directory command (system/status)
+        // Test 3: Verify unique command ID (critical for handler dispatch)
         let result = shell.resolve_path("system/status");
         assert!(result.is_ok(), "Should resolve system/status");
         if let Ok((node, _)) = result {
             assert!(node.is_some());
             if let Some(Node::Command(cmd)) = node {
                 assert_eq!(cmd.name, "status");
+                assert_eq!(cmd.id, "status");
+                // Verify this is different from network/status which has id "network_status"
             }
         }
 
@@ -1739,16 +1744,25 @@ mod tests {
             "Should return CommandNotFound for non-existent command"
         );
 
-        // Test 7: Invalid path with non-existent directory
+        // Test 7: Invalid path (nonexistent directory)
         let result = shell.resolve_path("invalid/path/command");
-        assert!(result.is_err(), "Should fail for invalid path");
-        // Could be CommandNotFound or InvalidPath depending on where it fails
+        assert!(result.is_err(), "Should fail for nonexistent path");
+        assert_eq!(
+            result.unwrap_err(),
+            CliError::CommandNotFound,
+            "Should return CommandNotFound when first segment doesn't exist"
+        );
+
+        // Test 7b: Invalid path (attempting to navigate through a command)
+        let result = shell.resolve_path("test-cmd/something");
         assert!(
-            matches!(
-                result.unwrap_err(),
-                CliError::CommandNotFound | CliError::InvalidPath
-            ),
-            "Should return CommandNotFound or InvalidPath"
+            result.is_err(),
+            "Should fail when navigating through command"
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            CliError::InvalidPath,
+            "Should return InvalidPath when trying to navigate through a command"
         );
 
         // Test 8: Resolve to directory (system)
@@ -1785,14 +1799,16 @@ mod tests {
         let result = shell.resolve_path("system/network/status");
         assert!(result.is_ok(), "Should resolve system/network/status");
         let (_, path) = result.unwrap();
-        // Path should have indices for system (0), network (2), and status (0)
-        // [0] = system (index 0 in children of root)
-        // [2] = network (index 2 in children of system)
+        // Path should have indices for system (1), network (3)
+        // [1] = system (index 1 in children of root: test-cmd, system)
+        // [3] = network (index 3 in children of system: reboot, status, hardware, network)
         assert_eq!(
             path.len(),
             2,
             "Path should have 2 elements (system, network)"
         );
+        assert_eq!(path[0], 1, "system should be at index 1 in root");
+        assert_eq!(path[1], 3, "network should be at index 3 in system");
 
         // Test 2: Use .. to go back to system from system/network
         let result = shell.resolve_path("system/network/..");
@@ -1803,20 +1819,23 @@ mod tests {
                 assert_eq!(dir.name, "system", "Should be back at system directory");
             }
             assert_eq!(path.len(), 1, "Path should have 1 element");
+            assert_eq!(path[0], 1, "system should be at index 1 in root");
         }
 
         // Test 3: Multiple .. to go back to root
         let result = shell.resolve_path("system/network/../..");
         assert!(result.is_ok(), "Should resolve system/network/../..");
-        if let Ok((_, path)) = result {
+        if let Ok((node, path)) = result {
             assert_eq!(path.len(), 0, "Path should be empty (at root)");
+            assert!(node.is_none(), "Node should be None (representing root)");
         }
 
         // Test 4: Go beyond root with .. (should stay at root)
         let result = shell.resolve_path("..");
         assert!(result.is_ok(), "Should handle .. at root");
-        if let Ok((_, path)) = result {
+        if let Ok((node, path)) = result {
             assert_eq!(path.len(), 0, "Path should stay at root");
+            assert!(node.is_none(), "Node should be None (representing root)");
         }
     }
 }
