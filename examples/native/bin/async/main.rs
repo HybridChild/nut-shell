@@ -18,8 +18,6 @@ mod handler;
 mod tree;
 
 use handler::AsyncHandler;
-#[cfg(feature = "authentication")]
-use native_examples::ExampleCredentialProvider;
 use native_examples::{ExampleAccessLevel, RawModeGuard, StdioCharIo};
 use nut_shell::{config::DefaultConfig, shell::Shell};
 use std::io::{self as stdio, Read};
@@ -66,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create shell (different constructors based on authentication feature)
     #[cfg(feature = "authentication")]
-    let provider = ExampleCredentialProvider::new();
+    let provider = native_examples::create_example_provider();
     #[cfg(feature = "authentication")]
     let mut shell: Shell<ExampleAccessLevel, StdioCharIo, AsyncHandler, DefaultConfig> =
         Shell::new(&ROOT, handler, &provider, io);

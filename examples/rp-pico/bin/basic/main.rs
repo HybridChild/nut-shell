@@ -29,9 +29,6 @@ use nut_shell::{config::DefaultConfig, shell::Shell};
 
 use rp_pico_examples::{PicoAccessLevel, init_boot_time, init_chip_id, init_reset_reason};
 
-#[cfg(feature = "authentication")]
-use rp_pico_examples::PicoCredentialProvider;
-
 use crate::handler::PicoHandler;
 use crate::io::UsbCharIo;
 use crate::tree::ROOT;
@@ -67,7 +64,7 @@ fn main() -> ! {
 
     // Create credential provider (must live as long as shell)
     #[cfg(feature = "authentication")]
-    let provider = PicoCredentialProvider::new();
+    let provider = rp_pico_examples::create_pico_provider();
 
     // Create shell (with or without authentication based on feature flag)
     #[cfg(feature = "authentication")]
