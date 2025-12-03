@@ -12,16 +12,13 @@ use crate::tree::Directory;
 #[cfg(feature = "completion")]
 use crate::tree::Node;
 
-/// Completion result containing the completed text and match information.
-///
-/// Uses enum to make illegal states unrepresentable - `is_directory` is only
-/// meaningful for single matches.
+/// Tab completion result with type-safe variants for different match outcomes.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CompletionResult<const MAX_MATCHES: usize> {
-    /// No matches found
+    /// No matches found for the input prefix
     None,
 
-    /// Exactly one match found
+    /// Exactly one match found (auto-completable)
     Single {
         /// The completed name (with "/" appended for directories)
         // TODO: Use C::MAX_INPUT when const generics stabilize
@@ -31,7 +28,7 @@ pub enum CompletionResult<const MAX_MATCHES: usize> {
         is_directory: bool,
     },
 
-    /// Multiple matches found
+    /// Multiple matches found (show options to user)
     Multiple {
         /// Common prefix of all matches
         // TODO: Use C::MAX_INPUT when const generics stabilize
@@ -71,23 +68,16 @@ impl<const MAX_MATCHES: usize> CompletionResult<MAX_MATCHES> {
 /// # Examples
 ///
 /// ```rust,ignore
-/// // Single match
-/// let result = suggest_completions(&dir, "sta", Some(&user))?;
-/// match result {
-///     CompletionResult::Single { completion, .. } => {
-///         assert_eq!(completion.as_str(), "status");
+/// match suggest_completions(&dir, "sta", Some(&user))? {
+///     CompletionResult::Single { completion, is_directory } => {
+///         // One match - can auto-complete
 ///     }
-///     _ => panic!("Expected single match"),
-/// }
-///
-/// // Multiple matches (common prefix)
-/// let result = suggest_completions(&dir, "s", Some(&user))?;
-/// match result {
 ///     CompletionResult::Multiple { common_prefix, all_matches } => {
-///         assert_eq!(common_prefix.as_str(), "s");
-///         assert_eq!(all_matches.len(), 2);  // "status", "system"
+///         // Show all_matches to user
 ///     }
-///     _ => panic!("Expected multiple matches"),
+///     CompletionResult::None => {
+///         // Beep or show "no matches"
+///     }
 /// }
 /// ```
 #[cfg(feature = "completion")]
@@ -561,5 +551,147 @@ mod tests {
         let matches = [("abc", false), ("xyz", false)];
         let prefix = find_common_prefix(&matches);
         assert_eq!(prefix, ""); // No common prefix
+    }
+
+    #[test]
+    #[cfg(feature = "completion")]
+    fn test_max_matches_exceeded() {
+        // Create directory with more nodes than MAX_MATCHES
+        const CMD1: CommandMeta<TestLevel> = CommandMeta {
+            id: "a1",
+            name: "a1",
+            description: "Command 1",
+            access_level: TestLevel::Guest,
+            kind: CommandKind::Sync,
+            min_args: 0,
+            max_args: 0,
+        };
+        const CMD2: CommandMeta<TestLevel> = CommandMeta {
+            id: "a2",
+            name: "a2",
+            description: "Command 2",
+            access_level: TestLevel::Guest,
+            kind: CommandKind::Sync,
+            min_args: 0,
+            max_args: 0,
+        };
+        const CMD3: CommandMeta<TestLevel> = CommandMeta {
+            id: "a3",
+            name: "a3",
+            description: "Command 3",
+            access_level: TestLevel::Guest,
+            kind: CommandKind::Sync,
+            min_args: 0,
+            max_args: 0,
+        };
+        const CMD4: CommandMeta<TestLevel> = CommandMeta {
+            id: "a4",
+            name: "a4",
+            description: "Command 4",
+            access_level: TestLevel::Guest,
+            kind: CommandKind::Sync,
+            min_args: 0,
+            max_args: 0,
+        };
+
+        const OVERFLOW_DIR: Directory<TestLevel> = Directory {
+            name: "overflow",
+            children: &[
+                Node::Command(&CMD1),
+                Node::Command(&CMD2),
+                Node::Command(&CMD3),
+                Node::Command(&CMD4),
+            ],
+            access_level: TestLevel::Guest,
+        };
+
+        // Use MAX_MATCHES = 2, but we have 4 matching items
+        let result = suggest_completions::<TestLevel, 2>(&OVERFLOW_DIR, "a", None);
+
+        // Should return BufferFull error
+        assert!(matches!(result, Err(CliError::BufferFull)));
+    }
+
+    #[test]
+    #[cfg(feature = "completion")]
+    fn test_very_long_command_name() {
+        // Create a command with name > 128 characters
+        const LONG_CMD: CommandMeta<TestLevel> = CommandMeta {
+            id: "long",
+            name: "this_is_a_very_long_command_name_that_exceeds_the_maximum_buffer_size_of_128_characters_and_should_cause_a_buffer_overflow_error_when_completing",
+            description: "Long command",
+            access_level: TestLevel::Guest,
+            kind: CommandKind::Sync,
+            min_args: 0,
+            max_args: 0,
+        };
+
+        const LONG_DIR: Directory<TestLevel> = Directory {
+            name: "long",
+            children: &[Node::Command(&LONG_CMD)],
+            access_level: TestLevel::Guest,
+        };
+
+        // Try to complete - should return BufferFull error
+        let result = suggest_completions::<TestLevel, 16>(&LONG_DIR, "this", None);
+
+        assert!(matches!(result, Err(CliError::BufferFull)));
+    }
+
+    #[test]
+    #[cfg(feature = "completion")]
+    fn test_long_directory_name_with_slash() {
+        // Create a directory with name = 128 characters (so adding "/" would overflow)
+        const LONG_DIR_CHILD: Directory<TestLevel> = Directory {
+            name: "this_is_exactly_one_hundred_twenty_eight_characters_long_directory_name_abcdefghijklmnopqrstuvwxyz_0123456789_more_padding_needed",
+            children: &[],
+            access_level: TestLevel::Guest,
+        };
+
+        const LONG_DIR: Directory<TestLevel> = Directory {
+            name: "parent",
+            children: &[Node::Directory(&LONG_DIR_CHILD)],
+            access_level: TestLevel::Guest,
+        };
+
+        // Try to complete - should return BufferFull error when trying to append "/"
+        let result = suggest_completions::<TestLevel, 16>(&LONG_DIR, "this", None);
+
+        assert!(matches!(result, Err(CliError::BufferFull)));
+    }
+
+    #[test]
+    #[cfg(feature = "completion")]
+    fn test_match_name_exceeds_64_chars() {
+        // Create commands with names > 64 characters (for all_matches buffer)
+        const LONG1: CommandMeta<TestLevel> = CommandMeta {
+            id: "m1",
+            name: "match_name_that_is_longer_than_sixty_four_characters_abcdefghijklm",
+            description: "Long 1",
+            access_level: TestLevel::Guest,
+            kind: CommandKind::Sync,
+            min_args: 0,
+            max_args: 0,
+        };
+        const LONG2: CommandMeta<TestLevel> = CommandMeta {
+            id: "m2",
+            name: "match_name_that_is_longer_than_sixty_four_characters_nopqrstuvwxyz",
+            description: "Long 2",
+            access_level: TestLevel::Guest,
+            kind: CommandKind::Sync,
+            min_args: 0,
+            max_args: 0,
+        };
+
+        const LONG_MATCH_DIR: Directory<TestLevel> = Directory {
+            name: "longmatch",
+            children: &[Node::Command(&LONG1), Node::Command(&LONG2)],
+            access_level: TestLevel::Guest,
+        };
+
+        // Multiple matches with long names should cause BufferFull when building all_matches
+        let result = suggest_completions::<TestLevel, 16>(&LONG_MATCH_DIR, "match", None);
+
+        assert!(matches!(result, Err(CliError::BufferFull)));
     }
 }
