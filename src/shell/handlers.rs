@@ -1,9 +1,7 @@
 //! Command handler trait for executing commands.
 //!
-//! The `CommandHandler` trait maps command IDs to execution functions,
-//! implementing the execution side of the metadata/execution separation pattern.
-//!
-//! See [DESIGN.md](../../docs/DESIGN.md) section 1 for complete pattern explanation.
+//! Maps command IDs to execution functions, implementing the execution side
+//! of the metadata/execution separation pattern.
 
 use crate::config::ShellConfig;
 use crate::error::CliError;
@@ -11,69 +9,16 @@ use crate::response::Response;
 
 /// Command execution handler trait.
 ///
-/// Generic over `C: ShellConfig` to match Response buffer sizes.
-/// Implementations map command IDs to execution functions.
-///
-/// # Pattern
-///
-/// Commands use metadata/execution separation:
-/// - `CommandMeta` stores const metadata (id, name, args, access level)
-/// - `CommandHandler` provides execution logic (this trait)
-///
-/// The handler dispatches on the unique command ID, not the display name.
-/// This allows multiple commands with the same name in different directories.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// struct MyHandlers;
-///
-/// impl CommandHandler<DefaultConfig> for MyHandlers {
-///     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-///         match id {
-///             "system_reboot" => reboot_fn(args),
-///             "system_status" => status_fn(args),
-///             _ => Err(CliError::CommandNotFound),
-///         }
-///     }
-/// }
-/// ```
+/// Maps command IDs to execution functions. Dispatches on unique ID (not display name)
+/// to support duplicate command names in different directories.
 pub trait CommandHandler<C: ShellConfig> {
     /// Execute synchronous command by unique ID.
-    ///
-    /// # Arguments
-    ///
-    /// - `id`: Unique command identifier from `CommandMeta.id`
-    /// - `args`: Command arguments (already validated by Shell)
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(Response)`: Command executed successfully
-    /// - `Err(CliError::CommandNotFound)`: Command ID not recognized
-    /// - `Err(CliError)`: Other execution error
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
 
     /// Execute asynchronous command by unique ID (requires `async` feature).
     ///
-    /// # Arguments
-    ///
-    /// - `id`: Unique command identifier from `CommandMeta.id`
-    /// - `args`: Command arguments (already validated by Shell)
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(Response)`: Command executed successfully
-    /// - `Err(CliError::CommandNotFound)`: Command ID not recognized
-    /// - `Err(CliError)`: Other execution error
-    ///
-    /// # Implementation Note
-    ///
-    /// This uses `async fn` in trait without Send bounds to support both:
-    /// - Single-threaded embedded executors (Embassy) where Send isn't required
-    /// - Multi-threaded native executors (Tokio) where implementations can be Send
-    ///
-    /// Users needing Send bounds for multi-threaded spawning can verify this
-    /// at the call site.
+    /// Uses `async fn` in trait without Send bounds to support both single-threaded
+    /// embedded executors (Embassy) and multi-threaded executors (Tokio).
     #[cfg(feature = "async")]
     #[allow(async_fn_in_trait)]
     async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
