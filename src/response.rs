@@ -3,9 +3,6 @@
 //! The `Response` type represents successful command execution with formatting flags
 //! and message content. Command failures are represented via `CliError::CommandFailed`.
 //! Generic over `ShellConfig` for buffer sizing.
-//!
-//! See [TYPE_REFERENCE.md](../docs/TYPE_REFERENCE.md) and [INTERNALS.md](../docs/INTERNALS.md)
-//! Level 7 for complete response formatting details.
 
 use crate::config::ShellConfig;
 use core::marker::PhantomData;

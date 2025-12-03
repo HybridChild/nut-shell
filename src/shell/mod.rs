@@ -58,8 +58,6 @@ pub enum CliState {
 ///
 /// Generic over `C: ShellConfig` to use configured buffer sizes.
 /// Variants are feature-gated based on available features.
-///
-/// See [TYPE_REFERENCE.md](../../docs/TYPE_REFERENCE.md) for complete type definition.
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
 pub enum Request<C: ShellConfig> {
