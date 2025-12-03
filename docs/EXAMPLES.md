@@ -1,6 +1,6 @@
 # EXAMPLES
 
-Practical implementation patterns for using nut-shell in your embedded projects.
+Practical implementation patterns for using **nut-shell** in your embedded projects.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ Working examples in `examples/` directory:
 | Platform | Path | Key Features |
 |----------|------|--------------|
 | **Native (sync)** | `examples/native/bin/basic/` | Stdio with immediate flush |
-| **Native (async)** | `examples/native/bin/async/` | Buffered stdio, Embassy runtime |
+| **Native (async)** | `examples/native/bin/async/` | Async command execution, Tokio runtime |
 | **RP2040 (bare-metal)** | `examples/rp-pico/bin/basic/` | Blocking USB-CDC writes |
 | **RP2040 (Embassy)** | `examples/rp-pico/bin/embassy/` | Async USB-CDC with buffered output |
 | **STM32F072** | `examples/stm32f072/bin/basic/` | Blocking UART writes |

@@ -31,7 +31,7 @@ A lightweight command shell library for `no_std` Rust environments with optional
 - **Tab completion** - Command and path prefix matching *(Default: enabled)*
 - **Command history** - Arrow key navigation with configurable buffer *(Default: enabled)*
 
-### What We Explicitly Exclude
+### What This Library Excludes
 - ❌ Shell scripting (piping, variables, conditionals, command substitution)
 - ❌ Command aliases
 - ❌ Job control (background jobs, fg/bg)
@@ -140,6 +140,36 @@ async fn shell_task(usb: CdcAcmClass<'static, Driver<'static, USB>>) {
 }
 ```
 
+**See [docs/EXAMPLES.md](docs/EXAMPLES.md) for further implementation patterns.**
+
+---
+
+## Interactive Session with authentication feature disabled
+
+```console
+Welcome to nut-shell! Type '?' for help.
+@/> ?
+  ?        - List global commands
+  ls       - List directory contents
+  clear    - Clear screen
+  ESC ESC  - Clear input buffer
+@/> ls
+  system/  - Directory
+  echo  - Echo arguments back
+@/> echo hello world!
+hello world!
+@/> system/
+@/system> ls
+  status  - Show system status
+  version  - Show version information
+@/system> status
+System Status:
+  CPU Usage: 23%
+  Uptime: 42 hours
+@/system> ..
+@/>
+```
+
 ---
 
 ## Platform Support
@@ -154,6 +184,8 @@ Built for `no_std` embedded systems:
 
 **I/O abstraction:** Platform-agnostic `CharIo` trait for UART, USB-CDC, or custom adapters.
 
+**See [examples/](examples/)** for complete working implementations on real hardware.
+
 ---
 
 ## Memory Footprint
@@ -165,7 +197,7 @@ Measured on ARMv6-M (Cortex-M0/M0+) with `opt-level = "z"` and LTO enabled:
 | None (minimal) | ~1.5KB | 0B |
 | All features | ~1.2KB | 0B |
 
-**These measurements use zero-size stubs and minimal command tree** to isolate nut-shell's code overhead. Your actual footprint will also include:
+**These measurements use zero-size stubs and minimal command tree** to isolate **nut-shell**'s code overhead. Your actual footprint will also include:
 
 **Flash costs:**
 - Command implementations
@@ -193,6 +225,28 @@ Optional `authentication` feature provides:
 - Password masking during input
 - Access control enforced at every path segment
 - Pluggable credential providers (build-time, flash storage, custom)
+
+### Interactive session with authentication feature enabled
+
+```console
+Welcome to nut-shell! Type '?' for help.
+Login> admin:********
+  Logged in.
+admin@/> ls
+  system/  - Directory
+  echo  - Echo arguments back
+admin@/> system/version
+Firmware version 3.4.5
+admin@/> logout
+  Logged out.
+Login> admin:******
+  Login failed. Try again.
+Login> user:*******
+  Logged in.
+user@/> ls
+  echo  - Echo arguments back
+user@/>
+```
 
 ---
 

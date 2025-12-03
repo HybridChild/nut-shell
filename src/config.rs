@@ -78,9 +78,9 @@ impl ShellConfig for DefaultConfig {
     #[cfg(not(feature = "history"))]
     const HISTORY_SIZE: usize = 0;
 
-    const MSG_WELCOME: &'static str = "Welcome to nut-shell!";
+    const MSG_WELCOME: &'static str = "Welcome to nut-shell! Type '?' for help.";
     const MSG_LOGIN_PROMPT: &'static str = "Login> ";
-    const MSG_LOGIN_SUCCESS: &'static str = "Logged in. Type '?' for help.";
+    const MSG_LOGIN_SUCCESS: &'static str = "Logged in.";
     const MSG_LOGIN_FAILED: &'static str = "Login failed. Try again.";
     const MSG_LOGOUT: &'static str = "Logged out.";
     const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use <username>:<password>";
@@ -113,10 +113,10 @@ impl ShellConfig for MinimalConfig {
 
     const MSG_WELCOME: &'static str = "Welcome!";
     const MSG_LOGIN_PROMPT: &'static str = "Login> ";
-    const MSG_LOGIN_SUCCESS: &'static str = "Logged in.";
-    const MSG_LOGIN_FAILED: &'static str = "Login failed.";
-    const MSG_LOGOUT: &'static str = "Logged out.";
-    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use <name>:<password>";
+    const MSG_LOGIN_SUCCESS: &'static str = "Logged in";
+    const MSG_LOGIN_FAILED: &'static str = "Login failed";
+    const MSG_LOGOUT: &'static str = "Logged out";
+    const MSG_INVALID_LOGIN_FORMAT: &'static str = "Invalid format. Use name:password";
 }
 
 #[cfg(test)]
