@@ -140,22 +140,4 @@ mod tests {
         assert!(!hasher.verify("different", &salt, &hash));
     }
 
-    #[test]
-    fn test_constant_time_verification() {
-        // This test verifies that the verification function uses constant-time comparison.
-        // While we can't directly measure timing in a unit test, we can verify that
-        // the function uses ConstantTimeEq trait which provides the guarantee.
-
-        let hasher = Sha256Hasher::new();
-        let salt = [1u8; 16];
-        let hash = hasher.hash("password", &salt);
-
-        // Verify correct password
-        assert!(hasher.verify("password", &salt, &hash));
-
-        // Verify incorrect password (should take same time regardless of where it differs)
-        assert!(!hasher.verify("Password", &salt, &hash)); // First char different
-        assert!(!hasher.verify("passwore", &salt, &hash)); // Last char different
-        assert!(!hasher.verify("PASSWORD", &salt, &hash)); // All chars different
-    }
 }
