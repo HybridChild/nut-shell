@@ -1,14 +1,16 @@
 //! Path parsing and navigation.
 //!
-//! Provides Unix-style path resolution with support for absolute and relative paths,
-//! parent navigation (..), and current directory (.).
+//! Unix-style path resolution with `.` and `..` support.
+//! See [`Path`] for syntax details.
 //!
 //! # Example
 //!
-//! ```rust,ignore
+//! ```
 //! use nut_shell::tree::path::Path;
-//! use nut_shell::config::DefaultConfig;
+//! use nut_shell::config::{DefaultConfig, ShellConfig};
+//! use nut_shell::error::CliError;
 //!
+//! # fn example() -> Result<(), CliError> {
 //! // Absolute path (using DefaultConfig depth of 8)
 //! let path = Path::<{DefaultConfig::MAX_PATH_DEPTH}>::parse("/system/reboot")?;
 //! assert!(path.is_absolute());
@@ -18,6 +20,8 @@
 //! let path = Path::<{DefaultConfig::MAX_PATH_DEPTH}>::parse("../network/status")?;
 //! assert!(!path.is_absolute());
 //! assert_eq!(path.segments(), &["..", "network", "status"]);
+//! # Ok(())
+//! # }
 //! ```
 
 use crate::error::CliError;
@@ -40,39 +44,19 @@ use crate::error::CliError;
 /// All parsing is zero-allocation, working with string slices.
 #[derive(Debug, PartialEq)]
 pub struct Path<'a, const MAX_DEPTH: usize> {
-    /// Whether this is an absolute path (starts with `/`)
+    /// Whether path starts with `/`
     is_absolute: bool,
 
-    /// Path segments (directories/commands)
-    /// Includes `.` and `..` for processing during resolution
+    /// Path segments (includes `.` and `..` for resolution)
     segments: heapless::Vec<&'a str, MAX_DEPTH>,
 }
 
 impl<'a, const MAX_DEPTH: usize> Path<'a, MAX_DEPTH> {
     /// Parse path string into Path structure.
     ///
-    /// # Supported Syntax
+    /// Supports absolute (`/system/reboot`), relative (`cmd`, `./cmd`), and parent (`..`) paths.
     ///
-    /// - Absolute paths: `/system/reboot`
-    /// - Relative paths: `../network/status`, `./cmd`, `cmd`
-    /// - Parent navigation: `..` (go up one level)
-    /// - Current directory: `.` (stay at current level)
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(Path)` - Successfully parsed
-    /// - `Err(CliError::InvalidPath)` - Empty path or invalid syntax
-    /// - `Err(CliError::PathTooDeep)` - Exceeds MAX_DEPTH
-    ///
-    /// # Examples
-    ///
-    /// ```rust,ignore
-    /// let path = Path::<8>::parse("/system/reboot")?;  // DefaultConfig depth
-    /// assert!(path.is_absolute());
-    ///
-    /// let path = Path::<4>::parse("../network")?;  // MinimalConfig depth
-    /// assert!(!path.is_absolute());
-    /// ```
+    /// Returns `InvalidPath` for empty input or `PathTooDeep` if MAX_DEPTH exceeded.
     pub fn parse(input: &'a str) -> Result<Self, CliError> {
         // Handle empty path
         if input.is_empty() {
@@ -119,39 +103,17 @@ impl<'a, const MAX_DEPTH: usize> Path<'a, MAX_DEPTH> {
         })
     }
 
-    /// Check if this is an absolute path (starts with `/`).
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// assert!(Path::parse("/system")?.is_absolute());
-    /// assert!(!Path::parse("network")?.is_absolute());
-    /// ```
+    /// Returns true if this is an absolute path (starts with `/`).
     pub fn is_absolute(&self) -> bool {
         self.is_absolute
     }
 
     /// Get path segments as slice.
-    ///
-    /// Returns borrowed slice of segment strings. Segments include `.` and `..`
-    /// which are processed during path resolution.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let path = Path::parse("/system/network")?;
-    /// assert_eq!(path.segments(), &["system", "network"]);
-    ///
-    /// let path = Path::parse("../hw/led")?;
-    /// assert_eq!(path.segments(), &["..", "hw", "led"]);
-    /// ```
     pub fn segments(&self) -> &[&'a str] {
         &self.segments
     }
 
-    /// Get number of segments in path.
-    ///
-    /// Useful for checking path depth before resolution.
+    /// Returns the number of segments in this path.
     pub fn segment_count(&self) -> usize {
         self.segments.len()
     }
@@ -245,6 +207,7 @@ mod tests {
         assert_eq!(path.segments(), &["system"]);
 
         let path = TestPath::parse("network/").unwrap();
+        assert!(!path.is_absolute());
         assert_eq!(path.segments(), &["network"]);
     }
 
@@ -254,6 +217,7 @@ mod tests {
         assert_eq!(path.segments(), &["system", "network"]);
 
         let path = TestPath::parse("//system").unwrap();
+        assert!(path.is_absolute());
         assert_eq!(path.segments(), &["system"]);
     }
 
@@ -277,22 +241,6 @@ mod tests {
         let path = TestPath::parse("/../system").unwrap();
         assert!(path.is_absolute());
         assert_eq!(path.segments(), &["..", "system"]);
-    }
-
-    #[test]
-    fn test_complex_real_world_paths() {
-        // Real navigation scenarios
-        let path = TestPath::parse("/system/network/config").unwrap();
-        assert!(path.is_absolute());
-        assert_eq!(path.segments(), &["system", "network", "config"]);
-
-        let path = TestPath::parse("../../debug/memory").unwrap();
-        assert!(!path.is_absolute());
-        assert_eq!(path.segments(), &["..", "..", "debug", "memory"]);
-
-        let path = TestPath::parse("./status").unwrap();
-        assert!(!path.is_absolute());
-        assert_eq!(path.segments(), &[".", "status"]);
     }
 
     #[test]

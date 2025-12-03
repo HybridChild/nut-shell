@@ -51,35 +51,10 @@ impl<const MAX_MATCHES: usize> CompletionResult<MAX_MATCHES> {
 // Feature-enabled implementation
 // ============================================================================
 
-/// Suggest completions for a partial path input.
+/// Suggest completions for a partial input.
 ///
-/// # Feature-enabled behavior
-///
-/// Performs prefix matching against nodes in the current directory:
-/// 1. Finds all nodes whose names start with the input prefix
-/// 2. If single match: returns complete name (+ "/" for directories)
-/// 3. If multiple matches: returns common prefix and all match names
-/// 4. If no matches: returns empty result
-///
-/// # Feature-disabled behavior
-///
-/// Returns empty CompletionResult (graceful degradation).
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// match suggest_completions(&dir, "sta", Some(&user))? {
-///     CompletionResult::Single { completion, is_directory } => {
-///         // One match - can auto-complete
-///     }
-///     CompletionResult::Multiple { common_prefix, all_matches } => {
-///         // Show all_matches to user
-///     }
-///     CompletionResult::None => {
-///         // Beep or show "no matches"
-///     }
-/// }
-/// ```
+/// Performs prefix matching against accessible nodes in the current directory.
+/// Directories get "/" appended for single matches.
 #[cfg(feature = "completion")]
 pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
     dir: &Directory<L>,
@@ -163,11 +138,7 @@ pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
     })
 }
 
-/// Find common prefix among multiple matches.
-///
-/// # Returns
-///
-/// Longest common prefix string. If no common prefix beyond what was already typed, returns empty.
+/// Find longest common prefix among multiple matches.
 #[cfg(feature = "completion")]
 fn find_common_prefix<'a>(matches: &[(&'a str, bool)]) -> &'a str {
     if matches.is_empty() {
@@ -199,8 +170,6 @@ fn find_common_prefix<'a>(matches: &[(&'a str, bool)]) -> &'a str {
 // ============================================================================
 
 /// Stub implementation when completion feature is disabled.
-///
-/// Returns empty CompletionResult (no completions available).
 #[cfg(not(feature = "completion"))]
 pub fn suggest_completions<L: AccessLevel, const MAX_MATCHES: usize>(
     _dir: &Directory<L>,
