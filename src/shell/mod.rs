@@ -636,6 +636,89 @@ where
         Ok(())
     }
 
+    /// Process global commands (?, ls, clear, logout).
+    ///
+    /// Returns true if a global command was handled, false otherwise.
+    fn handle_global_commands(&mut self, input: &str) -> Result<bool, IO::Error> {
+        // Check for global commands first (non-tree operations)
+        // Global commands don't support inline mode
+        match input.trim() {
+            "?" => {
+                self.io.write_str("\r\n")?;
+                self.show_help()?;
+                self.generate_and_write_prompt()?;
+                Ok(true)
+            }
+            "ls" => {
+                self.io.write_str("\r\n")?;
+                self.show_ls()?;
+                self.generate_and_write_prompt()?;
+                Ok(true)
+            }
+            "clear" => {
+                // Clear screen - no newline needed before ANSI clear sequence
+                self.io.write_str("\x1b[2J\x1b[H")?; // ANSI clear screen
+                self.generate_and_write_prompt()?;
+                Ok(true)
+            }
+            #[cfg(feature = "authentication")]
+            "logout" => {
+                self.io.write_str("\r\n  ")?;
+                self.current_user = None;
+                self.state = CliState::LoggedOut;
+                self.current_path.clear();
+                self.io.write_str(C::MSG_LOGOUT)?;
+                self.io.write_str("\r\n")?;
+                self.io.write_str(C::MSG_LOGIN_PROMPT)?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
+
+    /// Write response and handle history/prompt based on Response flags.
+    fn write_response_and_prompt(
+        &mut self,
+        response: Response<C>,
+        #[cfg_attr(not(feature = "history"), allow(unused_variables))] input: &str,
+    ) -> Result<(), IO::Error> {
+        // Add newline after input UNLESS response wants inline mode
+        if !response.inline_message {
+            self.io.write_str("\r\n")?;
+        }
+
+        // Write formatted response (implements all Response flags!)
+        self.write_formatted_response(&response)?;
+
+        // Add to history if not excluded
+        #[cfg(feature = "history")]
+        if !response.exclude_from_history {
+            self.history.add(input);
+        }
+
+        // Show prompt if requested by response
+        if response.show_prompt {
+            self.generate_and_write_prompt()?;
+        }
+
+        Ok(())
+    }
+
+    /// Write error message with formatting.
+    fn write_error_and_prompt(&mut self, error: CliError) -> Result<(), IO::Error> {
+        // Errors don't support inline mode - add newline
+        self.io.write_str("\r\n  ")?;
+
+        // Format and write error message using Display trait
+        self.io.write_str("Error: ")?;
+        let error_msg = Self::format_error(&error);
+        self.io.write_str(error_msg.as_str())?;
+        self.io.write_str("\r\n")?;
+        self.generate_and_write_prompt()?;
+
+        Ok(())
+    }
+
     /// Handle user input line when in LoggedIn state.
     ///
     /// Processes three types of input:
@@ -651,76 +734,15 @@ where
         }
 
         // Check for global commands first (non-tree operations)
-        // Global commands don't support inline mode
-        match input.trim() {
-            "?" => {
-                self.io.write_str("\r\n")?;
-                self.show_help()?;
-                self.generate_and_write_prompt()?;
-                return Ok(());
-            }
-            "ls" => {
-                self.io.write_str("\r\n")?;
-                self.show_ls()?;
-                self.generate_and_write_prompt()?;
-                return Ok(());
-            }
-            "clear" => {
-                // Clear screen - no newline needed before ANSI clear sequence
-                self.io.write_str("\x1b[2J\x1b[H")?; // ANSI clear screen
-                self.generate_and_write_prompt()?;
-                return Ok(());
-            }
-            #[cfg(feature = "authentication")]
-            "logout" => {
-                self.io.write_str("\r\n  ")?;
-                self.current_user = None;
-                self.state = CliState::LoggedOut;
-                self.current_path.clear();
-                self.io.write_str(C::MSG_LOGOUT)?;
-                self.io.write_str("\r\n")?;
-                self.io.write_str(C::MSG_LOGIN_PROMPT)?;
-                return Ok(());
-            }
-            _ => {}
+        if self.handle_global_commands(input)? {
+            return Ok(());
         }
 
         // Handle tree operations (navigation or command execution)
         match self.execute_tree_path(input) {
-            Ok(response) => {
-                // Add newline after input UNLESS response wants inline mode
-                if !response.inline_message {
-                    self.io.write_str("\r\n")?;
-                }
-
-                // Write formatted response (implements all Response flags!)
-                self.write_formatted_response(&response)?;
-
-                // Add to history if not excluded
-                #[cfg(feature = "history")]
-                if !response.exclude_from_history {
-                    self.history.add(input);
-                }
-
-                // Show prompt if requested by response
-                if response.show_prompt {
-                    self.generate_and_write_prompt()?;
-                }
-            }
-            Err(e) => {
-                // Errors don't support inline mode - add newline
-                self.io.write_str("\r\n  ")?;
-
-                // Format and write error message using Display trait
-                self.io.write_str("Error: ")?;
-                let error_msg = Self::format_error(&e);
-                self.io.write_str(error_msg.as_str())?;
-                self.io.write_str("\r\n")?;
-                self.generate_and_write_prompt()?;
-            }
+            Ok(response) => self.write_response_and_prompt(response, input),
+            Err(e) => self.write_error_and_prompt(e),
         }
-
-        Ok(())
     }
 
     /// Handle user input line when in LoggedIn state - async version.
@@ -739,76 +761,15 @@ where
         }
 
         // Check for global commands first (non-tree operations)
-        // Global commands don't support inline mode
-        match input.trim() {
-            "?" => {
-                self.io.write_str("\r\n")?;
-                self.show_help()?;
-                self.generate_and_write_prompt()?;
-                return Ok(());
-            }
-            "ls" => {
-                self.io.write_str("\r\n")?;
-                self.show_ls()?;
-                self.generate_and_write_prompt()?;
-                return Ok(());
-            }
-            "clear" => {
-                // Clear screen - no newline needed before ANSI clear sequence
-                self.io.write_str("\x1b[2J\x1b[H")?; // ANSI clear screen
-                self.generate_and_write_prompt()?;
-                return Ok(());
-            }
-            #[cfg(feature = "authentication")]
-            "logout" => {
-                self.io.write_str("\r\n  ")?;
-                self.current_user = None;
-                self.state = CliState::LoggedOut;
-                self.current_path.clear();
-                self.io.write_str(C::MSG_LOGOUT)?;
-                self.io.write_str("\r\n")?;
-                self.io.write_str(C::MSG_LOGIN_PROMPT)?;
-                return Ok(());
-            }
-            _ => {}
+        if self.handle_global_commands(input)? {
+            return Ok(());
         }
 
         // Handle tree operations (navigation or command execution) - async version
         match self.execute_tree_path_async(input).await {
-            Ok(response) => {
-                // Add newline after input UNLESS response wants inline mode
-                if !response.inline_message {
-                    self.io.write_str("\r\n")?;
-                }
-
-                // Write formatted response (implements all Response flags!)
-                self.write_formatted_response(&response)?;
-
-                // Add to history if not excluded
-                #[cfg(feature = "history")]
-                if !response.exclude_from_history {
-                    self.history.add(input);
-                }
-
-                // Show prompt if requested by response
-                if response.show_prompt {
-                    self.generate_and_write_prompt()?;
-                }
-            }
-            Err(e) => {
-                // Errors don't support inline mode - add newline
-                self.io.write_str("\r\n  ")?;
-
-                // Format and write error message using Display trait
-                self.io.write_str("Error: ")?;
-                let error_msg = Self::format_error(&e);
-                self.io.write_str(error_msg.as_str())?;
-                self.io.write_str("\r\n")?;
-                self.generate_and_write_prompt()?;
-            }
+            Ok(response) => self.write_response_and_prompt(response, input),
+            Err(e) => self.write_error_and_prompt(e),
         }
-
-        Ok(())
     }
 
     /// Execute a tree path (navigation or command execution).
