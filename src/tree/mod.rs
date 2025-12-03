@@ -30,8 +30,6 @@ pub enum CommandKind {
 ///
 /// The `id` field uniquely identifies the command for handler dispatch, allowing
 /// multiple commands with the same display name in different directories.
-///
-/// See [DESIGN.md](../../docs/DESIGN.md) section 1 for complete pattern explanation.
 #[derive(Debug, Clone)]
 pub struct CommandMeta<L: AccessLevel> {
     /// Unique identifier for handler dispatch
