@@ -2,8 +2,6 @@
 //!
 //! Provides smart completion with prefix matching and directory handling.
 //! Uses stub function pattern - module always exists, functions return empty when disabled.
-//!
-//! See [DESIGN.md](../../docs/DESIGN.md) "Feature Gating & Optional Features" for pattern details.
 
 #![cfg_attr(not(feature = "completion"), allow(unused_variables))]
 

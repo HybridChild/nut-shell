@@ -2,8 +2,6 @@
 //!
 //! Provides the core tree structure for organizing commands and directories.
 //! All tree structures are const-initializable and live in ROM.
-//!
-//! See [DESIGN.md](../../docs/DESIGN.md) for metadata/execution separation pattern.
 
 use crate::auth::AccessLevel;
 

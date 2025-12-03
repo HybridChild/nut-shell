@@ -1,7 +1,6 @@
 //! Command history with up/down arrow navigation.
 //!
 //! Uses stub type pattern - struct always exists, but behavior is feature-gated.
-//! See [DESIGN.md](../../docs/DESIGN.md) "Feature Gating & Optional Features" for pattern details.
 
 #![cfg_attr(not(feature = "history"), allow(unused_variables))]
 

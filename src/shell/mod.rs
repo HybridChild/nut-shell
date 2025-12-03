@@ -1,7 +1,6 @@
 //! Shell orchestration and command processing.
 //!
 //! The `Shell` struct brings together all components to provide interactive CLI functionality.
-//! See [DESIGN.md](../../docs/DESIGN.md) for unified architecture pattern.
 
 use crate::auth::{AccessLevel, User};
 use crate::config::ShellConfig;
@@ -115,8 +114,6 @@ pub enum Request<C: ShellConfig> {
 /// - `IO`: CharIo implementation
 /// - `H`: CommandHandler implementation
 /// - `C`: ShellConfig implementation
-///
-/// See [DESIGN.md](../../docs/DESIGN.md) for unified architecture pattern.
 pub struct Shell<'tree, L, IO, H, C>
 where
     L: AccessLevel,
