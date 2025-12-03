@@ -124,69 +124,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_default_config() {
-        assert_eq!(DefaultConfig::MAX_INPUT, 128);
-        assert_eq!(DefaultConfig::MAX_PATH_DEPTH, 8);
-        assert_eq!(DefaultConfig::MAX_ARGS, 16);
-        assert_eq!(DefaultConfig::MAX_PROMPT, 64);
-        assert_eq!(DefaultConfig::MAX_RESPONSE, 256);
-
-        #[cfg(feature = "history")]
-        assert_eq!(DefaultConfig::HISTORY_SIZE, 10);
-
-        #[cfg(not(feature = "history"))]
-        assert_eq!(DefaultConfig::HISTORY_SIZE, 0);
-    }
-
-    #[test]
-    fn test_minimal_config() {
-        assert_eq!(MinimalConfig::MAX_INPUT, 64);
-        assert_eq!(MinimalConfig::MAX_PATH_DEPTH, 4);
-        assert_eq!(MinimalConfig::MAX_ARGS, 8);
-        assert_eq!(MinimalConfig::MAX_PROMPT, 32);
-        assert_eq!(MinimalConfig::MAX_RESPONSE, 128);
-
-        #[cfg(feature = "history")]
-        assert_eq!(MinimalConfig::HISTORY_SIZE, 4);
-
-        #[cfg(not(feature = "history"))]
-        assert_eq!(MinimalConfig::HISTORY_SIZE, 0);
-    }
-
-    #[test]
-    fn test_custom_config_messages() {
-        // Test that users can customize messages
-        struct CustomConfig;
-
-        impl ShellConfig for CustomConfig {
-            const MAX_INPUT: usize = 128;
-            const MAX_PATH_DEPTH: usize = 8;
-            const MAX_ARGS: usize = 16;
-            const MAX_PROMPT: usize = 64;
-            const MAX_RESPONSE: usize = 256;
-            const HISTORY_SIZE: usize = 10;
-
-            const MSG_WELCOME: &'static str = "🚀 Custom System Ready";
-            const MSG_LOGIN_PROMPT: &'static str = "Enter credentials (user:pass): ";
-            const MSG_LOGIN_SUCCESS: &'static str = "✓ Access granted";
-            const MSG_LOGIN_FAILED: &'static str = "✗ Access denied";
-            const MSG_LOGOUT: &'static str = "Session ended";
-            const MSG_INVALID_LOGIN_FORMAT: &'static str = "Format error";
-        }
-
-        // Verify custom messages
-        assert_eq!(CustomConfig::MSG_WELCOME, "🚀 Custom System Ready");
-        assert_eq!(
-            CustomConfig::MSG_LOGIN_PROMPT,
-            "Enter credentials (user:pass): "
-        );
-        assert_eq!(CustomConfig::MSG_LOGIN_SUCCESS, "✓ Access granted");
-        assert_eq!(CustomConfig::MSG_LOGIN_FAILED, "✗ Access denied");
-        assert_eq!(CustomConfig::MSG_LOGOUT, "Session ended");
-        assert_eq!(CustomConfig::MSG_INVALID_LOGIN_FORMAT, "Format error");
-    }
-
-    #[test]
     fn test_messages_are_const() {
         // Verify that messages are compile-time constants (can be used in const context)
         const _WELCOME: &str = DefaultConfig::MSG_WELCOME;

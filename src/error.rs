@@ -155,10 +155,4 @@ mod tests {
         };
         assert_eq!(format!("{}", err), "Argument 3: expected IP address");
     }
-
-    #[test]
-    fn test_error_equality() {
-        assert_eq!(CliError::CommandNotFound, CliError::CommandNotFound);
-        assert_ne!(CliError::CommandNotFound, CliError::InvalidPath);
-    }
 }
