@@ -142,7 +142,7 @@ fn generate_users(configs: &[UserConfig]) -> Result<Vec<GeneratedUser>, String> 
 /// Generate cryptographically random salt
 fn generate_salt() -> [u8; 16] {
     let mut salt = [0u8; 16];
-    getrandom::getrandom(&mut salt)
+    getrandom::fill(&mut salt)
         .expect("Failed to generate random salt");
     salt
 }
