@@ -124,6 +124,19 @@ mod tests {
     }
 
     #[test]
+    fn test_response_empty_message() {
+        let response = Response::<DefaultConfig>::success("");
+        assert_eq!(response.message.as_str(), "");
+    }
+
+    #[test]
+    fn test_response_long_message() {
+        let long_msg = "A".repeat(250);
+        let response = Response::<DefaultConfig>::success(&long_msg);
+        assert!(response.message.len() <= 256);
+    }
+
+    #[test]
     fn test_builder_chaining() {
         let response = Response::<DefaultConfig>::success("OK")
             .inline()
@@ -138,6 +151,28 @@ mod tests {
         assert!(response.indent_message);
         assert!(!response.postfix_newline);
         assert!(!response.show_prompt);
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_response_exclude_from_history_default() {
+        let response = Response::<DefaultConfig>::success("Test");
+        assert!(!response.exclude_from_history);
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_response_success_no_history() {
+        let response = Response::<DefaultConfig>::success_no_history("Sensitive data");
+        assert!(response.exclude_from_history);
+        assert_eq!(response.message.as_str(), "Sensitive data");
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_response_without_history_builder() {
+        let response = Response::<DefaultConfig>::success("Password set").without_history();
+        assert!(response.exclude_from_history);
     }
 
     #[test]

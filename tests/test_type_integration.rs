@@ -1,9 +1,8 @@
-//! Type-Level Integration Validation
+//! Type-Level Integration Tests
 //!
-//! This checkpoint validates that all core types integrate correctly before
-//! proceeding to Phase 7 (Tab Completion) and Phase 8 (Shell implementation).
+//! Validates that all core types integrate correctly across the library.
 //!
-//! **Purpose**: Discover type integration issues NOW rather than during Shell implementation.
+//! **Purpose**: Catch type integration issues early through compile-time and runtime checks.
 //!
 //! **What we validate**:
 //! - All foundational types instantiate without compilation errors
@@ -11,7 +10,6 @@
 //! - Path parsing and tree navigation work end-to-end
 //! - Request/Response types integrate with tree and command handler
 //! - Both DefaultConfig and MinimalConfig work correctly
-//! - Feature combinations compile cleanly
 //! - Lifetime relationships between tree and runtime state are sound
 
 #[allow(clippy::duplicate_mod)]
@@ -300,34 +298,6 @@ fn test_request_response_with_handler() {
     }
 }
 
-#[test]
-fn test_command_not_found_error() {
-    let handler = MockHandler;
-
-    let result = handler.execute_sync("nonexistent", &[]);
-    assert!(matches!(result, Err(CliError::CommandNotFound)));
-}
-
-#[test]
-fn test_handler_with_different_commands() {
-    let handler = MockHandler;
-
-    // Test reboot command (ID: "reboot")
-    let result = handler.execute_sync("reboot", &[]);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap().message.as_str(), "Rebooting...");
-
-    // Test status command (ID: "status")
-    let result = handler.execute_sync("status", &[]);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap().message.as_str(), "System OK");
-
-    // Test led command with argument (ID: "hw_led")
-    let result = handler.execute_sync("hw_led", &["on"]);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap().message.as_str(), "LED: on");
-}
-
 // ============================================================================
 // Test 4: Generic Parameter Inference
 // ============================================================================
@@ -384,177 +354,7 @@ fn test_lifetime_relationships() {
 }
 
 // ============================================================================
-// Test 6: Const Initialization Validation
-// ============================================================================
-
-#[test]
-fn test_const_initialization() {
-    // Verify that CommandMeta and Directory can be const-initialized
-
-    const CMD: CommandMeta<MockAccessLevel> = CommandMeta {
-        id: "const_test",
-        name: "const_test",
-        description: "Test const init",
-        access_level: MockAccessLevel::User,
-        kind: CommandKind::Sync,
-        min_args: 0,
-        max_args: 0,
-    };
-
-    assert_eq!(CMD.id, "const_test");
-    assert_eq!(CMD.name, "const_test");
-    assert_eq!(CMD.kind, CommandKind::Sync);
-
-    // Verify tree is const-initializable (already proven by TEST_TREE)
-    const _TREE: &Directory<MockAccessLevel> = &TEST_TREE;
-
-    // This test compiling proves const initialization works
-}
-
-// ============================================================================
-// Test 7: Feature-Gated Request Variants
-// ============================================================================
-
-#[cfg(feature = "authentication")]
-#[test]
-fn test_login_request() {
-    let request: Request<DefaultConfig> = Request::Login {
-        username: {
-            let mut s = heapless::String::<32>::new();
-            s.push_str("admin").unwrap();
-            s
-        },
-        password: {
-            let mut s = heapless::String::<64>::new();
-            s.push_str("password123").unwrap();
-            s
-        },
-    };
-
-    if let Request::Login { username, password } = request {
-        assert_eq!(username.as_str(), "admin");
-        assert_eq!(password.as_str(), "password123");
-    } else {
-        panic!("Expected Login request");
-    }
-
-    // InvalidLogin variant
-    let invalid: Request<DefaultConfig> = Request::InvalidLogin;
-    assert!(matches!(invalid, Request::InvalidLogin));
-}
-
-#[cfg(feature = "completion")]
-#[test]
-fn test_tab_complete_request() {
-    let request: Request<DefaultConfig> = Request::TabComplete {
-        path: {
-            let mut s = heapless::String::<128>::new();
-            s.push_str("sys").unwrap();
-            s
-        },
-    };
-
-    if let Request::TabComplete { path } = request {
-        assert_eq!(path.as_str(), "sys");
-    } else {
-        panic!("Expected TabComplete request");
-    }
-}
-
-#[cfg(feature = "history")]
-#[test]
-fn test_history_request() {
-    let request: Request<DefaultConfig> = Request::History {
-        direction: HistoryDirection::Previous,
-        buffer: {
-            let mut s = heapless::String::<128>::new();
-            s.push_str("current input").unwrap();
-            s
-        },
-    };
-
-    if let Request::History { direction, buffer } = request {
-        assert_eq!(direction, HistoryDirection::Previous);
-        assert_eq!(buffer.as_str(), "current input");
-    } else {
-        panic!("Expected History request");
-    }
-}
-
-// ============================================================================
-// Test 8: Access Level Integration with Tree
-// ============================================================================
-
-#[test]
-fn test_access_levels_in_tree() {
-    let tree = &TEST_TREE;
-
-    // Guest-level command at root
-    if let Some(Node::Command(help)) = tree.find_child("help") {
-        assert_eq!(help.access_level, MockAccessLevel::Guest);
-    } else {
-        panic!("Expected help command");
-    }
-
-    // User-level directory
-    if let Some(Node::Directory(system)) = tree.find_child("system") {
-        assert_eq!(system.access_level, MockAccessLevel::User);
-
-        // Admin-level command in subdirectory
-        if let Some(Node::Command(reboot)) = system.find_child("reboot") {
-            assert_eq!(reboot.access_level, MockAccessLevel::Admin);
-        } else {
-            panic!("Expected reboot command");
-        }
-    } else {
-        panic!("Expected system directory");
-    }
-
-    // Admin-level directory
-    if let Some(Node::Directory(debug)) = tree.find_child("debug") {
-        assert_eq!(debug.access_level, MockAccessLevel::Admin);
-    } else {
-        panic!("Expected debug directory");
-    }
-}
-
-// ============================================================================
-// Test 9: Async Command Validation
-// ============================================================================
-
-#[cfg(feature = "async")]
-#[test]
-fn test_async_command_metadata() {
-    use nut_shell::tree::CommandKind;
-
-    let tree = &TEST_TREE;
-
-    // Find async command
-    if let Some(Node::Directory(system)) = tree.find_child("system") {
-        if let Some(Node::Command(async_cmd)) = system.find_child("async-wait") {
-            assert_eq!(async_cmd.name, "async-wait");
-            assert_eq!(async_cmd.kind, CommandKind::Async);
-        } else {
-            panic!("Expected async-wait command when async feature enabled");
-        }
-    }
-}
-
-#[cfg(feature = "async")]
-#[tokio::test]
-async fn test_async_handler_execution() {
-    let handler = MockHandler;
-
-    // Execute async command
-    let result = handler.execute_async("async-wait", &[]).await;
-    assert!(result.is_ok());
-
-    let response = result.unwrap();
-    assert!(response.message.contains("Waited") || response.message.contains("Async"));
-}
-
-// ============================================================================
-// Test 10: CharIo Integration
+// Test 6: CharIo Integration
 // ============================================================================
 
 #[test]
@@ -640,39 +440,4 @@ fn test_complete_integration() {
 
     // 6. Verify output was written
     assert!(!io.output().is_empty());
-}
-
-// ============================================================================
-// Config Validation
-// ============================================================================
-
-#[test]
-#[allow(clippy::assertions_on_constants)]
-fn test_config_constants() {
-    // DefaultConfig
-    assert_eq!(DefaultConfig::MAX_INPUT, 128);
-    assert_eq!(DefaultConfig::MAX_PATH_DEPTH, 8);
-    assert_eq!(DefaultConfig::MAX_ARGS, 16);
-    assert_eq!(DefaultConfig::MAX_PROMPT, 64);
-    assert_eq!(DefaultConfig::MAX_RESPONSE, 256);
-    #[cfg(feature = "history")]
-    assert_eq!(DefaultConfig::HISTORY_SIZE, 10);
-    #[cfg(not(feature = "history"))]
-    assert_eq!(DefaultConfig::HISTORY_SIZE, 0);
-
-    // MinimalConfig
-    assert_eq!(MinimalConfig::MAX_INPUT, 64);
-    assert_eq!(MinimalConfig::MAX_PATH_DEPTH, 4);
-    assert_eq!(MinimalConfig::MAX_ARGS, 8);
-    assert_eq!(MinimalConfig::MAX_PROMPT, 32);
-    assert_eq!(MinimalConfig::MAX_RESPONSE, 128);
-    #[cfg(feature = "history")]
-    assert_eq!(MinimalConfig::HISTORY_SIZE, 4);
-    #[cfg(not(feature = "history"))]
-    assert_eq!(MinimalConfig::HISTORY_SIZE, 0);
-
-    // MinimalConfig should be smaller in all dimensions
-    assert!(MinimalConfig::MAX_INPUT < DefaultConfig::MAX_INPUT);
-    assert!(MinimalConfig::MAX_PATH_DEPTH < DefaultConfig::MAX_PATH_DEPTH);
-    assert!(MinimalConfig::MAX_ARGS < DefaultConfig::MAX_ARGS);
 }

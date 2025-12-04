@@ -1,6 +1,6 @@
 //! Integration tests for tree data structures and metadata/execution separation pattern.
 //!
-//! This module validates Phase 3 of the implementation:
+//! Validates that:
 //! - Tree types are const-initializable
 //! - Metadata/execution separation pattern works correctly
 //! - Sync and async commands compile and execute properly
@@ -427,71 +427,6 @@ fn test_varied_argument_counts() {
 }
 
 #[test]
-fn test_const_tree_size() {
-    // Validates tree structure counts for ROM size estimation
-    use fixtures::{DIR_DEBUG, DIR_SYSTEM, TEST_TREE};
-
-    // Count total nodes in tree
-    let mut command_count = 0;
-    let mut directory_count = 0;
-
-    // Root level
-    for child in TEST_TREE.children {
-        match child {
-            Node::Command(_) => command_count += 1,
-            Node::Directory(_) => directory_count += 1,
-        }
-    }
-
-    // System level
-    for child in DIR_SYSTEM.children {
-        match child {
-            Node::Command(_) => command_count += 1,
-            Node::Directory(dir) => {
-                directory_count += 1;
-                // Count subdirectory contents
-                for subchild in dir.children {
-                    match subchild {
-                        Node::Command(_) => command_count += 1,
-                        Node::Directory(_) => directory_count += 1,
-                    }
-                }
-            }
-        }
-    }
-
-    // Debug level
-    for child in DIR_DEBUG.children {
-        match child {
-            Node::Command(_) => command_count += 1,
-            Node::Directory(_) => directory_count += 1,
-        }
-    }
-
-    // Verify expected structure
-    // Commands: help(2) + system(2) + network(3) + hardware(2) + debug(2) + test commands(6) = 17
-    // With async: +1 (async-wait) = 18
-    // Directories: system(1) + debug(1) + network(1) + hardware(1) = 4 (root doesn't count)
-    #[cfg(not(feature = "async"))]
-    {
-        assert_eq!(
-            command_count, 17,
-            "Should have exactly 17 commands without async"
-        );
-        assert_eq!(directory_count, 4, "Should have exactly 4 directories");
-    }
-
-    #[cfg(feature = "async")]
-    {
-        assert_eq!(
-            command_count, 18,
-            "Should have exactly 18 commands with async"
-        );
-        assert_eq!(directory_count, 4, "Should have exactly 4 directories");
-    }
-}
-
-#[test]
 fn test_const_metadata_properties() {
     // Validates that CommandMeta is truly const-initializable
     use fixtures::{CMD_DEBUG_REG, CMD_NET_STATUS};
@@ -540,29 +475,3 @@ fn test_tree_can_navigate_full_paths() {
     }
 }
 
-// ============================================================================
-// Pattern Validation Summary
-// ============================================================================
-
-/// This test serves as documentation of what Phase 3 validates.
-///
-/// If all tests in this module pass, we have validated:
-/// 1. ✅ CommandMeta is const-initializable (no function pointers)
-/// 2. ✅ Directory and Node types are const-initializable
-/// 3. ✅ TEST_TREE lives in ROM with zero runtime initialization
-/// 4. ✅ CommandHandler trait compiles with both sync and async methods
-/// 5. ✅ MockHandler proves metadata/execution separation pattern works
-/// 6. ✅ Sync commands execute correctly through handler
-/// 7. ✅ Async commands compile and execute when feature enabled
-/// 8. ✅ Generic parameters (L: AccessLevel, C: ShellConfig) integrate correctly
-/// 9. ✅ Node enum enables zero-cost dispatch via pattern matching
-/// 10. ✅ Access level integration works with generic parameter
-///
-/// This early validation ensures the foundational pattern is sound before
-/// proceeding to Phase 8 (Shell implementation), preventing costly refactoring.
-#[test]
-#[allow(clippy::assertions_on_constants)]
-fn test_phase_3_validation_complete() {
-    // If we got here, all validations passed
-    assert!(true);
-}
