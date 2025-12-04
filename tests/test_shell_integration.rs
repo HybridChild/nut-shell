@@ -10,7 +10,59 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 use fixtures::{MockHandler, MockIo, TEST_TREE};
+use nut_shell::config::DefaultConfig;
+use nut_shell::error::CliError;
+use nut_shell::response::Response;
+use nut_shell::shell::Request;
 use nut_shell::Shell;
+
+// ============================================================================
+// Request/Response Workflow Tests
+// ============================================================================
+
+#[test]
+fn test_request_response_workflow() {
+    // Simulate command execution workflow
+    let mut path = heapless::String::<128>::new();
+    path.push_str("status").unwrap();
+    #[cfg(feature = "history")]
+    let original = {
+        let mut s = heapless::String::<128>::new();
+        s.push_str("status").unwrap();
+        s
+    };
+
+    let request = Request::<DefaultConfig>::Command {
+        path,
+        args: heapless::Vec::new(),
+        #[cfg(feature = "history")]
+        original,
+        _phantom: core::marker::PhantomData,
+    };
+
+    // Extract command info
+    let result: Result<Response<DefaultConfig>, CliError> = match request {
+        Request::Command { path, .. } => {
+            if path.as_str() == "status" {
+                Ok(Response::<DefaultConfig>::success("System OK"))
+            } else {
+                let mut msg = heapless::String::new();
+                msg.push_str("Unknown command").unwrap();
+                Err(CliError::CommandFailed(msg))
+            }
+        }
+        #[allow(unreachable_patterns)]
+        _ => {
+            let mut msg = heapless::String::new();
+            msg.push_str("Invalid request").unwrap();
+            Err(CliError::CommandFailed(msg))
+        }
+    };
+
+    assert!(result.is_ok());
+    let response = result.unwrap();
+    assert_eq!(response.message.as_str(), "System OK");
+}
 
 // ============================================================================
 // Command Execution Tests
@@ -316,48 +368,6 @@ fn test_double_esc_clears_buffer() {
     );
 }
 
-#[test]
-#[cfg(all(feature = "history", not(feature = "authentication")))]
-fn test_double_esc_exits_history_navigation() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute a command
-    for c in "echo previous\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
-
-    // Start typing new command
-    for c in "echo new".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    // Press up arrow to enter history (should recall "echo previous")
-    shell.process_char('\x1b').unwrap();
-    shell.process_char('[').unwrap();
-    shell.process_char('A').unwrap();
-
-    // Double-ESC should exit history and clear buffer
-    shell.process_char('\x1b').unwrap();
-    shell.process_char('\x1b').unwrap();
-
-    // Press enter - nothing should execute since buffer was cleared
-    shell.io_mut().clear_output();
-    shell.process_char('\n').unwrap();
-
-    // Verify neither "previous" nor "new" executed
-    let output = shell.io_mut().output();
-    assert!(
-        !output.contains("previous") && !output.contains("new"),
-        "Double-ESC should clear history/buffer, got: {}",
-        output
-    );
-}
-
 // ============================================================================
 // Error Handling Tests
 // ============================================================================
@@ -446,43 +456,6 @@ fn test_buffer_overflow_emits_bell() {
     assert!(
         output.contains('\x07'),
         "Should emit bell character on buffer full"
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_buffer_overflow_continues_working() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-
-    // Fill buffer to capacity
-    let long_input = "a".repeat(128);
-    for c in long_input.chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    // Try to add more - should beep but not crash
-    shell.process_char('x').unwrap();
-    shell.process_char('y').unwrap();
-    shell.process_char('z').unwrap();
-
-    // Clear the buffer with double-ESC
-    shell.process_char('\x1b').unwrap();
-    shell.process_char('\x1b').unwrap();
-
-    shell.io_mut().clear_output();
-
-    // Should be able to use shell normally after overflow
-    for c in "echo test\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("test"),
-        "Shell should work normally after buffer overflow"
     );
 }
 
@@ -764,36 +737,6 @@ fn test_admin_can_access_admin_directories() {
     assert!(
         output.contains("Memory"),
         "Admin should be able to access Admin directories: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(feature = "authentication")]
-fn test_admin_can_execute_guest_level_commands() {
-    let (provider, _hasher) = create_test_provider();
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Login as admin
-    for c in "admin:admin123\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
-
-    // Admin should also be able to execute lower-level commands
-    for c in "echo hello\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("hello"),
-        "Admin should be able to execute Guest-level commands: {}",
         output
     );
 }

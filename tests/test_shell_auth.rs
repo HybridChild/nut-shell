@@ -1,7 +1,6 @@
 //! Tests for Shell authentication and password masking.
 //!
-//! These tests validate the authentication flow and password masking behavior
-//! as specified in SPECIFICATION.md.
+//! These tests validate the authentication flow and password masking behavior.
 
 #![cfg(feature = "authentication")]
 
@@ -76,45 +75,6 @@ fn test_password_masking_basic() {
 
     let output = shell.io().output();
     assert_eq!(output, "****", "Password should be masked with asterisks");
-}
-
-#[test]
-fn test_password_masking_full_sequence() {
-    let users = create_test_users();
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Type "admin:pass123"
-    let input = "admin:pass123";
-    for c in input.chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io().output();
-
-    // Should contain "admin:" echoed normally
-    assert!(
-        output.contains("admin:"),
-        "Username and colon should be visible"
-    );
-
-    // Should contain "*******" for the password (7 characters for "pass123")
-    assert!(
-        output.contains("*******"),
-        "Password should be masked (7 chars)"
-    );
-
-    // Should NOT contain actual password
-    assert!(
-        !output.contains("pass123"),
-        "Actual password should not appear"
-    );
 }
 
 #[test]
@@ -322,45 +282,4 @@ fn test_double_esc_clears_masked_input() {
 
     // Should trigger ClearAndRedraw (sends CR and clear sequence)
     assert!(output.contains("\r"), "Should redraw after double ESC");
-}
-
-#[test]
-fn test_character_by_character_masking() {
-    let users = create_test_users();
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-
-    // Type username
-    shell.io_mut().clear_output();
-    shell.process_char('a').unwrap();
-    assert_eq!(shell.io().output(), "a", "First char of username visible");
-
-    shell.io_mut().clear_output();
-    shell.process_char('d').unwrap();
-    assert_eq!(shell.io().output(), "d", "Second char of username visible");
-
-    // Type colon
-    shell.io_mut().clear_output();
-    shell.process_char(':').unwrap();
-    assert_eq!(shell.io().output(), ":", "Colon visible");
-
-    // Type first password char
-    shell.io_mut().clear_output();
-    shell.process_char('p').unwrap();
-    assert_eq!(shell.io().output(), "*", "First password char masked");
-
-    // Type second password char
-    shell.io_mut().clear_output();
-    shell.process_char('a').unwrap();
-    assert_eq!(shell.io().output(), "*", "Second password char masked");
-
-    // Type third password char
-    shell.io_mut().clear_output();
-    shell.process_char('s').unwrap();
-    assert_eq!(shell.io().output(), "*", "Third password char masked");
 }

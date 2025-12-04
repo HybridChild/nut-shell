@@ -1365,18 +1365,286 @@ mod tests {
     };
 
     #[test]
-    fn test_history_direction() {
+    fn test_history_direction_values() {
         assert_eq!(HistoryDirection::Previous as u8, 0);
         assert_eq!(HistoryDirection::Next as u8, 1);
     }
 
     #[test]
-    fn test_cli_state() {
-        assert_eq!(CliState::Inactive, CliState::Inactive);
-        assert_eq!(CliState::LoggedIn, CliState::LoggedIn);
+    fn test_history_direction_copy() {
+        let dir1 = HistoryDirection::Previous;
+        let dir2 = dir1;
+        assert_eq!(dir1, dir2);
+    }
+
+    #[test]
+    fn test_history_direction_clone() {
+        let dir1 = HistoryDirection::Next;
+        let dir2 = dir1;
+        assert_eq!(dir1, dir2);
+    }
+
+    #[test]
+    fn test_cli_state_inactive() {
+        let state = CliState::Inactive;
+        assert_eq!(state, CliState::Inactive);
+    }
+
+    #[test]
+    fn test_cli_state_logged_in() {
+        let state = CliState::LoggedIn;
+        assert_eq!(state, CliState::LoggedIn);
+    }
+
+    #[test]
+    #[cfg(feature = "authentication")]
+    fn test_cli_state_logged_out() {
+        let state = CliState::LoggedOut;
+        assert_eq!(state, CliState::LoggedOut);
+        assert_ne!(state, CliState::LoggedIn);
+    }
+
+    #[test]
+    fn test_cli_state_copy() {
+        let state1 = CliState::Inactive;
+        let state2 = state1;
+        assert_eq!(state1, state2);
+    }
+
+    #[test]
+    fn test_cli_state_matches_auth_feature() {
+        let _inactive = CliState::Inactive;
+        let _logged_in = CliState::LoggedIn;
 
         #[cfg(feature = "authentication")]
-        assert_ne!(CliState::LoggedOut, CliState::LoggedIn);
+        let _logged_out = CliState::LoggedOut;
+    }
+
+    #[test]
+    fn test_request_command_no_args() {
+        let mut path = heapless::String::<128>::new();
+        path.push_str("help").unwrap();
+        let args = heapless::Vec::new();
+        #[cfg(feature = "history")]
+        let original = {
+            let mut s = heapless::String::<128>::new();
+            s.push_str("help").unwrap();
+            s
+        };
+
+        let request = Request::<DefaultConfig>::Command {
+            path,
+            args,
+            #[cfg(feature = "history")]
+            original,
+            _phantom: core::marker::PhantomData,
+        };
+
+        match request {
+            Request::Command { path, args, .. } => {
+                assert_eq!(path.as_str(), "help");
+                assert_eq!(args.len(), 0);
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected Command variant"),
+        }
+    }
+
+    #[test]
+    fn test_request_command_with_args() {
+        let mut path = heapless::String::<128>::new();
+        path.push_str("echo").unwrap();
+
+        let mut args = heapless::Vec::new();
+        let mut hello = heapless::String::<128>::new();
+        hello.push_str("hello").unwrap();
+        let mut world = heapless::String::<128>::new();
+        world.push_str("world").unwrap();
+        args.push(hello).unwrap();
+        args.push(world).unwrap();
+
+        #[cfg(feature = "history")]
+        let original = {
+            let mut s = heapless::String::<128>::new();
+            s.push_str("echo hello world").unwrap();
+            s
+        };
+
+        let request = Request::<DefaultConfig>::Command {
+            path,
+            args,
+            #[cfg(feature = "history")]
+            original,
+            _phantom: core::marker::PhantomData,
+        };
+
+        match request {
+            Request::Command { path, args, .. } => {
+                assert_eq!(path.as_str(), "echo");
+                assert_eq!(args.len(), 2);
+                assert_eq!(args[0].as_str(), "hello");
+                assert_eq!(args[1].as_str(), "world");
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected Command variant"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_request_command_with_original() {
+        let mut path = heapless::String::<128>::new();
+        path.push_str("reboot").unwrap();
+        let mut original = heapless::String::<128>::new();
+        original.push_str("reboot").unwrap();
+
+        let request = Request::<DefaultConfig>::Command {
+            path,
+            args: heapless::Vec::new(),
+            original,
+            _phantom: core::marker::PhantomData,
+        };
+
+        match request {
+            Request::Command { path, original, .. } => {
+                assert_eq!(path.as_str(), "reboot");
+                assert_eq!(original.as_str(), "reboot");
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected Command variant"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "authentication")]
+    fn test_request_login() {
+        let mut username = heapless::String::<32>::new();
+        username.push_str("admin").unwrap();
+        let mut password = heapless::String::<64>::new();
+        password.push_str("secret123").unwrap();
+
+        let request = Request::<DefaultConfig>::Login { username, password };
+
+        match request {
+            Request::Login { username, password } => {
+                assert_eq!(username.as_str(), "admin");
+                assert_eq!(password.as_str(), "secret123");
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected Login variant"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "authentication")]
+    fn test_request_invalid_login() {
+        let request = Request::<DefaultConfig>::InvalidLogin;
+
+        match request {
+            Request::InvalidLogin => {}
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected InvalidLogin variant"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "completion")]
+    fn test_request_tab_complete() {
+        let mut path = heapless::String::<128>::new();
+        path.push_str("sys").unwrap();
+
+        let request = Request::<DefaultConfig>::TabComplete { path };
+
+        match request {
+            Request::TabComplete { path } => {
+                assert_eq!(path.as_str(), "sys");
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected TabComplete variant"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "completion")]
+    fn test_request_tab_complete_empty() {
+        let request = Request::<DefaultConfig>::TabComplete {
+            path: heapless::String::new(),
+        };
+
+        match request {
+            Request::TabComplete { path } => {
+                assert_eq!(path.as_str(), "");
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected TabComplete variant"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_request_history_previous() {
+        let mut buffer = heapless::String::<128>::new();
+        buffer.push_str("current input").unwrap();
+
+        let request = Request::<DefaultConfig>::History {
+            direction: HistoryDirection::Previous,
+            buffer,
+        };
+
+        match request {
+            Request::History { direction, buffer } => {
+                assert_eq!(direction, HistoryDirection::Previous);
+                assert_eq!(buffer.as_str(), "current input");
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected History variant"),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_request_history_next() {
+        let request = Request::<DefaultConfig>::History {
+            direction: HistoryDirection::Next,
+            buffer: heapless::String::new(),
+        };
+
+        match request {
+            Request::History { direction, buffer } => {
+                assert_eq!(direction, HistoryDirection::Next);
+                assert_eq!(buffer.as_str(), "");
+            }
+            #[allow(unreachable_patterns)]
+            _ => panic!("Expected History variant"),
+        }
+    }
+
+    #[test]
+    fn test_request_variants_match_features() {
+        let _cmd = Request::<DefaultConfig>::Command {
+            path: heapless::String::new(),
+            args: heapless::Vec::new(),
+            #[cfg(feature = "history")]
+            original: heapless::String::new(),
+            _phantom: core::marker::PhantomData,
+        };
+
+        #[cfg(feature = "authentication")]
+        let _login = Request::<DefaultConfig>::Login {
+            username: heapless::String::new(),
+            password: heapless::String::new(),
+        };
+
+        #[cfg(feature = "completion")]
+        let _complete = Request::<DefaultConfig>::TabComplete {
+            path: heapless::String::new(),
+        };
+
+        #[cfg(feature = "history")]
+        let _history = Request::<DefaultConfig>::History {
+            direction: HistoryDirection::Previous,
+            buffer: heapless::String::new(),
+        };
     }
 
     #[test]
