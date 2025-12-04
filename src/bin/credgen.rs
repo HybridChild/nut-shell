@@ -55,17 +55,15 @@ fn main() {
     let input_path = PathBuf::from(&args[1]);
 
     // Read and parse TOML
-    let toml_content = fs::read_to_string(&input_path)
-        .unwrap_or_else(|e| {
-            eprintln!("Error reading {}: {}", input_path.display(), e);
-            process::exit(1);
-        });
+    let toml_content = fs::read_to_string(&input_path).unwrap_or_else(|e| {
+        eprintln!("Error reading {}: {}", input_path.display(), e);
+        process::exit(1);
+    });
 
-    let config: Config = toml::from_str(&toml_content)
-        .unwrap_or_else(|e| {
-            eprintln!("Error parsing TOML: {}", e);
-            process::exit(1);
-        });
+    let config: Config = toml::from_str(&toml_content).unwrap_or_else(|e| {
+        eprintln!("Error parsing TOML: {}", e);
+        process::exit(1);
+    });
 
     // Validate configuration
     if let Err(e) = validate_config(&config) {
@@ -74,11 +72,10 @@ fn main() {
     }
 
     // Generate hashed credentials
-    let users = generate_users(&config.users)
-        .unwrap_or_else(|e| {
-            eprintln!("Error generating credentials: {}", e);
-            process::exit(1);
-        });
+    let users = generate_users(&config.users).unwrap_or_else(|e| {
+        eprintln!("Error generating credentials: {}", e);
+        process::exit(1);
+    });
 
     // Generate Rust code
     let code = generate_code(&config.access_level_type, &users);
@@ -123,33 +120,35 @@ fn validate_config(config: &Config) -> Result<(), String> {
 
 /// Generate users with hashed credentials
 fn generate_users(configs: &[UserConfig]) -> Result<Vec<GeneratedUser>, String> {
-    configs.iter().map(|cfg| {
-        // Generate random salt
-        let salt = generate_salt();
+    configs
+        .iter()
+        .map(|cfg| {
+            // Generate random salt
+            let salt = generate_salt();
 
-        // Hash password with salt
-        let hash = hash_password(&cfg.password, &salt)?;
+            // Hash password with salt
+            let hash = hash_password(&cfg.password, &salt)?;
 
-        Ok(GeneratedUser {
-            username: cfg.username.clone(),
-            password_hash: hash,
-            salt,
-            level: cfg.level.clone(),
+            Ok(GeneratedUser {
+                username: cfg.username.clone(),
+                password_hash: hash,
+                salt,
+                level: cfg.level.clone(),
+            })
         })
-    }).collect()
+        .collect()
 }
 
 /// Generate cryptographically random salt
 fn generate_salt() -> [u8; 16] {
     let mut salt = [0u8; 16];
-    getrandom::fill(&mut salt)
-        .expect("Failed to generate random salt");
+    getrandom::fill(&mut salt).expect("Failed to generate random salt");
     salt
 }
 
 /// Hash password using SHA-256 (matching nut-shell's Sha256Hasher)
 fn hash_password(password: &str, salt: &[u8; 16]) -> Result<[u8; 32], String> {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
 
     let mut hasher = Sha256::new();
     hasher.update(salt);
@@ -165,7 +164,10 @@ fn hash_password(password: &str, salt: &[u8; 16]) -> Result<[u8; 32], String> {
 /// Generate Rust source code
 fn generate_code(access_level_type: &str, users: &[GeneratedUser]) -> String {
     // Extract simple type name from full path
-    let type_name = access_level_type.split("::").last().unwrap_or(access_level_type);
+    let type_name = access_level_type
+        .split("::")
+        .last()
+        .unwrap_or(access_level_type);
 
     let mut output = String::new();
 
@@ -181,7 +183,11 @@ fn generate_code(access_level_type: &str, users: &[GeneratedUser]) -> String {
 
     // Provider type alias
     output.push_str("/// Build-time credential provider with pre-hashed credentials.\n");
-    output.push_str(&format!("pub type BuildTimeProvider = ConstCredentialProvider<{}, Sha256Hasher, {}>;\n\n", type_name, users.len()));
+    output.push_str(&format!(
+        "pub type BuildTimeProvider = ConstCredentialProvider<{}, Sha256Hasher, {}>;\n\n",
+        type_name,
+        users.len()
+    ));
 
     // Provider constructor
     output.push_str("/// Create the build-time credential provider with pre-hashed credentials.\n");
@@ -193,7 +199,10 @@ fn generate_code(access_level_type: &str, users: &[GeneratedUser]) -> String {
         output.push_str(&format!("        User::new(\n"));
         output.push_str(&format!("            \"{}\",\n", user.username));
         output.push_str(&format!("            {}::{},\n", type_name, user.level));
-        output.push_str(&format!("            {},\n", format_byte_array(&user.password_hash)));
+        output.push_str(&format!(
+            "            {},\n",
+            format_byte_array(&user.password_hash)
+        ));
         output.push_str(&format!("            {},\n", format_byte_array(&user.salt)));
         output.push_str(&format!("        ).unwrap(),\n"));
     }
@@ -206,9 +215,7 @@ fn generate_code(access_level_type: &str, users: &[GeneratedUser]) -> String {
 
 /// Format byte array as Rust array literal
 fn format_byte_array(bytes: &[u8]) -> String {
-    let hex_bytes: Vec<String> = bytes.iter()
-        .map(|b| format!("0x{:02x}", b))
-        .collect();
+    let hex_bytes: Vec<String> = bytes.iter().map(|b| format!("0x{:02x}", b)).collect();
     format!("[{}]", hex_bytes.join(", "))
 }
 
