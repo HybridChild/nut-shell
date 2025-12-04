@@ -177,7 +177,7 @@ fn generate_code(access_level_type: &str, users: &[GeneratedUser]) -> String {
     output.push_str("//\n");
     output.push_str("// WARNING: Credentials are visible in the binary.\n");
     output.push_str("// Only use in production if you understand the security implications.\n");
-    output.push_str("\n");
+    output.push('\n');
     output.push_str("use nut_shell::auth::{ConstCredentialProvider, Sha256Hasher, User};\n");
     output.push_str(&format!("use {};\n\n", access_level_type));
 
@@ -193,10 +193,10 @@ fn generate_code(access_level_type: &str, users: &[GeneratedUser]) -> String {
     output.push_str("/// Create the build-time credential provider with pre-hashed credentials.\n");
     output.push_str("pub fn create_provider() -> BuildTimeProvider {\n");
     output.push_str("    // Pre-hashed credentials generated at build time\n");
-    output.push_str(&format!("    let users = [\n"));
+    output.push_str("    let users = [\n");
 
     for user in users {
-        output.push_str(&format!("        User::new(\n"));
+        output.push_str("        User::new(\n");
         output.push_str(&format!("            \"{}\",\n", user.username));
         output.push_str(&format!("            {}::{},\n", type_name, user.level));
         output.push_str(&format!(
@@ -204,7 +204,7 @@ fn generate_code(access_level_type: &str, users: &[GeneratedUser]) -> String {
             format_byte_array(&user.password_hash)
         ));
         output.push_str(&format!("            {},\n", format_byte_array(&user.salt)));
-        output.push_str(&format!("        ).unwrap(),\n"));
+        output.push_str("        ).unwrap(),\n");
     }
     output.push_str("    ];\n\n");
     output.push_str("    ConstCredentialProvider::new(users, Sha256Hasher)\n");
