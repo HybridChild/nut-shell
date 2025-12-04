@@ -81,26 +81,6 @@ const CONFIG_DIR: Directory<ExampleAccessLevel> = Directory {
 };
 
 // =============================================================================
-// Coffee Commands
-// =============================================================================
-
-pub const CMD_MAKE_COFFEE: CommandMeta<ExampleAccessLevel> = CommandMeta {
-    id: "coffee_make",
-    name: "make",
-    description: "Brew coffee",
-    access_level: ExampleAccessLevel::User,
-    kind: CommandKind::Sync,
-    min_args: 0,
-    max_args: 0,
-};
-
-const COFFEE_DIR: Directory<ExampleAccessLevel> = Directory {
-    name: "coffee",
-    children: &[Node::Command(&CMD_MAKE_COFFEE)],
-    access_level: ExampleAccessLevel::User,
-};
-
-// =============================================================================
 // Root-Level Commands
 // =============================================================================
 
@@ -133,7 +113,6 @@ pub const ROOT: Directory<ExampleAccessLevel> = Directory {
     children: &[
         Node::Directory(&SYSTEM_DIR),
         Node::Directory(&CONFIG_DIR),
-        Node::Directory(&COFFEE_DIR),
         Node::Command(&CMD_ECHO),
         Node::Command(&CMD_UPTIME),
     ],

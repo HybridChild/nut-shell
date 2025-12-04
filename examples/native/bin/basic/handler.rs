@@ -10,7 +10,6 @@ pub struct ExampleHandler;
 impl CommandHandler<DefaultConfig> for ExampleHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
-            "coffee_make" => Ok(Response::success("Brewing coffee...")),
             "system_reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!")),
             "system_status" => {
                 let mut msg = heapless::String::<256>::new();
