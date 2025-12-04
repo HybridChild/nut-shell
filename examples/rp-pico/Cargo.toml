@@ -54,6 +54,15 @@ name = "embassy"
 path = "bin/embassy/main.rs"
 required-features = ["embassy"]
 
+[[bin]]
+name = "buildtime"
+path = "bin/buildtime/main.rs"
+required-features = ["authentication"]
+
+[build-dependencies]
+# Required to run nut-shell-credgen at build time (only for buildtime example)
+nut-shell = { path = "../..", features = ["credgen"] }
+
 [features]
 
 # Import features from nut-shell for pass through

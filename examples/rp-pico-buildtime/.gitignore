@@ -1,5 +1,0 @@
-/target
-Cargo.lock
-
-# Uncomment in production - the demo includes credentials.toml for examples
-# credentials.toml

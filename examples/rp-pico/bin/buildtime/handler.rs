@@ -5,7 +5,7 @@ use heapless;
 use nut_shell::{
     CliError, config::DefaultConfig, response::Response, shell::handler::CommandHandler,
 };
-use rp_pico_buildtime::{hw_commands, system_commands};
+use rp_pico_examples::{hw_commands, system_commands};
 
 use crate::hw_state;
 

@@ -4,12 +4,11 @@ Examples for Raspberry Pi Pico (RP2040) demonstrating **nut-shell** CLI framewor
 
 - **[basic](#basic)** - Complete interactive CLI over USB CDC (synchronous/bare-metal)
 - **[embassy](#embassy)** - Embassy async runtime with async command execution
-
-**Also see:** [`rp-pico-buildtime`](../rp-pico-buildtime/) - Build-time credential generation example using `nut-shell-credgen` tool
+- **[buildtime](#buildtime)** - Build-time credential generation using `nut-shell-credgen` tool
 
 ## Hardware Setup
 
-**USB Connection:** Both examples use USB CDC (Communications Device Class) - no external UART adapter needed! Simply connect the Pico's USB port directly to your computer.
+**USB Connection:** All examples use USB CDC (Communications Device Class) - no external UART adapter needed! Simply connect the Pico's USB port directly to your computer.
 
 ## Prerequisites
 
@@ -118,10 +117,55 @@ screen /dev/tty.usbmodemnut_shell1 115200
 
 ---
 
+### buildtime
+
+Build-time credential generation demonstrating `nut-shell-credgen` tool on RP2040 hardware.
+
+**Build Flow:**
+
+```
+credentials.toml   →   nut-shell-credgen   →   credentials.rs   →   final binary
+(plaintext)            (build tool)            (hashed)            (compiled)
+```
+
+1. `build.rs` runs `nut-shell-credgen` during compilation
+2. Reads `credentials.toml` with plaintext passwords
+3. Generates `credentials.rs` with hashed credentials and random salts
+4. `include!` macro pulls generated code into binary
+5. Final binary contains only hashed credentials
+
+**Security:** Only hashed credentials in firmware. Plaintext passwords stay in `credentials.toml` (gitignored).
+
+**Default credentials:**
+- `admin:admin123`
+- `user:user123`
+
+**Flash and connect:**
+
+```bash
+# Build with authentication feature (required)
+cargo run --release --bin buildtime --features authentication
+
+# Customize credentials (edit credentials.toml, then rebuild)
+vim credentials.toml
+cargo clean && cargo build --release --bin buildtime --features authentication
+
+# Connect to serial
+screen /dev/tty.usbmodemnut_shell1 115200
+```
+
+**Production notes:**
+- Add `credentials.toml` to `.gitignore`
+- Use strong passwords (not demo credentials)
+- Hashed credentials visible in binary (secure physical access)
+- Credentials regenerated when `credentials.toml` changes or after `cargo clean`
+
+---
+
 ## Feature Configuration
 
 ```bash
-# With authentication
+# Basic with authentication
 cargo build --release --bin basic --features authentication
 
 # Minimal (no optional features)
@@ -129,6 +173,9 @@ cargo build --release --bin basic --no-default-features
 
 # Embassy with all features
 cargo build --release --bin embassy --features embassy,authentication,completion,history
+
+# Buildtime (requires authentication)
+cargo build --release --bin buildtime --features authentication
 ```
 
 Available features: `authentication`, `completion`, `history`, `embassy`

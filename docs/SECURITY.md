@@ -177,7 +177,7 @@ Build-time credential generation separates plaintext passwords from source code 
 - Small deployments where per-device credentials unnecessary
 - Build pipelines with secrets management (TOML from vault)
 
-**Implementation:** [RP2040 example](../examples/rp-pico-buildtime/)
+**Implementation:** [RP2040 buildtime example](../examples/rp-pico/README.md#buildtime)
 
 ### Flash-Based Credentials
 
