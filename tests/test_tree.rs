@@ -474,4 +474,3 @@ fn test_tree_can_navigate_full_paths() {
         assert_eq!(cmd.name, "temperature");
     }
 }
-

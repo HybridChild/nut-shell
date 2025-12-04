@@ -10,11 +10,11 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 use fixtures::{MockHandler, MockIo, TEST_TREE};
+use nut_shell::Shell;
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
 use nut_shell::shell::Request;
-use nut_shell::Shell;
 
 // ============================================================================
 // Request/Response Workflow Tests
