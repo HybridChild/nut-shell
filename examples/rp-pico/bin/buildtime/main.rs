@@ -54,7 +54,7 @@ mod credentials {
 }
 
 // Import the access level type from library
-use rp_pico_buildtime::PicoAccessLevel;
+use rp_pico_examples::PicoAccessLevel;
 
 // =============================================================================
 // Main Entry Point

@@ -1,7 +1,7 @@
 //! Command tree definition for the basic example
 
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
-use rp_pico_buildtime::{PicoAccessLevel, hw_commands, system_commands};
+use rp_pico_examples::{PicoAccessLevel, hw_commands, system_commands};
 
 // =============================================================================
 // System Commands
