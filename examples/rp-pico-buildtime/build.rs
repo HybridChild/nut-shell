@@ -16,20 +16,43 @@ fn main() {
     // Important: Build for host target, not embedded target
     let host = env::var("HOST").unwrap_or_else(|_| "x86_64-unknown-linux-gnu".into());
 
-    let output = Command::new("cargo")
+    // Get paths
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
+    let credentials_path = manifest_dir.join("credentials.toml");
+    let nut_shell_dir = manifest_dir.join("../..");
+
+    // Step 1: Build credgen binary for host
+    // We need to clear RUSTFLAGS to avoid embedded linker flags
+    let build_status = Command::new("cargo")
+        .current_dir(&nut_shell_dir)
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")  // Clear any rustflags
+        .env("RUSTFLAGS", "")  // Set empty rustflags
         .args([
-            "run",
-            "--manifest-path",
-            "../../Cargo.toml",  // Path to nut-shell root
+            "build",
             "--bin",
             "nut-shell-credgen",
             "--features",
             "credgen",
             "--target",
             &host,
-            "--",
-            "credentials.toml",
         ])
+        .status()
+        .expect("Failed to build nut-shell-credgen");
+
+    if !build_status.success() {
+        eprintln!("Failed to build nut-shell-credgen");
+        panic!("Credential generation failed");
+    }
+
+    // Step 2: Run the built binary
+    let credgen_bin = nut_shell_dir
+        .join("target")
+        .join(&host)
+        .join("debug")
+        .join("nut-shell-credgen");
+
+    let output = Command::new(&credgen_bin)
+        .arg(&credentials_path)
         .output()
         .expect("Failed to run nut-shell-credgen");
 

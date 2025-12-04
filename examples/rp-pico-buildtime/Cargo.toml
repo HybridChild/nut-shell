@@ -47,6 +47,7 @@ default = []
 # Optional features from nut-shell
 completion = ["nut-shell/completion"]
 history = ["nut-shell/history"]
+async = ["nut-shell/async"]
 
 [profile.release]
 debug = true
