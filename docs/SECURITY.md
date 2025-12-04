@@ -108,48 +108,20 @@ fn verify_password(password: &str, salt: &[u8; 16], expected_hash: &[u8; 32]) ->
 }
 ```
 
-Users implement the `CredentialProvider` trait to supply credentials (see Implementation Patterns section).
+Users implement the `CredentialProvider` trait to supply credentials (see [Implementation Patterns](#implementation-patterns) section).
 
 ### Salt Generation
 
 **Purpose:** Salts prevent attackers from using precomputed rainbow tables. Each user gets a unique 128-bit (16 byte) salt stored alongside their password hash.
 
-| Approach | Salt Source | Use Case | Per-Device Unique |
-|----------|-------------|----------|-------------------|
-| **Build-time** | Hardcoded constants | Development, testing | ❌ No (same across all devices) |
-| **Runtime** | Hardware RNG | Production deployments | ✅ Yes |
+| Approach | Salt Source | Per-Device Unique | Use Case |
+|----------|-------------|-------------------|----------|
+| **Build-time** | Random (during compilation) | ❌ No | Development, testing, small deployments |
+| **Flash-based** | Hardware RNG (provisioning) | ✅ Yes | Production with unique per-device credentials |
 
-**Build-time approach:**
+**Build-time:** Salts generated during compilation using cryptographic RNG. Unique per build but identical across all devices running the same binary.
 
-Salts are hardcoded constants in source code. Hash is precomputed offline:
-
-```rust
-// 1. Generate random salt offline (e.g., openssl rand -hex 16)
-const ADMIN_SALT: [u8; 16] = *b"a3f9d2c8e1b4567a";
-
-// 2. Compute hash offline using hash_password() function
-const ADMIN_HASH: [u8; 32] = [
-    0x5a, 0x2b, /* ... 32 bytes total ... */
-];
-```
-
-**Runtime approach:**
-
-Generate salt during user creation or provisioning:
-
-```rust
-// During manufacturing/provisioning:
-let mut salt = [0u8; 16];
-hardware_rng.fill_bytes(&mut salt);  // Fill with random bytes
-
-let password = "initial_password";
-let hash = hash_password(password, &salt);
-
-// Store both salt and hash in flash memory
-flash.write_user(User { username, salt, password_hash: hash, access_level });
-```
-
-**Security note:** Build-time salts protect against rainbow tables but are identical across all devices built from the same source. Production systems should use hardware RNG to generate per-device unique salts.
+**Flash-based:** Unique salt per device generated during manufacturing/provisioning using hardware RNG, stored in flash with hashed password.
 
 ---
 
@@ -187,171 +159,25 @@ Every node in the command tree has a minimum `AccessLevel`. When a user navigate
 
 ### Build-Time Credentials
 
-Credentials are hardcoded in source as const values. The password comes from an environment variable at build time to avoid committing secrets.
+Build-time credential generation separates plaintext passwords from source code while still embedding hashed credentials in the binary. **nut-shell** provides the `nut-shell-credgen` tool which reads a TOML file during compilation, hashes passwords with random salts, and generates Rust code included in the final binary.
 
-**Complete example:**
+**Concept:**
+- Plaintext passwords in configuration file (gitignored, not committed)
+- Build script generates code with pre-hashed credentials
+- Const-initializable provider (no heap, stored in flash)
 
-```rust
-use nut_shell::auth::{CredentialProvider, User};
-use sha2::{Sha256, Digest};
-use subtle::ConstantTimeEq;
-
-// 1. Hardcoded salt (generated offline, unique per user)
-const ADMIN_SALT: [u8; 16] = *b"a3f9d2c8e1b4567a";
-
-// 2. Hash computed at build time from env var
-const ADMIN_HASH: [u8; 32] = {
-    // Compute this offline and paste here
-    // hash = SHA256(salt || password)
-    [0x5a, 0x2b, /* ... precomputed hash bytes ... */]
-};
-
-const USERS: &[User<MyAccessLevel>] = &[
-    User {
-        username: "admin",
-        password_hash: ADMIN_HASH,
-        salt: ADMIN_SALT,
-        level: MyAccessLevel::Admin,
-    },
-];
-
-pub struct BuildTimeProvider;
-
-impl CredentialProvider<MyAccessLevel> for BuildTimeProvider {
-    fn get_user(&self, username: &str) -> Option<&User<MyAccessLevel>> {
-        USERS.iter().find(|u| u.username == username)
-    }
-
-    fn list_users(&self) -> &[User<MyAccessLevel>] {
-        USERS
-    }
-}
-```
-
-**Workflow:**
-1. Generate random salt: `openssl rand 16 | xxd -p` (produces 16 random bytes as hex)
-2. Create small Rust program using `nut_shell::auth::password::hash_password()` to compute hash
-3. Copy generated constants into your code
-4. Build and deploy
-
-**Example hash generator:**
-```rust
-use nut_shell::auth::password::hash_password;
-
-fn main() {
-    let salt = [0xa3, 0xf9, /* paste your 16 bytes */];
-    let hash = hash_password("your_password", &salt).expect("hash failed");
-    println!("const HASH: [u8; 32] = {:?};", hash);
-}
-```
+**Security model:**
+- Plaintext passwords never in source or binary
+- Each password gets cryptographically random salt (unique per build)
+- Same binary = same credentials (salts identical across devices)
+- Suitable for development, testing, small deployments
 
 **Use cases:**
-- Development and testing environments
-- Single-device deployments
-- Small-batch production where per-device credentials aren't required
+- Development environments without provisioning infrastructure
+- Small deployments where per-device credentials unnecessary
+- Build pipelines with secrets management (TOML from vault)
 
-**Limitations:**
-- All devices built from same source have identical credentials
-- Changing credentials requires rebuild and reflash
-- Hash can be extracted from binary with tools like `strings` or `objdump`
-
-### Build-Time Credential Generation
-
-For production deployments where credentials should not be hardcoded in source but still compiled into the binary, use the `nut-shell-credgen` tool to generate credentials at build time from a TOML configuration file.
-
-**Tool:** The `nut-shell-credgen` binary reads a TOML file with plaintext passwords and generates Rust code with pre-hashed credentials and random salts.
-
-**Workflow:**
-
-1. **Create credentials.toml** (keep out of version control):
-   ```toml
-   access_level_type = "my_app::AccessLevel"
-
-   [[users]]
-   username = "admin"
-   password = "production_secret"
-   level = "Admin"
-
-   [[users]]
-   username = "user"
-   password = "user_password"
-   level = "User"
-   ```
-
-2. **Add build.rs** to run credgen during compilation:
-   ```rust
-   use std::env;
-   use std::process::Command;
-
-   fn main() {
-       println!("cargo:rerun-if-changed=credentials.toml");
-
-       let out_dir = env::var("OUT_DIR").unwrap();
-
-       let output = Command::new("cargo")
-           .args(["run", "--bin", "nut-shell-credgen",
-                  "--features", "credgen", "--", "credentials.toml"])
-           .output()
-           .expect("Failed to run nut-shell-credgen");
-
-       std::fs::write(
-           format!("{}/credentials.rs", out_dir),
-           output.stdout
-       ).expect("Failed to write credentials.rs");
-   }
-   ```
-
-3. **Include generated code** in your application:
-   ```rust
-   mod credentials {
-       include!(concat!(env!("OUT_DIR"), "/credentials.rs"));
-   }
-
-   fn main() {
-       let provider = credentials::create_provider();
-       let shell = Shell::new(&ROOT, handler, &provider, io);
-       // ...
-   }
-   ```
-
-**Generated code structure:**
-```rust
-// Generated by nut-shell-credgen
-pub type BuildTimeProvider = ConstCredentialProvider<AccessLevel, Sha256Hasher, 2>;
-
-pub fn create_provider() -> BuildTimeProvider {
-    let users = [
-        User::new(
-            "admin",
-            AccessLevel::Admin,
-            [0x5a, 0x2b, ...],  // Pre-hashed password
-            [0xa3, 0xf9, ...],  // Random salt (unique per build)
-        ).unwrap(),
-        // ...
-    ];
-    ConstCredentialProvider::new(users, Sha256Hasher)
-}
-```
-
-**Security properties:**
-- ✅ Plaintext passwords only in `credentials.toml` (gitignored, not in source)
-- ✅ Random salts generated per build (cryptographically secure via `getrandom`)
-- ✅ Only hashed credentials compiled into binary
-- ✅ Const-initializable (no heap, no runtime overhead)
-- ✅ Generated code is `no_std` compatible
-
-**Use cases:**
-- Production embedded systems where credentials must be compiled in
-- Deployments where flash provisioning infrastructure is unavailable
-- Systems requiring credentials in flash (not RAM) for security
-- Build pipelines with secrets management (credentials.toml from vault)
-
-**Complete example:** See `examples/rp-pico-buildtime/` for a working Raspberry Pi Pico implementation with full documentation.
-
-**Installation:**
-```bash
-cargo install nut-shell --features credgen --bin nut-shell-credgen
-```
+**Implementation:** [RP2040 example](../examples/rp-pico-buildtime/)
 
 ### Flash-Based Credentials
 
