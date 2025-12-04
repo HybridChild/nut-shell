@@ -17,7 +17,8 @@ fn main() {
     let host = env::var("HOST").unwrap_or_else(|_| "x86_64-unknown-linux-gnu".into());
 
     // Get paths
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
+    let manifest_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
     let credentials_path = manifest_dir.join("credentials.toml");
     let nut_shell_dir = manifest_dir.join("../..");
 
@@ -25,8 +26,8 @@ fn main() {
     // We need to clear RUSTFLAGS to avoid embedded linker flags
     let build_status = Command::new("cargo")
         .current_dir(&nut_shell_dir)
-        .env_remove("CARGO_ENCODED_RUSTFLAGS")  // Clear any rustflags
-        .env("RUSTFLAGS", "")  // Set empty rustflags
+        .env_remove("CARGO_ENCODED_RUSTFLAGS") // Clear any rustflags
+        .env("RUSTFLAGS", "") // Set empty rustflags
         .args([
             "build",
             "--bin",
