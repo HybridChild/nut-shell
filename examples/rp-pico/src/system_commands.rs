@@ -19,26 +19,45 @@ use nut_shell::{
     response::Response,
     tree::{CommandKind, CommandMeta},
 };
+use portable_atomic::{AtomicU64, Ordering};
 
 // =============================================================================
 // Static Cache Storage
 // =============================================================================
 
 /// Cached boot time (timer value at startup in microseconds)
-static mut BOOT_TIME_MICROS: u64 = 0;
+///
+/// Note: The RP2040 timer starts counting from power-on/reset, so we cache
+/// the timer value when init_boot_time() is called to establish our "time zero".
+///
+/// Uses AtomicU64 for proper memory ordering and to prevent compiler optimizations
+/// from eliminating the write.
+static BOOT_TIME_MICROS: AtomicU64 = AtomicU64::new(0);
 
 /// Cache the boot time for uptime calculation
 ///
 /// Must be called early in main() before any significant delays.
-/// Reads the RP2040 64-bit microsecond timer and stores it.
+/// Reads the RP2040 64-bit microsecond timer and stores it as the reference point.
+///
+/// Note: Due to potential wraparound when reading the 64-bit timer as two 32-bit
+/// values, we read high->low->high to detect and handle wraparound.
 pub fn init_boot_time() {
     const TIMER_TIMELR: u32 = 0x4005_4028;
     const TIMER_TIMEHR: u32 = 0x4005_402C;
 
     unsafe {
+        // Read high first, then low, then high again to detect wraparound
+        let high1 = core::ptr::read_volatile(TIMER_TIMEHR as *const u32);
         let low = core::ptr::read_volatile(TIMER_TIMELR as *const u32);
-        let high = core::ptr::read_volatile(TIMER_TIMEHR as *const u32);
-        BOOT_TIME_MICROS = ((high as u64) << 32) | (low as u64);
+        let high2 = core::ptr::read_volatile(TIMER_TIMEHR as *const u32);
+
+        // If high changed, low wrapped around during our read, use second high value
+        let high = if high1 != high2 { high2 } else { high1 };
+
+        let boot_time = ((high as u64) << 32) | (low as u64);
+
+        // Store with Release ordering to ensure visibility across threads/optimizations
+        BOOT_TIME_MICROS.store(boot_time, Ordering::Release);
     }
 }
 
@@ -112,15 +131,19 @@ pub fn cmd_uptime<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErro
     const TIMER_TIMELR: u32 = 0x4005_4028;
     const TIMER_TIMEHR: u32 = 0x4005_402C;
 
-    let (low, high, boot_time) = unsafe {
-        (
-            core::ptr::read_volatile(TIMER_TIMELR as *const u32),
-            core::ptr::read_volatile(TIMER_TIMEHR as *const u32),
-            BOOT_TIME_MICROS,
-        )
+    let current_micros = unsafe {
+        // Read high->low->high to detect wraparound
+        let high1 = core::ptr::read_volatile(TIMER_TIMEHR as *const u32);
+        let low = core::ptr::read_volatile(TIMER_TIMELR as *const u32);
+        let high2 = core::ptr::read_volatile(TIMER_TIMEHR as *const u32);
+
+        let high = if high1 != high2 { high2 } else { high1 };
+        ((high as u64) << 32) | (low as u64)
     };
 
-    let current_micros = ((high as u64) << 32) | (low as u64);
+    // Load with Acquire ordering to ensure we see the write from init_boot_time()
+    let boot_time = BOOT_TIME_MICROS.load(Ordering::Acquire);
+
     let uptime_micros = current_micros.saturating_sub(boot_time);
 
     let seconds = uptime_micros / 1_000_000;
@@ -242,14 +265,19 @@ pub fn cmd_meminfo<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliErr
 /// Performs simple computational tests and reports performance metrics.
 /// Useful for comparing clock speeds or compiler optimizations.
 pub fn cmd_benchmark<C: ShellConfig>(_args: &[&str]) -> Result<Response<C>, CliError> {
-    // Read start time
+    // Timer register addresses
     const TIMER_TIMELR: u32 = 0x4005_4028;
     const TIMER_TIMEHR: u32 = 0x4005_402C;
 
+    // Safe timer reading function that handles potential wraparound
     let read_timer = || -> u64 {
         unsafe {
+            // Read high->low->high to detect wraparound
+            let high1 = core::ptr::read_volatile(TIMER_TIMEHR as *const u32);
             let low = core::ptr::read_volatile(TIMER_TIMELR as *const u32);
-            let high = core::ptr::read_volatile(TIMER_TIMEHR as *const u32);
+            let high2 = core::ptr::read_volatile(TIMER_TIMEHR as *const u32);
+
+            let high = if high1 != high2 { high2 } else { high1 };
             ((high as u64) << 32) | (low as u64)
         }
     };
