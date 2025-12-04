@@ -1,0 +1,314 @@
+//! Build-time credential generator for nut-shell
+//!
+//! Reads plaintext credentials from TOML and generates Rust code with
+//! pre-hashed passwords for compile-time inclusion.
+
+use serde::Deserialize;
+use std::env;
+use std::fs;
+use std::path::PathBuf;
+use std::process;
+
+/// TOML configuration structure
+#[derive(Debug, Deserialize)]
+struct Config {
+    access_level_type: String,
+    #[serde(rename = "users")]
+    users: Vec<UserConfig>,
+}
+
+/// User configuration from TOML
+#[derive(Debug, Deserialize)]
+struct UserConfig {
+    username: String,
+    password: String,
+    level: String,
+}
+
+/// Generated user with hashed credentials
+struct GeneratedUser {
+    username: String,
+    password_hash: [u8; 32],
+    salt: [u8; 16],
+    level: String,
+}
+
+fn main() {
+    // Parse command line arguments
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() != 2 {
+        eprintln!("Usage: {} <credentials.toml>", args[0]);
+        eprintln!();
+        eprintln!("Generates Rust code with pre-hashed credentials from TOML configuration.");
+        eprintln!();
+        eprintln!("Example credentials.toml:");
+        eprintln!("  access_level_type = \"my_crate::AccessLevel\"");
+        eprintln!();
+        eprintln!("  [[users]]");
+        eprintln!("  username = \"admin\"");
+        eprintln!("  password = \"secret123\"");
+        eprintln!("  level = \"Admin\"");
+        process::exit(1);
+    }
+
+    let input_path = PathBuf::from(&args[1]);
+
+    // Read and parse TOML
+    let toml_content = fs::read_to_string(&input_path)
+        .unwrap_or_else(|e| {
+            eprintln!("Error reading {}: {}", input_path.display(), e);
+            process::exit(1);
+        });
+
+    let config: Config = toml::from_str(&toml_content)
+        .unwrap_or_else(|e| {
+            eprintln!("Error parsing TOML: {}", e);
+            process::exit(1);
+        });
+
+    // Validate configuration
+    if let Err(e) = validate_config(&config) {
+        eprintln!("Configuration error: {}", e);
+        process::exit(1);
+    }
+
+    // Generate hashed credentials
+    let users = generate_users(&config.users)
+        .unwrap_or_else(|e| {
+            eprintln!("Error generating credentials: {}", e);
+            process::exit(1);
+        });
+
+    // Generate Rust code
+    let code = generate_code(&config.access_level_type, &users);
+
+    // Write to stdout
+    println!("{}", code);
+}
+
+/// Validate the configuration
+fn validate_config(config: &Config) -> Result<(), String> {
+    if config.access_level_type.is_empty() {
+        return Err("access_level_type cannot be empty".into());
+    }
+
+    if config.users.is_empty() {
+        return Err("at least one user must be defined".into());
+    }
+
+    // Check for empty usernames or passwords
+    for user in &config.users {
+        if user.username.is_empty() {
+            return Err("username cannot be empty".into());
+        }
+        if user.password.is_empty() {
+            return Err("password cannot be empty".into());
+        }
+        if user.level.is_empty() {
+            return Err("access level cannot be empty".into());
+        }
+    }
+
+    // Check for duplicate usernames
+    let mut usernames = std::collections::HashSet::new();
+    for user in &config.users {
+        if !usernames.insert(&user.username) {
+            return Err(format!("duplicate username: {}", user.username));
+        }
+    }
+
+    Ok(())
+}
+
+/// Generate users with hashed credentials
+fn generate_users(configs: &[UserConfig]) -> Result<Vec<GeneratedUser>, String> {
+    configs.iter().map(|cfg| {
+        // Generate random salt
+        let salt = generate_salt();
+
+        // Hash password with salt
+        let hash = hash_password(&cfg.password, &salt)?;
+
+        Ok(GeneratedUser {
+            username: cfg.username.clone(),
+            password_hash: hash,
+            salt,
+            level: cfg.level.clone(),
+        })
+    }).collect()
+}
+
+/// Generate cryptographically random salt
+fn generate_salt() -> [u8; 16] {
+    let mut salt = [0u8; 16];
+    getrandom::getrandom(&mut salt)
+        .expect("Failed to generate random salt");
+    salt
+}
+
+/// Hash password using SHA-256 (matching nut-shell's Sha256Hasher)
+fn hash_password(password: &str, salt: &[u8; 16]) -> Result<[u8; 32], String> {
+    use sha2::{Sha256, Digest};
+
+    let mut hasher = Sha256::new();
+    hasher.update(salt);
+    hasher.update(password.as_bytes());
+
+    let result = hasher.finalize();
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&result);
+
+    Ok(hash)
+}
+
+/// Generate Rust source code
+fn generate_code(access_level_type: &str, users: &[GeneratedUser]) -> String {
+    // Extract simple type name from full path
+    let type_name = access_level_type.split("::").last().unwrap_or(access_level_type);
+
+    let mut output = String::new();
+
+    // Header
+    output.push_str("// Generated by nut-shell-credgen - DO NOT EDIT\n");
+    output.push_str("// This file contains hashed credentials compiled at build time.\n");
+    output.push_str("//\n");
+    output.push_str("// WARNING: Credentials are visible in the binary.\n");
+    output.push_str("// Only use in production if you understand the security implications.\n");
+    output.push_str("\n");
+    output.push_str("use nut_shell::auth::{ConstCredentialProvider, Sha256Hasher, User};\n");
+    output.push_str(&format!("use {};\n\n", access_level_type));
+
+    // Provider type alias
+    output.push_str("/// Build-time credential provider with pre-hashed credentials.\n");
+    output.push_str(&format!("pub type BuildTimeProvider = ConstCredentialProvider<{}, Sha256Hasher, {}>;\n\n", type_name, users.len()));
+
+    // Provider constructor
+    output.push_str("/// Create the build-time credential provider with pre-hashed credentials.\n");
+    output.push_str("pub fn create_provider() -> BuildTimeProvider {\n");
+    output.push_str("    // Pre-hashed credentials generated at build time\n");
+    output.push_str(&format!("    let users = [\n"));
+
+    for user in users {
+        output.push_str(&format!("        User::new(\n"));
+        output.push_str(&format!("            \"{}\",\n", user.username));
+        output.push_str(&format!("            {}::{},\n", type_name, user.level));
+        output.push_str(&format!("            {},\n", format_byte_array(&user.password_hash)));
+        output.push_str(&format!("            {},\n", format_byte_array(&user.salt)));
+        output.push_str(&format!("        ).unwrap(),\n"));
+    }
+    output.push_str("    ];\n\n");
+    output.push_str("    ConstCredentialProvider::new(users, Sha256Hasher)\n");
+    output.push_str("}\n");
+
+    output
+}
+
+/// Format byte array as Rust array literal
+fn format_byte_array(bytes: &[u8]) -> String {
+    let hex_bytes: Vec<String> = bytes.iter()
+        .map(|b| format!("0x{:02x}", b))
+        .collect();
+    format!("[{}]", hex_bytes.join(", "))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_config_valid() {
+        let config = Config {
+            access_level_type: "my_crate::Level".into(),
+            users: vec![UserConfig {
+                username: "admin".into(),
+                password: "pass".into(),
+                level: "Admin".into(),
+            }],
+        };
+        assert!(validate_config(&config).is_ok());
+    }
+
+    #[test]
+    fn test_validate_config_empty_access_level_type() {
+        let config = Config {
+            access_level_type: "".into(),
+            users: vec![UserConfig {
+                username: "admin".into(),
+                password: "pass".into(),
+                level: "Admin".into(),
+            }],
+        };
+        assert!(validate_config(&config).is_err());
+    }
+
+    #[test]
+    fn test_validate_config_no_users() {
+        let config = Config {
+            access_level_type: "Foo::Bar".into(),
+            users: vec![],
+        };
+        assert!(validate_config(&config).is_err());
+    }
+
+    #[test]
+    fn test_validate_config_empty_username() {
+        let config = Config {
+            access_level_type: "Foo::Bar".into(),
+            users: vec![UserConfig {
+                username: "".into(),
+                password: "pass".into(),
+                level: "Admin".into(),
+            }],
+        };
+        assert!(validate_config(&config).is_err());
+    }
+
+    #[test]
+    fn test_validate_config_duplicate_username() {
+        let config = Config {
+            access_level_type: "Foo::Bar".into(),
+            users: vec![
+                UserConfig {
+                    username: "admin".into(),
+                    password: "pass1".into(),
+                    level: "Admin".into(),
+                },
+                UserConfig {
+                    username: "admin".into(),
+                    password: "pass2".into(),
+                    level: "User".into(),
+                },
+            ],
+        };
+        assert!(validate_config(&config).is_err());
+    }
+
+    #[test]
+    fn test_format_byte_array() {
+        let bytes = [0x00, 0xff, 0x42];
+        assert_eq!(format_byte_array(&bytes), "[0x00, 0xff, 0x42]");
+    }
+
+    #[test]
+    fn test_extract_type_name() {
+        let full_path = "my_crate::auth::Level";
+        let name = full_path.split("::").last().unwrap();
+        assert_eq!(name, "Level");
+    }
+
+    #[test]
+    fn test_hash_password() {
+        let salt = [1u8; 16];
+        let hash = hash_password("test123", &salt).unwrap();
+        assert_eq!(hash.len(), 32);
+
+        // Same password and salt should produce same hash
+        let hash2 = hash_password("test123", &salt).unwrap();
+        assert_eq!(hash, hash2);
+
+        // Different password should produce different hash
+        let hash3 = hash_password("different", &salt).unwrap();
+        assert_ne!(hash, hash3);
+    }
+}
