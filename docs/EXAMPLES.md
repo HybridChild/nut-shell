@@ -21,9 +21,12 @@ Working examples in `examples/` directory:
 | **Native (async)** | `examples/native/bin/async/` | Async command execution, Tokio runtime |
 | **RP2040 (bare-metal)** | `examples/rp-pico/bin/basic/` | Blocking USB-CDC writes |
 | **RP2040 (Embassy)** | `examples/rp-pico/bin/embassy/` | Async USB-CDC with buffered output |
+| **RP2040 (build-time auth)** | `examples/rp-pico-buildtime/` | Build-time credential generation from TOML |
 | **STM32F072** | `examples/stm32f072/bin/basic/` | Blocking UART writes |
 
 Each example includes complete `CharIo` implementation in `io.rs`.
+
+**Build-time credentials example** (`rp-pico-buildtime`) demonstrates using the `nut-shell-credgen` tool to generate pre-hashed credentials at build time from a TOML configuration file. See [SECURITY.md](SECURITY.md#build-time-credential-generation) for details.
 
 ---
 

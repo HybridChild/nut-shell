@@ -5,6 +5,8 @@ Examples for Raspberry Pi Pico (RP2040) demonstrating **nut-shell** CLI framewor
 - **[basic](#basic)** - Complete interactive CLI over USB CDC (synchronous/bare-metal)
 - **[embassy](#embassy)** - Embassy async runtime with async command execution
 
+**Also see:** [`rp-pico-buildtime`](../rp-pico-buildtime/) - Build-time credential generation example using `nut-shell-credgen` tool
+
 ## Hardware Setup
 
 **USB Connection:** Both examples use USB CDC (Communications Device Class) - no external UART adapter needed! Simply connect the Pico's USB port directly to your computer.

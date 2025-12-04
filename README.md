@@ -2,7 +2,7 @@
 
 > _Interactive CLI for microcontrollers. No heap, no bloat._
 
-A lightweight command shell library for `no_std` Rust environments with optional async and authentication support.
+A lightweight command shell library for `#![no_std]` Rust environments with optional async and authentication support.
 
 [![Platform](https://img.shields.io/badge/platform-no_std-blue)](https://github.com/HybridChild/nut-shell)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)](https://github.com/HybridChild/nut-shell)
@@ -11,7 +11,7 @@ A lightweight command shell library for `no_std` Rust environments with optional
 
 ## Overview
 
-**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers, it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support, authentication, tab completion and command history.
+**nut-shell** provides essential CLI primitives for embedded systems with strict memory constraints. Built specifically for microcontrollers, it offers an interactive command-line interface over serial connections (UART/USB), with optional features including async/await support, login authentication, tab completion and command history.
 
 **Design Philosophy:** Essential primitives only. No shell scripting, no dynamic allocation, no bloat.
 
