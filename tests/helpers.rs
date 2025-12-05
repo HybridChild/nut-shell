@@ -132,6 +132,108 @@ pub fn type_input_auth(
 }
 
 // ============================================================================
+// Special Input Helpers (for testing terminal input sequences)
+// ============================================================================
+
+/// Press up arrow key (history navigation).
+#[cfg(not(feature = "authentication"))]
+pub fn press_up_arrow(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\x1b').unwrap(); // ESC
+    shell.process_char('[').unwrap();
+    shell.process_char('A').unwrap();
+}
+
+/// Press down arrow key (history navigation).
+#[cfg(not(feature = "authentication"))]
+pub fn press_down_arrow(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\x1b').unwrap(); // ESC
+    shell.process_char('[').unwrap();
+    shell.process_char('B').unwrap();
+}
+
+/// Press tab key (completion).
+#[cfg(not(feature = "authentication"))]
+pub fn press_tab(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\t').unwrap();
+}
+
+/// Press backspace key.
+#[cfg(not(feature = "authentication"))]
+pub fn press_backspace(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\x08').unwrap();
+}
+
+/// Press backspace N times.
+#[cfg(not(feature = "authentication"))]
+pub fn press_backspace_n(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+    count: usize,
+) {
+    for _ in 0..count {
+        shell.process_char('\x08').unwrap();
+    }
+}
+
+/// Press ESC twice (clear buffer).
+#[cfg(not(feature = "authentication"))]
+pub fn press_double_esc(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('\x1b').unwrap();
+}
+
+/// Press enter key.
+#[cfg(not(feature = "authentication"))]
+pub fn press_enter(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\n').unwrap();
+}
+
+// Auth versions of input helpers
+#[cfg(feature = "authentication")]
+pub fn press_up_arrow_auth(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('[').unwrap();
+    shell.process_char('A').unwrap();
+}
+
+#[cfg(feature = "authentication")]
+pub fn press_down_arrow_auth(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('[').unwrap();
+    shell.process_char('B').unwrap();
+}
+
+#[cfg(feature = "authentication")]
+pub fn press_backspace_auth(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\x08').unwrap();
+}
+
+#[cfg(feature = "authentication")]
+pub fn press_double_esc_auth(
+    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
+) {
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('\x1b').unwrap();
+}
+
+// ============================================================================
 // Assertion Helpers
 // ============================================================================
 
@@ -167,4 +269,28 @@ pub fn assert_contains_none(output: &str, forbidden: &[&str]) {
             output
         );
     }
+}
+
+/// Assert that output matches expected (with helpful error message).
+pub fn assert_output_matches(output: &str, expected: &str, context: &str) {
+    assert_eq!(
+        output, expected,
+        "{}\nExpected: {:?}\nGot: {:?}",
+        context, expected, output
+    );
+}
+
+/// Count occurrences of a character in output.
+pub fn count_char(output: &str, ch: char) -> usize {
+    output.matches(ch).count()
+}
+
+/// Assert prompt is present in output.
+pub fn assert_prompt(output: &str, prompt_fragment: &str) {
+    assert!(
+        output.contains(prompt_fragment),
+        "Expected prompt containing '{}' in output: {}",
+        prompt_fragment,
+        output
+    );
 }
