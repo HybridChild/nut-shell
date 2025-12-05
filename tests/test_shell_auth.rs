@@ -7,26 +7,11 @@
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-use fixtures::{MockAccessLevel, MockHandler, MockIo, TEST_TREE};
-use nut_shell::auth::{ConstCredentialProvider, User, password::Sha256Hasher};
+
+#[path = "helpers.rs"]
+mod helpers;
+
 use nut_shell::config::{DefaultConfig, ShellConfig};
-use nut_shell::shell::Shell;
-
-// ============================================================================
-// Test Credential Provider
-// ============================================================================
-
-/// Create test users for authentication testing.
-fn create_test_users() -> [User<MockAccessLevel>; 2] {
-    // Create dummy hash and salt (for testing, actual values don't matter)
-    let hash = [0u8; 32];
-    let salt = [0u8; 16];
-
-    [
-        User::new("admin", MockAccessLevel::Admin, hash, salt).unwrap(),
-        User::new("user", MockAccessLevel::User, hash, salt).unwrap(),
-    ]
-}
 
 // ============================================================================
 // Password Masking Tests
@@ -34,23 +19,10 @@ fn create_test_users() -> [User<MockAccessLevel>; 2] {
 
 #[test]
 fn test_password_masking_basic() {
-    let users = create_test_users();
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    // Activate shell (shows welcome and login prompt)
-    shell.activate().unwrap();
-
-    // Clear initial output
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_auth_shell();
 
     // Type username
-    for c in "admin".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input_auth(&mut shell, "admin");
 
     let output = shell.io().output();
     assert!(
@@ -69,9 +41,7 @@ fn test_password_masking_basic() {
     shell.io_mut().clear_output();
 
     // Type password
-    for c in "pass".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input_auth(&mut shell, "pass");
 
     let output = shell.io().output();
     assert_eq!(output, "****", "Password should be masked with asterisks");
@@ -79,21 +49,10 @@ fn test_password_masking_basic() {
 
 #[test]
 fn test_password_with_special_chars() {
-    let users = create_test_users();
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_auth_shell();
 
     // Type username with @ and password with special characters
-    let input = "user@example.com:P@ss!";
-    for c in input.chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input_auth(&mut shell, "user@example.com:P@ss!");
 
     let output = shell.io().output();
 
@@ -118,21 +77,10 @@ fn test_password_with_special_chars() {
 
 #[test]
 fn test_password_with_multiple_colons() {
-    let users = create_test_users();
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_auth_shell();
 
     // Type password with additional colons (as per spec, they're part of password)
-    let input = "admin:P:a:s:s";
-    for c in input.chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input_auth(&mut shell, "admin:P:a:s:s");
 
     let output = shell.io().output();
 
@@ -159,20 +107,10 @@ fn test_password_with_multiple_colons() {
 
 #[test]
 fn test_password_masking_with_backspace() {
-    let users = create_test_users();
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_auth_shell();
 
     // Type "admin:pass"
-    for c in "admin:pass".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input_auth(&mut shell, "admin:pass");
 
     // Verify password is masked (4 asterisks for "pass")
     let output_before = shell.io().output();
@@ -193,21 +131,10 @@ fn test_password_masking_with_backspace() {
 
 #[test]
 fn test_password_masking_empty_username() {
-    let users = create_test_users();
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_auth_shell();
 
     // Type just colon and password (empty username per spec is invalid, but masking should work)
-    let input = ":password";
-    for c in input.chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input_auth(&mut shell, ":password");
 
     let output = shell.io().output();
 
@@ -223,21 +150,10 @@ fn test_password_masking_empty_username() {
 
 #[test]
 fn test_password_masking_unicode_chars() {
-    let users = create_test_users();
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_auth_shell();
 
     // Type password with unicode characters
-    let input = "admin:päss";
-    for c in input.chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input_auth(&mut shell, "admin:päss");
 
     let output = shell.io().output();
 
@@ -257,20 +173,10 @@ fn test_password_masking_unicode_chars() {
 
 #[test]
 fn test_double_esc_clears_masked_input() {
-    let users = create_test_users();
-    let hasher = Sha256Hasher::new();
-    let provider = ConstCredentialProvider::new(users, hasher);
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell: Shell<_, _, _, DefaultConfig> = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_auth_shell();
 
     // Type partial login
-    for c in "admin:pass".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input_auth(&mut shell, "admin:pass");
 
     // Verify masked password was displayed before clearing
     let output_before = shell.io_mut().output();

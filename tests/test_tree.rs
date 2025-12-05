@@ -99,67 +99,34 @@ async fn test_async_command_execution() {
 }
 
 // ============================================================================
-// Node Type Tests
+// Node API Tests
 // ============================================================================
 
 #[test]
-fn test_node_type_checking() {
-    // Test command node
-    if let Some(node) = TEST_TREE.find_child("help") {
-        assert!(node.is_command());
-        assert!(!node.is_directory());
-        assert_eq!(node.name(), "help");
-    } else {
-        panic!("help command not found");
-    }
+fn test_node_api() {
+    // Test command node properties
+    let help_node = TEST_TREE.find_child("help").expect("help command should exist");
+    assert!(help_node.is_command(), "help should be a command");
+    assert!(!help_node.is_directory(), "help should not be a directory");
+    assert_eq!(help_node.name(), "help", "help name should match");
+    assert_eq!(help_node.access_level(), MockAccessLevel::Guest, "help should be Guest level");
 
-    // Test directory node
-    if let Some(node) = TEST_TREE.find_child("system") {
-        assert!(node.is_directory());
-        assert!(!node.is_command());
-        assert_eq!(node.name(), "system");
-    } else {
-        panic!("system directory not found");
-    }
-}
+    // Test directory node properties
+    let system_node = TEST_TREE.find_child("system").expect("system directory should exist");
+    assert!(system_node.is_directory(), "system should be a directory");
+    assert!(!system_node.is_command(), "system should not be a command");
+    assert_eq!(system_node.name(), "system", "system name should match");
+    assert_eq!(system_node.access_level(), MockAccessLevel::User, "system should be User level");
 
-#[test]
-fn test_node_access_level() {
-    // Test command access level
-    if let Some(node) = TEST_TREE.find_child("help") {
-        assert_eq!(node.access_level(), MockAccessLevel::Guest);
-    } else {
-        panic!("help command not found");
-    }
+    // Test finding existing and non-existent children
+    assert!(TEST_TREE.find_child("help").is_some(), "should find existing child");
+    assert!(TEST_TREE.find_child("nonexistent").is_none(), "should not find non-existent child");
 
-    // Test directory access level
-    if let Some(node) = TEST_TREE.find_child("system") {
-        assert_eq!(node.access_level(), MockAccessLevel::User);
-    } else {
-        panic!("system directory not found");
-    }
-}
-
-#[test]
-fn test_directory_find_child() {
-    // Test finding existing child
-    let help = TEST_TREE.find_child("help");
-    assert!(help.is_some());
-
-    // Test not finding non-existent child
-    let nonexistent = TEST_TREE.find_child("nonexistent");
-    assert!(nonexistent.is_none());
-
-    // Test finding child in subdirectory
+    // Test finding children in subdirectories
     if let Some(Node::Directory(system)) = TEST_TREE.find_child("system") {
-        let status = system.find_child("status");
-        assert!(status.is_some());
-
-        let reboot = system.find_child("reboot");
-        assert!(reboot.is_some());
-
-        let missing = system.find_child("missing");
-        assert!(missing.is_none());
+        assert!(system.find_child("status").is_some(), "should find status in system");
+        assert!(system.find_child("reboot").is_some(), "should find reboot in system");
+        assert!(system.find_child("missing").is_none(), "should not find missing child");
     } else {
         panic!("system should be a directory");
     }
