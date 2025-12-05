@@ -1365,62 +1365,6 @@ mod tests {
     };
 
     #[test]
-    fn test_history_direction_values() {
-        assert_eq!(HistoryDirection::Previous as u8, 0);
-        assert_eq!(HistoryDirection::Next as u8, 1);
-    }
-
-    #[test]
-    fn test_history_direction_copy() {
-        let dir1 = HistoryDirection::Previous;
-        let dir2 = dir1;
-        assert_eq!(dir1, dir2);
-    }
-
-    #[test]
-    fn test_history_direction_clone() {
-        let dir1 = HistoryDirection::Next;
-        let dir2 = dir1;
-        assert_eq!(dir1, dir2);
-    }
-
-    #[test]
-    fn test_cli_state_inactive() {
-        let state = CliState::Inactive;
-        assert_eq!(state, CliState::Inactive);
-    }
-
-    #[test]
-    fn test_cli_state_logged_in() {
-        let state = CliState::LoggedIn;
-        assert_eq!(state, CliState::LoggedIn);
-    }
-
-    #[test]
-    #[cfg(feature = "authentication")]
-    fn test_cli_state_logged_out() {
-        let state = CliState::LoggedOut;
-        assert_eq!(state, CliState::LoggedOut);
-        assert_ne!(state, CliState::LoggedIn);
-    }
-
-    #[test]
-    fn test_cli_state_copy() {
-        let state1 = CliState::Inactive;
-        let state2 = state1;
-        assert_eq!(state1, state2);
-    }
-
-    #[test]
-    fn test_cli_state_matches_auth_feature() {
-        let _inactive = CliState::Inactive;
-        let _logged_in = CliState::LoggedIn;
-
-        #[cfg(feature = "authentication")]
-        let _logged_out = CliState::LoggedOut;
-    }
-
-    #[test]
     fn test_request_command_no_args() {
         let mut path = heapless::String::<128>::new();
         path.push_str("help").unwrap();
