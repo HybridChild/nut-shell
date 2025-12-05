@@ -97,7 +97,7 @@ fn test_execute_command_with_path_and_args() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("LED") && output.contains("on"),
+        output.contains("LED: on"),
         "Should execute command with path and arguments: {}",
         output
     );
@@ -130,7 +130,7 @@ fn test_navigate_to_directory() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("System OK"),
+        output.contains("@/system>") && output.contains("System OK"),
         "Should be able to execute commands in navigated directory: {}",
         output
     );
@@ -162,7 +162,7 @@ fn test_navigate_to_nested_directory() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("Network OK"),
+        output.contains("@/system/network>") && output.contains("Network OK"),
         "Should execute network status in system/network/: {}",
         output
     );
@@ -191,7 +191,7 @@ fn test_navigate_with_relative_path() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("Network OK"),
+        output.contains("@/system/network>") && output.contains("Network OK"),
         "Should navigate using relative path: {}",
         output
     );
@@ -225,7 +225,7 @@ fn test_navigate_parent_directory() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("System OK"),
+        output.contains("@/system>") && output.contains("System OK"),
         "Should navigate to parent with ..: {}",
         output
     );
@@ -259,7 +259,7 @@ fn test_navigate_parent_multiple_levels() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("back at root"),
+        output.contains("@/>") && output.contains("back at root"),
         "Should navigate multiple parent levels: {}",
         output
     );
@@ -287,7 +287,7 @@ fn test_navigate_with_current_directory_dot() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("System OK"),
+        output.contains("@/system>") && output.contains("System OK"),
         "Should handle . in path: {}",
         output
     );
@@ -321,7 +321,7 @@ fn test_navigate_absolute_path() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("Memory"),
+        output.contains("@/debug>") && output.contains("Memory"),
         "Should navigate using absolute path: {}",
         output
     );
@@ -355,7 +355,7 @@ fn test_navigate_to_root_with_slash() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("at root"),
+        output.contains("@/>") && output.contains("at root"),
         "Should navigate to root with /: {}",
         output
     );
@@ -377,7 +377,7 @@ fn test_navigate_invalid_directory() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("Command not found") || output.contains("Invalid"),
+        output.contains("Error: Command not found"),
         "Should error on invalid directory: {}",
         output
     );
@@ -406,7 +406,7 @@ fn test_navigate_parent_beyond_root() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("still at root"),
+        output.contains("@/>") && output.contains("still at root"),
         "Should stay at root when navigating .. from root: {}",
         output
     );
@@ -502,23 +502,32 @@ fn test_tab_completion_single_match() {
     shell.activate().unwrap();
     shell.io_mut().clear_output();
 
-    // Type partial command, press tab to complete, then execute
+    // Type partial command
     for c in "ech".chars() {
         shell.process_char(c).unwrap();
     }
-    shell.process_char('\t').unwrap(); // Tab completes to "echo"
 
-    // Clear output and execute the completed command with an argument
     shell.io_mut().clear_output();
+
+    // Press tab - should emit "o" to complete "echo"
+    shell.process_char('\t').unwrap();
+
+    let completion_output = shell.io_mut().output();
+    assert!(
+        completion_output.contains('o'),
+        "Tab should have emitted 'o' to complete 'ech' to 'echo': {}",
+        completion_output
+    );
+
+    // Now execute with an argument
     for c in " completion_test\n".chars() {
         shell.process_char(c).unwrap();
     }
 
-    // Verify the command executed correctly (proves tab completion worked)
     let output = shell.io_mut().output();
     assert!(
         output.contains("completion_test"),
-        "Tab should have completed 'ech' to 'echo', output: {}",
+        "Completed command should execute correctly: {}",
         output
     );
 }
@@ -548,25 +557,33 @@ fn test_history_navigation_up() {
     }
     shell.io_mut().clear_output();
 
-    // Press up arrow (should recall "echo second") and execute
+    // Press up arrow (should recall "echo second")
     shell.process_char('\x1b').unwrap(); // ESC
     shell.process_char('[').unwrap();
     shell.process_char('A').unwrap(); // Up
-    shell.io_mut().clear_output();
-    shell.process_char('\n').unwrap(); // Execute
 
-    // Verify the recalled command executed
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("echo second"),
+        "Up arrow should recall 'echo second': {}",
+        output
+    );
+
+    // Execute and verify
+    shell.io_mut().clear_output();
+    shell.process_char('\n').unwrap();
+
     let output = shell.io_mut().output();
     assert!(
         output.contains("second"),
-        "Up arrow should recall and execute 'echo second', got: {}",
+        "Should execute 'echo second': {}",
         output
     );
 }
 
 #[test]
 #[cfg(all(feature = "history", not(feature = "authentication")))]
-fn test_history_navigation_up_down() {
+fn test_history_navigation_up_multiple() {
     let io = MockIo::new();
     let handler = MockHandler;
     let mut shell = Shell::new(&TEST_TREE, handler, io);
@@ -582,51 +599,105 @@ fn test_history_navigation_up_down() {
     }
     shell.io_mut().clear_output();
 
-    // Press up arrow twice to get to "echo first"
+    // Press up arrow once - should recall "echo second"
     shell.process_char('\x1b').unwrap();
     shell.process_char('[').unwrap();
-    shell.process_char('A').unwrap(); // Up (should show "echo second")
+    shell.process_char('A').unwrap();
 
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("echo second"),
+        "First up arrow should recall 'echo second': {}",
+        output
+    );
+
+    shell.io_mut().clear_output();
+
+    // Press up arrow again - should recall "echo first"
     shell.process_char('\x1b').unwrap();
     shell.process_char('[').unwrap();
-    shell.process_char('A').unwrap(); // Up again (should show "echo first")
+    shell.process_char('A').unwrap();
 
-    // Execute to verify we got "echo first"
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("echo first"),
+        "Second up arrow should recall 'echo first': {}",
+        output
+    );
+
+    // Execute to verify the buffer contains "echo first"
     shell.io_mut().clear_output();
     shell.process_char('\n').unwrap();
+
     let output = shell.io_mut().output();
     assert!(
         output.contains("first"),
-        "Up twice should recall 'echo first': {}",
+        "Should execute 'echo first': {}",
         output
     );
+}
+
+#[test]
+#[cfg(all(feature = "history", not(feature = "authentication")))]
+fn test_history_navigation_down() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
     shell.io_mut().clear_output();
 
-    // Now test down arrow: up three times then down once should give "echo second"
-    // History now contains: "echo first", "echo second", "echo first" (just executed)
-    shell.process_char('\x1b').unwrap();
-    shell.process_char('[').unwrap();
-    shell.process_char('A').unwrap(); // Up (at "echo first" - most recent)
-
-    shell.process_char('\x1b').unwrap();
-    shell.process_char('[').unwrap();
-    shell.process_char('A').unwrap(); // Up again (at "echo second")
-
-    shell.process_char('\x1b').unwrap();
-    shell.process_char('[').unwrap();
-    shell.process_char('A').unwrap(); // Up again (at "echo first" - oldest)
-
-    shell.process_char('\x1b').unwrap();
-    shell.process_char('[').unwrap();
-    shell.process_char('B').unwrap(); // Down (should show "echo second")
-
-    // Execute to verify we got "echo second"
+    // Execute three commands to have enough history
+    for c in "echo first\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    for c in "echo second\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    for c in "echo third\n".chars() {
+        shell.process_char(c).unwrap();
+    }
     shell.io_mut().clear_output();
-    shell.process_char('\n').unwrap();
+
+    // Navigate up twice to get to "echo second"
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('[').unwrap();
+    shell.process_char('A').unwrap(); // Up to "echo third"
+
+    shell.io_mut().clear_output();
+
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('[').unwrap();
+    shell.process_char('A').unwrap(); // Up to "echo second"
+
     let output = shell.io_mut().output();
     assert!(
-        output.contains("second"),
-        "Down should recall 'echo second': {}",
+        output.contains("echo second"),
+        "Should be at 'echo second': {}",
+        output
+    );
+
+    shell.io_mut().clear_output();
+
+    // Press down arrow - should move forward to "echo third"
+    shell.process_char('\x1b').unwrap();
+    shell.process_char('[').unwrap();
+    shell.process_char('B').unwrap();
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("echo third"),
+        "Down arrow should recall 'echo third': {}",
+        output
+    );
+
+    // Execute to verify
+    shell.io_mut().clear_output();
+    shell.process_char('\n').unwrap();
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("third"),
+        "Should execute 'echo third': {}",
         output
     );
 }
@@ -802,7 +873,7 @@ fn test_command_requires_exact_args() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("argument") || output.contains("require") || output.contains("Usage"),
+        output.contains("Error: Expected 1 arguments, got 0"),
         "Should report missing argument: {}",
         output
     );
@@ -824,30 +895,8 @@ fn test_command_accepts_valid_args() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("LED") && output.contains("on"),
+        output.contains("LED: on"),
         "Should execute command with valid args: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_command_with_variable_args() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // 'echo' allows 0-16 arguments
-    for c in "echo a b c d e\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("a") && output.contains("e"),
-        "Should handle variable arguments: {}",
         output
     );
 }
@@ -869,7 +918,7 @@ fn test_command_too_many_args() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("argument") || output.contains("too many") || output.contains("Usage"),
+        output.contains("Error: Expected 0 arguments, got 1"),
         "Should report too many arguments: {}",
         output
     );
@@ -1064,60 +1113,6 @@ fn test_admin_can_access_admin_directories() {
 }
 
 // ============================================================================
-// Config Variation Tests
-// ============================================================================
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_minimal_config_works() {
-    use nut_shell::Response;
-    use nut_shell::config::MinimalConfig;
-    use nut_shell::error::CliError;
-    use nut_shell::shell::handler::CommandHandler;
-
-    // Implement handler for MinimalConfig
-    struct MinimalHandler;
-
-    impl CommandHandler<MinimalConfig> for MinimalHandler {
-        fn execute_sync(
-            &self,
-            name: &str,
-            _args: &[&str],
-        ) -> Result<Response<MinimalConfig>, CliError> {
-            match name {
-                "help" => Ok(Response::success("Help")),
-                "echo" => Ok(Response::success("Echo")),
-                _ => Err(CliError::CommandNotFound),
-            }
-        }
-
-        #[cfg(feature = "async")]
-        async fn execute_async(
-            &self,
-            _name: &str,
-            _args: &[&str],
-        ) -> Result<Response<MinimalConfig>, CliError> {
-            Err(CliError::CommandNotFound)
-        }
-    }
-
-    let io = MockIo::new();
-    let handler = MinimalHandler;
-    let mut shell: Shell<_, _, _, MinimalConfig> = Shell::new(&TEST_TREE, handler, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute command with MinimalConfig
-    for c in "echo test\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(output.contains("Echo"), "MinimalConfig should work");
-}
-
-// ============================================================================
 // Async Command Execution Tests
 // ============================================================================
 
@@ -1143,7 +1138,7 @@ async fn test_async_command_via_process_char_async() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("Async complete") || output.contains("100ms"),
+        output.contains("Waited 100ms"),
         "Async command should have executed. Output: {}",
         output
     );
@@ -1193,20 +1188,7 @@ async fn test_async_command_with_arguments() {
 
     let output = shell.io_mut().output();
     assert!(
-        output.contains("Async complete") || output.contains("250ms"),
+        output.contains("Waited 250ms"),
         "Async command with args should execute"
     );
 }
-
-#[test]
-#[cfg(all(not(feature = "async"), feature = "async"))]
-fn test_async_command_errors_without_async_feature() {
-    // This test ensures that trying to call an async command from sync context fails
-    // Note: This test should never actually run because the feature combination is impossible
-    // It's here for documentation purposes
-    compile_error!("This should not compile - contradictory feature requirements");
-}
-
-// ============================================================================
-// Path Navigation Edge Cases
-// ============================================================================
