@@ -4,12 +4,12 @@
 
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
-mod fixtures;
+pub mod fixtures;
 
 use fixtures::{MockAccessLevel, MockHandler, MockIo, TEST_TREE};
 use heapless::String as HString;
-use nut_shell::config::DefaultConfig;
 use nut_shell::Shell;
+use nut_shell::config::DefaultConfig;
 
 // ============================================================================
 // Shell Creation Helpers
@@ -28,13 +28,25 @@ pub fn create_test_shell() -> Shell<'static, MockAccessLevel, MockIo, MockHandle
 
 // Static credential provider for auth tests
 #[cfg(feature = "authentication")]
-static AUTH_PROVIDER: std::sync::OnceLock<nut_shell::auth::ConstCredentialProvider<MockAccessLevel, nut_shell::auth::password::Sha256Hasher, 2>> = std::sync::OnceLock::new();
+static AUTH_PROVIDER: std::sync::OnceLock<
+    nut_shell::auth::ConstCredentialProvider<
+        MockAccessLevel,
+        nut_shell::auth::password::Sha256Hasher,
+        2,
+    >,
+> = std::sync::OnceLock::new();
 
 /// Get or create the static auth provider.
 #[cfg(feature = "authentication")]
-fn get_auth_provider() -> &'static nut_shell::auth::ConstCredentialProvider<MockAccessLevel, nut_shell::auth::password::Sha256Hasher, 2> {
+fn get_auth_provider() -> &'static nut_shell::auth::ConstCredentialProvider<
+    MockAccessLevel,
+    nut_shell::auth::password::Sha256Hasher,
+    2,
+> {
     AUTH_PROVIDER.get_or_init(|| {
-        use nut_shell::auth::{ConstCredentialProvider, PasswordHasher, User, password::Sha256Hasher};
+        use nut_shell::auth::{
+            ConstCredentialProvider, PasswordHasher, User, password::Sha256Hasher,
+        };
 
         let hasher = Sha256Hasher::new();
 
@@ -157,9 +169,7 @@ pub fn press_down_arrow(
 
 /// Press tab key (completion).
 #[cfg(not(feature = "authentication"))]
-pub fn press_tab(
-    shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>,
-) {
+pub fn press_tab(shell: &mut Shell<'static, MockAccessLevel, MockIo, MockHandler, DefaultConfig>) {
     shell.process_char('\t').unwrap();
 }
 

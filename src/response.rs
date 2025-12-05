@@ -134,13 +134,21 @@ mod tests {
         // Test that messages within buffer size are preserved
         let long_msg = "A".repeat(250);
         let response = Response::<DefaultConfig>::success(&long_msg);
-        assert_eq!(response.message.len(), 250, "Message within capacity should be preserved");
+        assert_eq!(
+            response.message.len(),
+            250,
+            "Message within capacity should be preserved"
+        );
 
         // Test that messages exceeding buffer capacity fail silently (heapless behavior)
         // Note: In production, command handlers should ensure responses fit within MAX_RESPONSE
         let too_long_msg = "B".repeat(300);
         let response = Response::<DefaultConfig>::success(&too_long_msg);
-        assert_eq!(response.message.len(), 0, "Message exceeding capacity results in empty message (heapless limitation)");
+        assert_eq!(
+            response.message.len(),
+            0,
+            "Message exceeding capacity results in empty message (heapless limitation)"
+        );
     }
 
     #[test]

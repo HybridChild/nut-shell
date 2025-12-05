@@ -8,6 +8,7 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 
+#[allow(clippy::duplicate_mod)]
 #[path = "helpers.rs"]
 mod helpers;
 
@@ -396,8 +397,7 @@ fn test_password_masking_immediate() {
 
     let output = shell.io().output();
     assert_eq!(
-        output,
-        "*",
+        output, "*",
         "First char after colon should be masked: {:?}",
         output
     );
