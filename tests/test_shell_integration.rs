@@ -18,27 +18,6 @@ use nut_shell::Shell;
 
 #[test]
 #[cfg(not(feature = "authentication"))]
-fn test_simple_command_execution() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute 'echo hello world'
-    for c in "echo hello world\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("hello world"),
-        "Output should contain echo result"
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
 fn test_command_with_arguments() {
     let io = MockIo::new();
     let handler = MockHandler;
@@ -61,6 +40,377 @@ fn test_command_with_arguments() {
 // ============================================================================
 // Navigation Tests
 // ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_to_directory() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Navigate to system directory
+    for c in "system\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.io_mut().clear_output();
+
+    // Now we should be in system/, so 'status' command should be accessible
+    for c in "status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("System OK"),
+        "Should be able to execute commands in navigated directory: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_to_nested_directory() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Navigate to system/network directory
+    for c in "system\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+    for c in "network\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.io_mut().clear_output();
+
+    // Now we should be in system/network/, test network-specific command
+    for c in "status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("Network OK"),
+        "Should execute network status in system/network/: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_with_relative_path() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Navigate using relative path system/network
+    for c in "system/network\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.io_mut().clear_output();
+
+    // Execute command in current directory
+    for c in "status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("Network OK"),
+        "Should navigate using relative path: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_parent_directory() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Navigate to system/network
+    for c in "system/network\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    // Navigate up one level using ..
+    for c in "..\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.io_mut().clear_output();
+
+    // Should be in system/ now, test system command
+    for c in "status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("System OK"),
+        "Should navigate to parent with ..: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_parent_multiple_levels() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Navigate to system/network
+    for c in "system/network\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    // Navigate up two levels using ../..
+    for c in "../..\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.io_mut().clear_output();
+
+    // Should be at root, test root command
+    for c in "echo back at root\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("back at root"),
+        "Should navigate multiple parent levels: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_with_current_directory_dot() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Navigate using . (current directory) in path
+    for c in "./system\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.io_mut().clear_output();
+
+    for c in "status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("System OK"),
+        "Should handle . in path: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_absolute_path() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Navigate to system first
+    for c in "system\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    // Navigate to debug using absolute path from system directory
+    for c in "/debug\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.io_mut().clear_output();
+
+    // Should be in debug/, test debug command
+    for c in "memory\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("Memory"),
+        "Should navigate using absolute path: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_to_root_with_slash() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Navigate to system/network
+    for c in "system/network\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    // Navigate to root using /
+    for c in "/\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.io_mut().clear_output();
+
+    // Should be at root, test root command
+    for c in "echo at root\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("at root"),
+        "Should navigate to root with /: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_execute_command_with_path() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Execute command using path without navigation (from root)
+    for c in "system/status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("System OK"),
+        "Should execute command via path without navigation: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_execute_nested_command_with_path() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Execute deeply nested command with full path
+    for c in "system/network/status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("Network OK"),
+        "Should execute nested command via full path: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_execute_command_with_path_and_args() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Execute command with path and arguments
+    for c in "system/hardware/led on\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("LED") && output.contains("on"),
+        "Should execute command with path and arguments: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_invalid_directory() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Try to navigate to non-existent directory
+    for c in "nonexistent\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("Command not found") || output.contains("Invalid"),
+        "Should error on invalid directory: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_parent_beyond_root() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Try to navigate above root
+    for c in "..\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    shell.io_mut().clear_output();
+
+    // Should still be at root (.. from root stays at root)
+    for c in "echo still at root\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("still at root"),
+        "Should stay at root when navigating .. from root: {}",
+        output
+    );
+}
 
 // ============================================================================
 // Global Commands Tests
