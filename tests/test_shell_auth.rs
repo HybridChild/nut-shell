@@ -225,3 +225,180 @@ fn test_double_esc_clears_masked_input() {
         output_after
     );
 }
+
+// ============================================================================
+// Authentication Edge Cases (documents login behavior)
+// ============================================================================
+
+#[test]
+fn test_login_with_wrong_password() {
+    // Wrong password should show failure message
+    let mut shell = helpers::create_auth_shell();
+
+    let output = helpers::execute_command_auth(&mut shell, "admin:wrongpass");
+
+    assert!(
+        output.contains(DefaultConfig::MSG_LOGIN_FAILED),
+        "Wrong password should show failure: {}",
+        output
+    );
+}
+
+#[test]
+fn test_login_with_nonexistent_user() {
+    // Non-existent user should show failure (not reveal user doesn't exist)
+    let mut shell = helpers::create_auth_shell();
+
+    let output = helpers::execute_command_auth(&mut shell, "nobody:password");
+
+    assert!(
+        output.contains(DefaultConfig::MSG_LOGIN_FAILED),
+        "Non-existent user should show generic failure: {}",
+        output
+    );
+}
+
+#[test]
+fn test_login_with_empty_username() {
+    // Empty username is processed as valid format but fails authentication
+    let mut shell = helpers::create_auth_shell();
+
+    let output = helpers::execute_command_auth(&mut shell, ":password");
+
+    assert!(
+        output.contains(DefaultConfig::MSG_LOGIN_FAILED),
+        "Empty username should show login failed: {}",
+        output
+    );
+}
+
+#[test]
+fn test_login_with_empty_password() {
+    // Empty password should still be processed (and fail)
+    let mut shell = helpers::create_auth_shell();
+
+    let output = helpers::execute_command_auth(&mut shell, "admin:");
+
+    assert!(
+        output.contains(DefaultConfig::MSG_LOGIN_FAILED),
+        "Empty password should show failure: {}",
+        output
+    );
+}
+
+#[test]
+fn test_login_without_colon() {
+    // Missing colon should show invalid format
+    let mut shell = helpers::create_auth_shell();
+
+    let output = helpers::execute_command_auth(&mut shell, "admin");
+
+    assert!(
+        output.contains(DefaultConfig::MSG_INVALID_LOGIN_FORMAT),
+        "Missing colon should show invalid format: {}",
+        output
+    );
+}
+
+#[test]
+fn test_multiple_login_attempts() {
+    // Multiple login attempts should be allowed
+    let mut shell = helpers::create_auth_shell();
+
+    // First attempt - wrong password
+    let output1 = helpers::execute_command_auth(&mut shell, "admin:wrong1");
+    assert!(output1.contains(DefaultConfig::MSG_LOGIN_FAILED));
+
+    // Second attempt - still wrong
+    let output2 = helpers::execute_command_auth(&mut shell, "admin:wrong2");
+    assert!(output2.contains(DefaultConfig::MSG_LOGIN_FAILED));
+
+    // Third attempt - correct
+    let output3 = helpers::execute_command_auth(&mut shell, "admin:admin123");
+    assert!(
+        output3.contains(DefaultConfig::MSG_LOGIN_SUCCESS),
+        "Should eventually succeed with correct credentials: {}",
+        output3
+    );
+}
+
+#[test]
+fn test_password_backspace_removes_asterisks() {
+    // Backspace in password field should remove asterisks
+    let mut shell = helpers::create_auth_shell();
+
+    helpers::type_input_auth(&mut shell, "admin:pass");
+
+    let before = shell.io().output();
+    assert_eq!(
+        helpers::count_char(&before, '*'),
+        4,
+        "Should have 4 asterisks before backspace"
+    );
+
+    shell.io_mut().clear_output();
+
+    // Backspace once
+    helpers::press_backspace_auth(&mut shell);
+
+    let after = shell.io().output();
+    // Should emit backspace sequence
+    assert!(
+        after.contains("\x08"),
+        "Backspace should emit backspace sequence"
+    );
+}
+
+#[test]
+fn test_successful_login_changes_prompt() {
+    // After successful login, prompt should show username
+    let mut shell = helpers::create_auth_shell();
+
+    helpers::execute_command_auth(&mut shell, "admin:admin123");
+
+    // Execute a command to see the prompt
+    shell.io_mut().clear_output();
+    helpers::execute_command_auth(&mut shell, "echo test");
+
+    let output = shell.io().output();
+    assert!(
+        output.contains("admin@/>"),
+        "Prompt should show username after login: {}",
+        output
+    );
+}
+
+#[test]
+fn test_case_sensitive_username() {
+    // Usernames should be case-sensitive
+    let mut shell = helpers::create_auth_shell();
+
+    let output = helpers::execute_command_auth(&mut shell, "Admin:admin123");
+
+    assert!(
+        output.contains(DefaultConfig::MSG_LOGIN_FAILED),
+        "Username should be case-sensitive: {}",
+        output
+    );
+}
+
+#[test]
+fn test_password_masking_immediate() {
+    // Password masking should start immediately after first colon
+    let mut shell = helpers::create_auth_shell();
+
+    helpers::type_input_auth(&mut shell, "admin:");
+
+    shell.io_mut().clear_output();
+
+    // Type one character
+    helpers::type_input_auth(&mut shell, "x");
+
+    let output = shell.io().output();
+    assert_eq!(
+        output,
+        "*",
+        "First char after colon should be masked: {:?}",
+        output
+    );
+}

@@ -554,6 +554,453 @@ fn test_admin_access_control() {
 }
 
 // ============================================================================
+// Input Editing Edge Cases (documents interactive editing behavior)
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_empty_command_does_nothing() {
+    let mut shell = helpers::create_test_shell();
+
+    // Press enter with no input - should just show new prompt
+    shell.io_mut().clear_output();
+    helpers::press_enter(&mut shell);
+
+    let output = shell.io_mut().output();
+    helpers::assert_prompt(&output, "@/>");
+    helpers::assert_contains_none(&output, &["Error", "Command"]);
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_command_with_leading_spaces() {
+    let mut shell = helpers::create_test_shell();
+
+    // Leading spaces should be trimmed
+    let output = helpers::execute_command(&mut shell, "   echo test");
+    assert!(output.contains("test"), "Leading spaces should be trimmed");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_command_with_trailing_spaces() {
+    let mut shell = helpers::create_test_shell();
+
+    // Trailing spaces should be trimmed
+    let output = helpers::execute_command(&mut shell, "echo test   ");
+    assert!(output.contains("test"), "Trailing spaces should be trimmed");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_command_with_multiple_spaces_between_args() {
+    let mut shell = helpers::create_test_shell();
+
+    // Multiple spaces between args should be normalized to single space
+    let output = helpers::execute_command(&mut shell, "echo arg1    arg2    arg3");
+    helpers::assert_contains_all(&output, &["arg1", "arg2", "arg3"]);
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_backspace_sequence() {
+    // Documents backspace behavior: removes last char and emits backspace sequence
+    let mut shell = helpers::create_test_shell();
+
+    helpers::type_input(&mut shell, "test");
+    shell.io_mut().clear_output();
+
+    helpers::press_backspace(&mut shell);
+
+    let output = shell.io_mut().output();
+    helpers::assert_contains_ansi(&output, "\x08"); // Backspace
+    helpers::assert_contains_ansi(&output, " ");    // Space
+    helpers::assert_contains_ansi(&output, "\x08"); // Backspace again (VT100 sequence)
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_backspace_until_empty() {
+    let mut shell = helpers::create_test_shell();
+
+    helpers::type_input(&mut shell, "test");
+    helpers::press_backspace_n(&mut shell, 4);
+
+    // Execute empty buffer - should do nothing
+    shell.io_mut().clear_output();
+    helpers::press_enter(&mut shell);
+
+    let output = shell.io_mut().output();
+    helpers::assert_prompt(&output, "@/>");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_double_esc_clears_and_shows_prompt() {
+    // Documents double-ESC behavior: clears buffer, sends CR + clear-to-EOL, re-shows prompt
+    let mut shell = helpers::create_test_shell();
+
+    helpers::type_input(&mut shell, "some command");
+    shell.io_mut().clear_output();
+
+    helpers::press_double_esc(&mut shell);
+
+    let output = shell.io_mut().output();
+    helpers::assert_contains_ansi(&output, "\r");      // Carriage return
+    helpers::assert_contains_ansi(&output, "\x1b[K");  // Clear to end of line
+    helpers::assert_prompt(&output, "@/>");
+}
+
+// ============================================================================
+// Tab Completion Edge Cases
+// ============================================================================
+
+#[test]
+#[cfg(all(feature = "completion", not(feature = "authentication")))]
+fn test_tab_with_no_input() {
+    // Tab on empty input should show all available options
+    let mut shell = helpers::create_test_shell();
+
+    shell.io_mut().clear_output();
+    helpers::press_tab(&mut shell);
+
+    let output = shell.io_mut().output();
+    // Should show multiple matches (all root commands/dirs)
+    helpers::assert_contains_all(&output, &["echo", "system"]);
+}
+
+#[test]
+#[cfg(all(feature = "completion", not(feature = "authentication")))]
+fn test_tab_with_no_matches() {
+    let mut shell = helpers::create_test_shell();
+
+    helpers::type_input(&mut shell, "xyz");
+    shell.io_mut().clear_output();
+
+    helpers::press_tab(&mut shell);
+
+    let output = shell.io_mut().output();
+    // No completion should occur - buffer should remain unchanged
+    assert!(output.is_empty() || output.trim().is_empty(),
+            "No completion should occur for non-matching prefix");
+}
+
+#[test]
+#[cfg(all(feature = "completion", not(feature = "authentication")))]
+fn test_tab_completion_in_subdirectory() {
+    // After navigating to a directory, tab should complete from that context
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "system");
+
+    // Now tab should complete commands in /system
+    helpers::type_input(&mut shell, "st");
+    shell.io_mut().clear_output();
+
+    helpers::press_tab(&mut shell);
+
+    let output = shell.io_mut().output();
+    assert!(output.contains("atus") || output.contains("status"),
+            "Should complete 'status' from 'st' in /system: {}",
+            output);
+}
+
+#[test]
+#[cfg(all(feature = "completion", not(feature = "authentication")))]
+fn test_tab_completes_directory_with_slash() {
+    // When tab completes a directory, it should append "/"
+    let mut shell = helpers::create_test_shell();
+
+    helpers::type_input(&mut shell, "syst");
+    shell.io_mut().clear_output();
+
+    helpers::press_tab(&mut shell);
+
+    let output = shell.io_mut().output();
+    assert!(output.contains("em/"),
+            "Directory completion should append '/': {}",
+            output);
+}
+
+// ============================================================================
+// History Navigation Edge Cases
+// ============================================================================
+
+#[test]
+#[cfg(all(feature = "history", not(feature = "authentication")))]
+fn test_history_empty_buffer() {
+    // Up arrow on fresh shell with no history - should do nothing
+    let mut shell = helpers::create_test_shell();
+
+    shell.io_mut().clear_output();
+    helpers::press_up_arrow(&mut shell);
+
+    let output = shell.io_mut().output();
+    assert!(output.is_empty() || output.trim().is_empty(),
+            "Up arrow on empty history should do nothing");
+}
+
+#[test]
+#[cfg(all(feature = "history", not(feature = "authentication")))]
+fn test_history_up_at_oldest() {
+    // Up arrow when at oldest command should stay at oldest
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "echo first");
+    helpers::execute_command(&mut shell, "echo second");
+
+    // Go up twice to reach oldest
+    helpers::press_up_arrow(&mut shell);
+    helpers::press_up_arrow(&mut shell);
+
+    shell.io_mut().clear_output();
+
+    // Press up again - should stay at "echo first"
+    helpers::press_up_arrow(&mut shell);
+
+    let output = shell.io_mut().output();
+    assert!(output.contains("echo first"),
+            "Should stay at oldest command: {}",
+            output);
+}
+
+#[test]
+#[cfg(all(feature = "history", not(feature = "authentication")))]
+fn test_history_down_at_newest() {
+    // Down arrow at newest position should clear to empty
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "echo test");
+
+    helpers::press_up_arrow(&mut shell);
+    shell.io_mut().clear_output();
+
+    // Press down - should go to empty (beyond newest)
+    helpers::press_down_arrow(&mut shell);
+
+    let output = shell.io_mut().output();
+    // Should show cleared line
+    assert!(output.contains("\r") || output.contains("\x1b"),
+            "Down at newest should clear buffer: {}",
+            output);
+}
+
+#[test]
+#[cfg(all(feature = "history", not(feature = "authentication")))]
+fn test_history_after_failed_command() {
+    // Failed commands should still be added to history
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "nonexistent");
+    helpers::execute_command(&mut shell, "echo valid");
+
+    shell.io_mut().clear_output();
+    helpers::press_up_arrow(&mut shell);
+
+    let output = shell.io_mut().output();
+    assert!(output.contains("echo valid"),
+            "Should recall last command (even after failed command): {}",
+            output);
+}
+
+#[test]
+#[cfg(all(feature = "history", not(feature = "authentication")))]
+fn test_history_edit_recalled_command() {
+    // User should be able to edit a recalled command before executing
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "echo original");
+
+    // Recall and edit
+    helpers::press_up_arrow(&mut shell);
+    shell.io_mut().clear_output();
+
+    // Backspace 8 times to remove "original"
+    helpers::press_backspace_n(&mut shell, 8);
+
+    // Type new text
+    helpers::type_input(&mut shell, "modified");
+
+    // Execute
+    shell.io_mut().clear_output();
+    helpers::press_enter(&mut shell);
+
+    let output = shell.io_mut().output();
+    assert!(output.contains("modified"),
+            "Should execute edited command: {}",
+            output);
+}
+
+// ============================================================================
+// Path Navigation Edge Cases
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_to_current_directory() {
+    // Using "." should stay in current directory
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "system");
+
+    let output = helpers::execute_command(&mut shell, ".");
+
+    helpers::assert_prompt(&output, "@/system>");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_multiple_parent_navigation() {
+    // Multiple ".." should navigate up multiple levels
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "system/network");
+
+    let output = helpers::execute_command(&mut shell, "../..");
+
+    helpers::assert_prompt(&output, "@/>");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_with_mixed_dots() {
+    // Mix of "." and ".." should work correctly
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "system");
+
+    let output = helpers::execute_command(&mut shell, "./network/../hardware");
+
+    helpers::assert_prompt(&output, "@/system/hardware>");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_absolute_path_from_subdirectory() {
+    // Absolute paths should work from any directory
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "system/network");
+
+    let output = helpers::execute_command(&mut shell, "/debug");
+
+    helpers::assert_prompt(&output, "@/debug>");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_navigate_to_root_explicitly() {
+    // "/" should navigate to root
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "system/network");
+
+    let output = helpers::execute_command(&mut shell, "/");
+
+    helpers::assert_prompt(&output, "@/>");
+}
+
+// ============================================================================
+// Command Execution Edge Cases
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_command_with_exact_buffer_size() {
+    // Command exactly at buffer limit should work
+    let mut shell = helpers::create_test_shell();
+
+    // Create command that's close to buffer size (128 chars)
+    // "echo " + 122 chars of args = 127 chars (leave 1 for null/safety)
+    let args = "a".repeat(120);
+    let cmd = format!("echo {}", args);
+
+    let output = helpers::execute_command(&mut shell, &cmd);
+    assert!(output.contains(&args), "Should handle command at buffer limit");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_repeated_command_execution() {
+    // Executing same command multiple times should work consistently
+    let mut shell = helpers::create_test_shell();
+
+    for i in 0..5 {
+        let output = helpers::execute_command(&mut shell, "echo test");
+        assert!(output.contains("test"),
+                "Repeated execution #{} should work",
+                i + 1);
+    }
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_rapid_state_changes() {
+    // Rapidly navigating and executing commands should maintain state correctly
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "system");
+    helpers::execute_command(&mut shell, "status");
+    helpers::execute_command(&mut shell, "..");
+    helpers::execute_command(&mut shell, "debug");
+    helpers::execute_command(&mut shell, "memory");
+    helpers::execute_command(&mut shell, "/");
+
+    let output = helpers::execute_command(&mut shell, "echo final");
+    helpers::assert_contains_all(&output, &["@/>", "final"]);
+}
+
+// ============================================================================
+// Terminal Behavior Documentation Tests
+// ============================================================================
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_prompt_format() {
+    // Documents prompt format: user@path>
+    let mut shell = helpers::create_test_shell();
+
+    shell.io_mut().clear_output();
+    helpers::press_enter(&mut shell);
+
+    let output = shell.io_mut().output();
+    helpers::assert_prompt(&output, "@/>");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_prompt_updates_with_navigation() {
+    // Prompt should reflect current directory
+    let mut shell = helpers::create_test_shell();
+
+    helpers::execute_command(&mut shell, "system");
+
+    shell.io_mut().clear_output();
+    helpers::press_enter(&mut shell);
+
+    let output = shell.io_mut().output();
+    helpers::assert_prompt(&output, "@/system>");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_bell_on_buffer_overflow() {
+    // Documents bell (^G) emission when buffer is full
+    let mut shell = helpers::create_test_shell();
+
+    // Fill buffer
+    helpers::type_input(&mut shell, &"a".repeat(128));
+    shell.io_mut().clear_output();
+
+    // Try to add more - should emit bell
+    helpers::type_input(&mut shell, "x");
+
+    let output = shell.io_mut().output();
+    assert_eq!(helpers::count_char(&output, '\x07'), 1,
+               "Should emit exactly one bell character");
+}
+
+// ============================================================================
 // Async Command Execution Tests
 // ============================================================================
 
