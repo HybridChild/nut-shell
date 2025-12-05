@@ -229,9 +229,9 @@ Optional `authentication` feature provides:
 ### Interaction session (authentication enabled)
 
 ```console
-Welcome to nut-shell! Type '?' for help.
+Welcome to nut-shell! Please login.
 Login> admin:********
-  Logged in.
+  Logged in. Type '?' for help.
 admin@/> ls
   system/  - Directory
   echo  - Echo arguments back
@@ -239,10 +239,10 @@ admin@/> system/version
 Firmware version 3.4.5
 admin@/> logout
   Logged out.
-Login> admin:******
+Login> admin:*****
   Login failed. Try again.
 Login> user:*******
-  Logged in.
+  Logged in. Type '?' for help.
 user@/> ls
   echo  - Echo arguments back
 user@/>
