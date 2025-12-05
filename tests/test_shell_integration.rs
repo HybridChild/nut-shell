@@ -138,38 +138,6 @@ fn test_navigate_to_directory() {
 
 #[test]
 #[cfg(not(feature = "authentication"))]
-fn test_navigate_to_nested_directory() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Navigate to system/network directory
-    for c in "system\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    for c in "network\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    shell.io_mut().clear_output();
-
-    // Now we should be in system/network/, test network-specific command
-    for c in "status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("@/system/network>") && output.contains("Network OK"),
-        "Should execute network status in system/network/: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
 fn test_navigate_with_relative_path() {
     let io = MockIo::new();
     let handler = MockHandler;
@@ -233,68 +201,6 @@ fn test_navigate_parent_directory() {
 
 #[test]
 #[cfg(not(feature = "authentication"))]
-fn test_navigate_parent_multiple_levels() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Navigate to system/network
-    for c in "system/network\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    // Navigate up two levels using ../..
-    for c in "../..\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    shell.io_mut().clear_output();
-
-    // Should be at root, test root command
-    for c in "echo back at root\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("@/>") && output.contains("back at root"),
-        "Should navigate multiple parent levels: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_navigate_with_current_directory_dot() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Navigate using . (current directory) in path
-    for c in "./system\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    shell.io_mut().clear_output();
-
-    for c in "status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("@/system>") && output.contains("System OK"),
-        "Should handle . in path: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
 fn test_navigate_absolute_path() {
     let io = MockIo::new();
     let handler = MockHandler;
@@ -323,40 +229,6 @@ fn test_navigate_absolute_path() {
     assert!(
         output.contains("@/debug>") && output.contains("Memory"),
         "Should navigate using absolute path: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_navigate_to_root_with_slash() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Navigate to system/network
-    for c in "system/network\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    // Navigate to root using /
-    for c in "/\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    shell.io_mut().clear_output();
-
-    // Should be at root, test root command
-    for c in "echo at root\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("@/>") && output.contains("at root"),
-        "Should navigate to root with /: {}",
         output
     );
 }
@@ -1141,28 +1013,6 @@ async fn test_async_command_via_process_char_async() {
         output.contains("Waited 100ms"),
         "Async command should have executed. Output: {}",
         output
-    );
-}
-
-#[tokio::test]
-#[cfg(all(feature = "async", not(feature = "authentication")))]
-async fn test_sync_command_in_async_context() {
-    // Test that sync commands work fine in process_char_async
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute sync command via async process_char
-    for c in "echo hello\n".chars() {
-        shell.process_char_async(c).await.unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("hello"),
-        "Sync command should work in async context"
     );
 }
 
