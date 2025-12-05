@@ -105,28 +105,55 @@ async fn test_async_command_execution() {
 #[test]
 fn test_node_api() {
     // Test command node properties
-    let help_node = TEST_TREE.find_child("help").expect("help command should exist");
+    let help_node = TEST_TREE
+        .find_child("help")
+        .expect("help command should exist");
     assert!(help_node.is_command(), "help should be a command");
     assert!(!help_node.is_directory(), "help should not be a directory");
     assert_eq!(help_node.name(), "help", "help name should match");
-    assert_eq!(help_node.access_level(), MockAccessLevel::Guest, "help should be Guest level");
+    assert_eq!(
+        help_node.access_level(),
+        MockAccessLevel::Guest,
+        "help should be Guest level"
+    );
 
     // Test directory node properties
-    let system_node = TEST_TREE.find_child("system").expect("system directory should exist");
+    let system_node = TEST_TREE
+        .find_child("system")
+        .expect("system directory should exist");
     assert!(system_node.is_directory(), "system should be a directory");
     assert!(!system_node.is_command(), "system should not be a command");
     assert_eq!(system_node.name(), "system", "system name should match");
-    assert_eq!(system_node.access_level(), MockAccessLevel::User, "system should be User level");
+    assert_eq!(
+        system_node.access_level(),
+        MockAccessLevel::User,
+        "system should be User level"
+    );
 
     // Test finding existing and non-existent children
-    assert!(TEST_TREE.find_child("help").is_some(), "should find existing child");
-    assert!(TEST_TREE.find_child("nonexistent").is_none(), "should not find non-existent child");
+    assert!(
+        TEST_TREE.find_child("help").is_some(),
+        "should find existing child"
+    );
+    assert!(
+        TEST_TREE.find_child("nonexistent").is_none(),
+        "should not find non-existent child"
+    );
 
     // Test finding children in subdirectories
     if let Some(Node::Directory(system)) = TEST_TREE.find_child("system") {
-        assert!(system.find_child("status").is_some(), "should find status in system");
-        assert!(system.find_child("reboot").is_some(), "should find reboot in system");
-        assert!(system.find_child("missing").is_none(), "should not find missing child");
+        assert!(
+            system.find_child("status").is_some(),
+            "should find status in system"
+        );
+        assert!(
+            system.find_child("reboot").is_some(),
+            "should find reboot in system"
+        );
+        assert!(
+            system.find_child("missing").is_none(),
+            "should not find missing child"
+        );
     } else {
         panic!("system should be a directory");
     }

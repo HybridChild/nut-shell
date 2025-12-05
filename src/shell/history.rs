@@ -103,7 +103,7 @@ impl<const N: usize, const INPUT_SIZE: usize> CommandHistory<N, INPUT_SIZE> {
             Some(p) if p >= self.buffer.len() - 1 => {
                 // At newest - go to empty
                 self.position = None;
-                None
+                Some(heapless::String::new()) // Return empty string to clear buffer
             }
             Some(p) => {
                 let pos = p + 1;
@@ -163,8 +163,8 @@ mod tests {
         assert_eq!(history.next_command().unwrap().as_str(), "cmd2");
         assert_eq!(history.next_command().unwrap().as_str(), "cmd3");
 
-        // At newest - should return None
-        assert!(history.next_command().is_none());
+        // At newest - should return empty string (to clear buffer)
+        assert_eq!(history.next_command().unwrap().as_str(), "");
     }
 
     #[test]
