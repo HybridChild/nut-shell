@@ -23,7 +23,7 @@ fn test_command_history_zero_size_when_disabled() {
     // When history feature is disabled, CommandHistory should be zero-size
     #[cfg(not(feature = "history"))]
     {
-        let size = core::mem::size_of::<CommandHistory<0, 128>>();
+        let size = core::mem::size_of::<CommandHistory<10, 128>>();
         assert_eq!(
             size, 0,
             "CommandHistory should be zero-size when history feature disabled, got: {} bytes",

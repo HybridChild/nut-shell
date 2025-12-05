@@ -9,7 +9,7 @@
 mod fixtures;
 use fixtures::{MockAccessLevel, MockHandler, MockIo, TEST_TREE};
 use nut_shell::auth::{ConstCredentialProvider, User, password::Sha256Hasher};
-use nut_shell::config::DefaultConfig;
+use nut_shell::config::{DefaultConfig, ShellConfig};
 use nut_shell::shell::Shell;
 
 // ============================================================================
@@ -272,14 +272,50 @@ fn test_double_esc_clears_masked_input() {
         shell.process_char(c).unwrap();
     }
 
+    // Verify masked password was displayed before clearing
+    let output_before = shell.io_mut().output();
+    assert!(
+        output_before.contains("admin:****"),
+        "Password should be masked before clearing: {}",
+        output_before
+    );
+
     shell.io_mut().clear_output();
 
     // Double ESC to clear
     shell.process_char('\x1b').unwrap(); // First ESC
     shell.process_char('\x1b').unwrap(); // Second ESC
 
-    let output = shell.io().output();
+    let clear_output = shell.io().output();
 
-    // Should trigger ClearAndRedraw (sends CR and clear sequence)
-    assert!(output.contains("\r"), "Should redraw after double ESC");
+    // Should send clear sequence: \r (CR) + \x1b[K (clear to end of line) + prompt
+    assert!(
+        clear_output.contains("\r"),
+        "Should send carriage return after double ESC: {:?}",
+        clear_output
+    );
+    assert!(
+        clear_output.contains("\x1b[K"),
+        "Should send clear-to-EOL sequence after double ESC: {:?}",
+        clear_output
+    );
+
+    // Now press enter - should not process the cleared login
+    shell.io_mut().clear_output();
+    shell.process_char('\n').unwrap();
+
+    let output_after = shell.io_mut().output();
+
+    // Empty input should show invalid format message, not successful login
+    assert!(
+        output_after.contains(DefaultConfig::MSG_INVALID_LOGIN_FORMAT),
+        "Empty input after double ESC should show invalid format message, got: {}",
+        output_after
+    );
+    assert!(
+        !output_after.contains(DefaultConfig::MSG_LOGIN_SUCCESS)
+            && !output_after.contains(DefaultConfig::MSG_LOGIN_FAILED),
+        "Double ESC should have cleared login buffer, got: {}",
+        output_after
+    );
 }
