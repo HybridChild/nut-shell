@@ -1,16 +1,7 @@
 //! Type-Level Integration Tests
 //!
-//! Validates that all core types integrate correctly across the library.
-//!
-//! **Purpose**: Catch type integration issues early through compile-time and runtime checks.
-//!
-//! **What we validate**:
-//! - All foundational types instantiate without compilation errors
-//! - Generic parameters (L, IO, H, C) work together correctly
-//! - Path parsing and tree navigation work end-to-end
-//! - Request/Response types integrate with tree and command handler
-//! - Both DefaultConfig and MinimalConfig work correctly
-//! - Lifetime relationships between tree and runtime state are sound
+//! Validates that core types integrate correctly: generic parameters (L, IO, H, C),
+//! path parsing, Request/Response types, config variants, and lifetime relationships.
 
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]

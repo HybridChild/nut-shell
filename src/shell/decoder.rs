@@ -130,7 +130,7 @@ impl InputDecoder {
             'B' => InputEvent::DownArrow,
 
             // Future: could add C (right arrow), D (left arrow), H (home), F (end)
-            // For Phase 6, only up/down arrows are implemented
+            // Currently, only up/down arrows are implemented
             // See PHILOSOPHY.md "Recommended Additions"
 
             // Unknown sequence - ignore
