@@ -1,10 +1,7 @@
 //! Rust-specific optimization and compile-time verification tests.
 //!
-//! Tests that validate:
-//! - Zero-size type optimizations
-//! - Const initialization
-//! - ROM placement
-//! - Type safety and lifetimes
+//! Validates zero-size type optimizations, const initialization, ROM placement,
+//! and type safety/lifetimes.
 
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]

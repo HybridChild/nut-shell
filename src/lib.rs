@@ -43,23 +43,23 @@ pub use nut_shell_macros::AccessLevel;
 // Module Declarations
 // ============================================================================
 
-// Phase 2: I/O & Access Control Foundation
+// I/O & Access Control Foundation
 pub mod config;
 pub mod io;
 
 // Authentication module (always present, but with different contents based on features)
 pub mod auth;
 
-// Phase 2: Error handling
+// Error handling
 pub mod error;
 
-// Phase 3: Tree data model
+// Tree data model
 pub mod tree;
 
-// Phase 5: Response types
+// Response types
 pub mod response;
 
-// Phase 6+: Shell orchestration
+// Shell orchestration
 pub mod shell;
 
 // ============================================================================
@@ -75,16 +75,16 @@ pub use config::{DefaultConfig, MinimalConfig, ShellConfig};
 // Error types
 pub use error::CliError;
 
-// Tree types (Phase 3)
+// Tree types
 pub use tree::{CommandKind, CommandMeta, Directory, Node};
 
 // Access control (always available, even without authentication feature)
 pub use auth::{AccessLevel, User};
 
-// Response types (Phase 5)
+// Response types
 pub use response::Response;
 
-// Shell types (Phase 6+)
+// Shell types
 pub use shell::handler::CommandHandler;
 pub use shell::{CliState, HistoryDirection, Request, Shell};
 

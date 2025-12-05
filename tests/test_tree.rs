@@ -1,10 +1,7 @@
 //! Integration tests for tree data structures and metadata/execution separation pattern.
 //!
-//! Validates that:
-//! - Tree types are const-initializable
-//! - Metadata/execution separation pattern works correctly
-//! - Sync and async commands compile and execute properly
-//! - Generic parameters (L, C) integrate correctly
+//! Validates const-initialization, metadata/execution separation, sync/async commands,
+//! and generic parameter integration.
 
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
@@ -169,7 +166,7 @@ fn test_directory_find_child() {
 }
 
 // ============================================================================
-// Phase 3b: Const Initialization Validation Tests
+// Const Initialization Validation Tests
 // ============================================================================
 
 #[test]
