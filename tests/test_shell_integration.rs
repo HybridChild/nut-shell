@@ -11,58 +11,6 @@
 mod fixtures;
 use fixtures::{MockHandler, MockIo, TEST_TREE};
 use nut_shell::Shell;
-use nut_shell::config::DefaultConfig;
-use nut_shell::error::CliError;
-use nut_shell::response::Response;
-use nut_shell::shell::Request;
-
-// ============================================================================
-// Request/Response Workflow Tests
-// ============================================================================
-
-#[test]
-fn test_request_response_workflow() {
-    // Simulate command execution workflow
-    let mut path = heapless::String::<128>::new();
-    path.push_str("status").unwrap();
-    #[cfg(feature = "history")]
-    let original = {
-        let mut s = heapless::String::<128>::new();
-        s.push_str("status").unwrap();
-        s
-    };
-
-    let request = Request::<DefaultConfig>::Command {
-        path,
-        args: heapless::Vec::new(),
-        #[cfg(feature = "history")]
-        original,
-        _phantom: core::marker::PhantomData,
-    };
-
-    // Extract command info
-    let result: Result<Response<DefaultConfig>, CliError> = match request {
-        Request::Command { path, .. } => {
-            if path.as_str() == "status" {
-                Ok(Response::<DefaultConfig>::success("System OK"))
-            } else {
-                let mut msg = heapless::String::new();
-                msg.push_str("Unknown command").unwrap();
-                Err(CliError::CommandFailed(msg))
-            }
-        }
-        #[allow(unreachable_patterns)]
-        _ => {
-            let mut msg = heapless::String::new();
-            msg.push_str("Invalid request").unwrap();
-            Err(CliError::CommandFailed(msg))
-        }
-    };
-
-    assert!(result.is_ok());
-    let response = result.unwrap();
-    assert_eq!(response.message.as_str(), "System OK");
-}
 
 // ============================================================================
 // Command Execution Tests
@@ -351,9 +299,33 @@ fn test_double_esc_clears_buffer() {
         shell.process_char(c).unwrap();
     }
 
+    // Verify input was echoed before clearing
+    let output_before = shell.io_mut().output();
+    assert!(
+        output_before.contains("echo test"),
+        "Input should be echoed before clearing: {}",
+        output_before
+    );
+
+    shell.io_mut().clear_output();
+
     // Double-ESC should clear the buffer
     shell.process_char('\x1b').unwrap();
     shell.process_char('\x1b').unwrap();
+
+    let clear_output = shell.io_mut().output();
+
+    // Should send clear sequence: \r (CR) + \x1b[K (clear to end of line) + prompt
+    assert!(
+        clear_output.contains("\r"),
+        "Should send carriage return after double-ESC: {:?}",
+        clear_output
+    );
+    assert!(
+        clear_output.contains("\x1b[K"),
+        "Should send clear-to-EOL sequence after double-ESC: {:?}",
+        clear_output
+    );
 
     // Now press enter - nothing should execute since buffer was cleared
     shell.io_mut().clear_output();

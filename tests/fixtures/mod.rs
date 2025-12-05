@@ -667,6 +667,15 @@ mod tests {
     }
 
     #[test]
+    fn test_helper_functions() {
+        let io = io_with_command("test");
+        assert_eq!(io.input_len(), 5); // "test\n"
+
+        let io = io_with_commands(&["cmd1", "cmd2"]);
+        assert_eq!(io.input_len(), 10); // "cmd1\ncmd2\n"
+    }
+
+    #[test]
     fn test_mock_access_level() {
         assert!(MockAccessLevel::Admin > MockAccessLevel::User);
         assert!(MockAccessLevel::User > MockAccessLevel::Guest);
@@ -752,14 +761,5 @@ mod tests {
         } else {
             panic!("Expected debug directory node");
         }
-    }
-
-    #[test]
-    fn test_helper_functions() {
-        let io = io_with_command("test");
-        assert_eq!(io.input_len(), 5); // "test\n"
-
-        let io = io_with_commands(&["cmd1", "cmd2"]);
-        assert_eq!(io.input_len(), 10); // "cmd1\ncmd2\n"
     }
 }
