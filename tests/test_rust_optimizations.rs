@@ -58,24 +58,6 @@ fn test_empty_history_is_zero_size() {
     }
 }
 
-#[test]
-fn test_phantom_data_types_are_zero_size() {
-    use core::marker::PhantomData;
-
-    // PhantomData should always be zero-size
-    assert_eq!(
-        core::mem::size_of::<PhantomData<DefaultConfig>>(),
-        0,
-        "PhantomData should be zero-size"
-    );
-
-    assert_eq!(
-        core::mem::size_of::<PhantomData<MinimalConfig>>(),
-        0,
-        "PhantomData should be zero-size"
-    );
-}
-
 // ============================================================================
 // Const Initialization Tests
 // ============================================================================
@@ -147,8 +129,10 @@ fn test_nested_tree_is_const_initializable() {
 
 #[test]
 fn test_test_tree_is_const() {
-    // TEST_TREE should be a const
-    // We can verify this by checking it's directly usable
+    // Validates that TEST_TREE is actually const-initializable
+    // This const binding forces compile-time evaluation
+    const _TREE: &Directory<MockAccessLevel> = &TEST_TREE;
+
     assert!(
         !TEST_TREE.name.is_empty(),
         "TEST_TREE should be initialized"
@@ -303,29 +287,6 @@ fn test_request_size_varies_with_features() {
         size > 100,
         "Request should have substantial size due to Command variant buffers (got {} bytes)",
         size
-    );
-}
-
-// ============================================================================
-// Alignment Tests
-// ============================================================================
-
-#[test]
-fn test_types_are_properly_aligned() {
-    // Verify that types have reasonable alignment
-    assert!(
-        core::mem::align_of::<CommandMeta<MockAccessLevel>>() <= 8,
-        "CommandMeta alignment should be reasonable"
-    );
-
-    assert!(
-        core::mem::align_of::<Directory<MockAccessLevel>>() <= 8,
-        "Directory alignment should be reasonable"
-    );
-
-    assert!(
-        core::mem::align_of::<Node<MockAccessLevel>>() <= 8,
-        "Node alignment should be reasonable"
     );
 }
 

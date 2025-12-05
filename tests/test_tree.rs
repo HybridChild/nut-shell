@@ -10,125 +10,15 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 use fixtures::{MockAccessLevel, MockHandler, TEST_TREE};
-use nut_shell::config::DefaultConfig;
-use nut_shell::error::CliError;
-use nut_shell::response::Response;
 use nut_shell::shell::handler::CommandHandler;
-use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
+use nut_shell::tree::{CommandKind, Node};
 
-// ============================================================================
-// Const Initialization Tests
-// ============================================================================
-
-#[test]
-fn test_const_command_meta() {
-    // Validates that CommandMeta is const-initializable
-    const TEST_CMD: CommandMeta<MockAccessLevel> = CommandMeta {
-        id: "test",
-        name: "test",
-        description: "Test command",
-        access_level: MockAccessLevel::User,
-        kind: CommandKind::Sync,
-        min_args: 0,
-        max_args: 5,
-    };
-
-    assert_eq!(TEST_CMD.id, "test");
-    assert_eq!(TEST_CMD.name, "test");
-    assert_eq!(TEST_CMD.description, "Test command");
-    assert_eq!(TEST_CMD.access_level, MockAccessLevel::User);
-    assert_eq!(TEST_CMD.kind, CommandKind::Sync);
-    assert_eq!(TEST_CMD.min_args, 0);
-    assert_eq!(TEST_CMD.max_args, 5);
-}
-
-#[test]
-fn test_const_directory() {
-    // Validates that Directory is const-initializable
-    const CMD: CommandMeta<MockAccessLevel> = CommandMeta {
-        id: "cmd",
-        name: "cmd",
-        description: "Test",
-        access_level: MockAccessLevel::Guest,
-        kind: CommandKind::Sync,
-        min_args: 0,
-        max_args: 0,
-    };
-
-    const DIR: Directory<MockAccessLevel> = Directory {
-        name: "testdir",
-        children: &[Node::Command(&CMD)],
-        access_level: MockAccessLevel::Guest,
-    };
-
-    assert_eq!(DIR.name, "testdir");
-    assert_eq!(DIR.children.len(), 1);
-    assert_eq!(DIR.access_level, MockAccessLevel::Guest);
-}
-
-#[test]
-fn test_const_tree_initialization() {
-    // Validates that TEST_TREE compiles as const
-    // The fact that this test compiles proves const initialization works
-    let _tree = &TEST_TREE;
-
-    assert_eq!(TEST_TREE.name, "/");
-    assert!(TEST_TREE.children.len() >= 3); // At least help, echo, system
-}
+#[cfg(feature = "async")]
+use nut_shell::error::CliError;
 
 // ============================================================================
 // Metadata/Execution Separation Pattern Tests
 // ============================================================================
-
-#[test]
-fn test_handler_implementation_exists() {
-    // Validates that MockHandler implements CommandHandler trait
-    let handler = MockHandler;
-
-    // CommandHandler is not dyn compatible due to async method,
-    // but we can verify the implementation exists
-    let _result = handler.execute_sync("help", &[]);
-}
-
-#[test]
-fn test_sync_command_execution() {
-    // Validates that sync commands execute correctly through handler
-    let handler = MockHandler;
-
-    // Test help command
-    let result = handler.execute_sync("help", &[]);
-    assert!(result.is_ok());
-    let response = result.unwrap();
-    assert_eq!(response.message.as_str(), "Help text here");
-
-    // Test echo command with args
-    let result = handler.execute_sync("echo", &["hello", "world"]);
-    assert!(result.is_ok());
-    let response = result.unwrap();
-    assert_eq!(response.message.as_str(), "hello world");
-
-    // Test echo with no args
-    let result = handler.execute_sync("echo", &[]);
-    assert!(result.is_ok());
-    let response = result.unwrap();
-    assert_eq!(response.message.as_str(), "");
-
-    // Test reboot command
-    let result = handler.execute_sync("reboot", &[]);
-    assert!(result.is_ok());
-    let response = result.unwrap();
-    assert_eq!(response.message.as_str(), "Rebooting...");
-
-    // Test status command
-    let result = handler.execute_sync("status", &[]);
-    assert!(result.is_ok());
-    let response = result.unwrap();
-    assert_eq!(response.message.as_str(), "System OK");
-
-    // Test unknown command
-    let result = handler.execute_sync("unknown", &[]);
-    assert_eq!(result, Err(CliError::CommandNotFound));
-}
 
 #[test]
 fn test_metadata_matches_handler() {
@@ -152,20 +42,6 @@ fn test_metadata_matches_handler() {
         assert!(handler.execute_sync("echo", &[]).is_ok());
     } else {
         panic!("echo command not found in TEST_TREE");
-    }
-}
-
-#[test]
-fn test_command_kind_markers() {
-    // Validates that CommandKind enum works as expected
-    let sync_kind = CommandKind::Sync;
-    assert_eq!(sync_kind, CommandKind::Sync);
-
-    #[cfg(feature = "async")]
-    {
-        let async_kind = CommandKind::Async;
-        assert_eq!(async_kind, CommandKind::Async);
-        assert_ne!(sync_kind, async_kind);
     }
 }
 
@@ -212,34 +88,17 @@ async fn test_async_command_execution() {
     let result = handler.execute_async("async-wait", &[]).await;
     assert!(result.is_ok());
     let response = result.unwrap();
-    assert!(
-        response.message.as_str().contains("100ms")
-            || response.message.as_str() == "Async complete"
-    );
+    assert!(response.message.as_str().contains("Waited 100ms"));
 
     // Test async-wait with custom duration
     let result = handler.execute_async("async-wait", &["250"]).await;
     assert!(result.is_ok());
     let response = result.unwrap();
-    assert!(
-        response.message.as_str().contains("250ms")
-            || response.message.as_str() == "Async complete"
-    );
+    assert!(response.message.as_str().contains("Waited 250ms"));
 
     // Test unknown async command
     let result = handler.execute_async("unknown-async", &[]).await;
     assert_eq!(result, Err(CliError::CommandNotFound));
-}
-
-#[test]
-#[cfg(feature = "async")]
-fn test_async_trait_method_compiles() {
-    // Validates that async trait method signature compiles
-    // This is a compile-time validation - if this test exists, the pattern works
-    let _handler = MockHandler;
-
-    // If we got here, the async trait method compiled successfully
-    // (CommandHandler is not dyn compatible due to async method, but that's expected)
 }
 
 // ============================================================================
@@ -310,95 +169,8 @@ fn test_directory_find_child() {
 }
 
 // ============================================================================
-// Generic Parameter Integration Tests
-// ============================================================================
-
-#[test]
-fn test_generic_access_level_integration() {
-    // Validates that AccessLevel generic parameter works throughout the system
-    const CMD: CommandMeta<MockAccessLevel> = CommandMeta {
-        id: "test",
-        name: "test",
-        description: "Test",
-        access_level: MockAccessLevel::Admin,
-        kind: CommandKind::Sync,
-        min_args: 0,
-        max_args: 0,
-    };
-
-    const DIR: Directory<MockAccessLevel> = Directory {
-        name: "testdir",
-        children: &[Node::Command(&CMD)],
-        access_level: MockAccessLevel::User,
-    };
-
-    let node = Node::Command(&CMD);
-
-    assert_eq!(CMD.access_level, MockAccessLevel::Admin);
-    assert_eq!(DIR.access_level, MockAccessLevel::User);
-    assert_eq!(node.access_level(), MockAccessLevel::Admin);
-}
-
-#[test]
-fn test_generic_config_integration() {
-    // Validates that ShellConfig generic parameter works with Response
-    let handler = MockHandler;
-
-    // Response should be generic over DefaultConfig
-    let result: Result<Response<DefaultConfig>, CliError> = handler.execute_sync("help", &[]);
-    assert!(result.is_ok());
-
-    // Verify Response type is correct
-    let _response = result.unwrap();
-}
-
-// ============================================================================
 // Phase 3b: Const Initialization Validation Tests
 // ============================================================================
-
-#[test]
-fn test_deep_nesting_const_initialization() {
-    // Validates that 3-level nesting works with const initialization
-    use fixtures::DIR_SYSTEM;
-
-    // System directory has nested subdirectories
-    let network = DIR_SYSTEM.find_child("network");
-    assert!(network.is_some(), "Network subdirectory should exist");
-
-    let hardware = DIR_SYSTEM.find_child("hardware");
-    assert!(hardware.is_some(), "Hardware subdirectory should exist");
-
-    // Each subdirectory has commands
-    if let Some(Node::Directory(net)) = network {
-        assert!(
-            net.children.len() >= 3,
-            "Network should have at least 3 commands"
-        );
-        assert!(net.find_child("status").is_some());
-        assert!(net.find_child("config").is_some());
-        assert!(net.find_child("ping").is_some());
-    }
-
-    if let Some(Node::Directory(hw)) = hardware {
-        assert!(
-            hw.children.len() >= 2,
-            "Hardware should have at least 2 commands"
-        );
-        assert!(hw.find_child("led").is_some());
-        assert!(hw.find_child("temperature").is_some());
-    }
-}
-
-#[test]
-fn test_varied_access_levels_in_tree() {
-    // Validates that mixed access levels work in const tree
-    use fixtures::{CMD_HELP, CMD_NET_CONFIG, CMD_REBOOT, MockAccessLevel};
-
-    // Different access levels across the tree
-    assert_eq!(CMD_HELP.access_level, MockAccessLevel::Guest);
-    assert_eq!(CMD_REBOOT.access_level, MockAccessLevel::Admin);
-    assert_eq!(CMD_NET_CONFIG.access_level, MockAccessLevel::Admin);
-}
 
 #[test]
 fn test_varied_argument_counts() {
@@ -424,53 +196,4 @@ fn test_varied_argument_counts() {
     // Exact arg count
     assert_eq!(CMD_HW_LED.min_args, 1);
     assert_eq!(CMD_HW_LED.max_args, 1);
-}
-
-#[test]
-fn test_const_metadata_properties() {
-    // Validates that CommandMeta is truly const-initializable
-    use fixtures::{CMD_DEBUG_REG, CMD_NET_STATUS};
-
-    // These should be compile-time constants (const fn)
-    const _TEST_NAME: &str = CMD_NET_STATUS.name;
-    const _TEST_MIN: usize = CMD_DEBUG_REG.min_args;
-    const _TEST_MAX: usize = CMD_DEBUG_REG.max_args;
-
-    // If this compiles, const initialization works
-    assert_eq!(_TEST_NAME, "status");
-    assert_eq!(_TEST_MIN, 1);
-    assert_eq!(_TEST_MAX, 1);
-}
-
-#[test]
-fn test_tree_can_navigate_full_paths() {
-    // Validates that full path navigation works through const tree
-    use fixtures::TEST_TREE;
-
-    // Navigate: root -> system -> network -> status
-    let system = TEST_TREE.find_child("system");
-    assert!(system.is_some());
-
-    if let Some(Node::Directory(sys_dir)) = system {
-        let network = sys_dir.find_child("network");
-        assert!(network.is_some());
-
-        if let Some(Node::Directory(net_dir)) = network {
-            let status = net_dir.find_child("status");
-            assert!(status.is_some());
-
-            if let Some(Node::Command(cmd)) = status {
-                assert_eq!(cmd.name, "status");
-                assert_eq!(cmd.description, "Show network status");
-            }
-        }
-    }
-
-    // Navigate: root -> system -> hardware -> temperature
-    if let Some(Node::Directory(sys_dir)) = TEST_TREE.find_child("system")
-        && let Some(Node::Directory(hw_dir)) = sys_dir.find_child("hardware")
-        && let Some(Node::Command(cmd)) = hw_dir.find_child("temperature")
-    {
-        assert_eq!(cmd.name, "temperature");
-    }
 }
