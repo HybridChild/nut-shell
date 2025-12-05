@@ -9,7 +9,11 @@
 #[allow(clippy::duplicate_mod)]
 #[path = "fixtures/mod.rs"]
 mod fixtures;
-use fixtures::{MockHandler, MockIo, TEST_TREE};
+
+#[path = "helpers.rs"]
+mod helpers;
+
+use fixtures::TEST_TREE;
 use nut_shell::Shell;
 
 // ============================================================================
@@ -19,88 +23,36 @@ use nut_shell::Shell;
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_command_with_arguments() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
-    // Execute echo with multiple arguments
-    for c in "echo arg1 arg2 arg3\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    let output = helpers::execute_command(&mut shell, "echo arg1 arg2 arg3");
 
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("arg1") && output.contains("arg2") && output.contains("arg3"),
-        "Should include all arguments"
-    );
+    helpers::assert_contains_all(&output, &["arg1", "arg2", "arg3"]);
 }
 
 #[test]
 #[cfg(not(feature = "authentication"))]
-fn test_execute_command_with_path() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+fn test_path_based_command_execution() {
+    // Table-driven test for path-based execution scenarios
+    let test_cases = [
+        // (command, expected_output, description)
+        ("system/status", "System OK", "simple path without navigation"),
+        ("system/network/status", "Network OK", "deeply nested path"),
+        ("system/hardware/led on", "LED: on", "path with arguments"),
+    ];
 
-    // Execute command using path without navigation (from root)
-    for c in "system/status\n".chars() {
-        shell.process_char(c).unwrap();
+    for (cmd, expected, description) in test_cases {
+        let mut shell = helpers::create_test_shell();
+        let output = helpers::execute_command(&mut shell, cmd);
+
+        assert!(
+            output.contains(expected),
+            "Failed '{}': expected '{}' in output: {}",
+            description,
+            expected,
+            output
+        );
     }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("System OK"),
-        "Should execute command via path without navigation: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_execute_nested_command_with_path() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute deeply nested command with full path
-    for c in "system/network/status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("Network OK"),
-        "Should execute nested command via full path: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_execute_command_with_path_and_args() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute command with path and arguments
-    for c in "system/hardware/led on\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("LED: on"),
-        "Should execute command with path and arguments: {}",
-        output
-    );
 }
 
 // ============================================================================
@@ -110,178 +62,86 @@ fn test_execute_command_with_path_and_args() {
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_navigate_to_directory() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
     // Navigate to system directory
-    for c in "system\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::execute_command(&mut shell, "system");
 
-    shell.io_mut().clear_output();
+    // Execute command in navigated directory
+    let output = helpers::execute_command(&mut shell, "status");
 
-    // Now we should be in system/, so 'status' command should be accessible
-    for c in "status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("@/system>") && output.contains("System OK"),
-        "Should be able to execute commands in navigated directory: {}",
-        output
-    );
+    helpers::assert_contains_all(&output, &["@/system>", "System OK"]);
 }
 
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_navigate_with_relative_path() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
-    // Navigate using relative path system/network
-    for c in "system/network\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    // Navigate using multi-segment relative path
+    helpers::execute_command(&mut shell, "system/network");
 
-    shell.io_mut().clear_output();
+    let output = helpers::execute_command(&mut shell, "status");
 
-    // Execute command in current directory
-    for c in "status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("@/system/network>") && output.contains("Network OK"),
-        "Should navigate using relative path: {}",
-        output
-    );
+    helpers::assert_contains_all(&output, &["@/system/network>", "Network OK"]);
 }
 
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_navigate_parent_directory() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
     // Navigate to system/network
-    for c in "system/network\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::execute_command(&mut shell, "system/network");
 
     // Navigate up one level using ..
-    for c in "..\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::execute_command(&mut shell, "..");
 
-    shell.io_mut().clear_output();
+    // Should be in system/ now
+    let output = helpers::execute_command(&mut shell, "status");
 
-    // Should be in system/ now, test system command
-    for c in "status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("@/system>") && output.contains("System OK"),
-        "Should navigate to parent with ..: {}",
-        output
-    );
+    helpers::assert_contains_all(&output, &["@/system>", "System OK"]);
 }
 
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_navigate_absolute_path() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
     // Navigate to system first
-    for c in "system\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::execute_command(&mut shell, "system");
 
-    // Navigate to debug using absolute path from system directory
-    for c in "/debug\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    // Navigate to debug using absolute path
+    helpers::execute_command(&mut shell, "/debug");
 
-    shell.io_mut().clear_output();
+    // Should be in debug/
+    let output = helpers::execute_command(&mut shell, "memory");
 
-    // Should be in debug/, test debug command
-    for c in "memory\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("@/debug>") && output.contains("Memory"),
-        "Should navigate using absolute path: {}",
-        output
-    );
+    helpers::assert_contains_all(&output, &["@/debug>", "Memory"]);
 }
 
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_navigate_invalid_directory() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
-    // Try to navigate to non-existent directory
-    for c in "nonexistent\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    let output = helpers::execute_command(&mut shell, "nonexistent");
 
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("Error: Command not found"),
-        "Should error on invalid directory: {}",
-        output
-    );
+    assert!(output.contains("Error: Command not found"));
 }
 
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_navigate_parent_beyond_root() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
     // Try to navigate above root
-    for c in "..\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::execute_command(&mut shell, "..");
 
-    shell.io_mut().clear_output();
+    // Should still be at root
+    let output = helpers::execute_command(&mut shell, "echo still at root");
 
-    // Should still be at root (.. from root stays at root)
-    for c in "echo still at root\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("@/>") && output.contains("still at root"),
-        "Should stay at root when navigating .. from root: {}",
-        output
-    );
+    helpers::assert_contains_all(&output, &["@/>", "still at root"]);
 }
 
 // ============================================================================
@@ -290,75 +150,27 @@ fn test_navigate_parent_beyond_root() {
 
 #[test]
 #[cfg(not(feature = "authentication"))]
-fn test_help_command() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+fn test_global_commands() {
+    // Table-driven test for global commands
+    let test_cases = [
+        ("?", &["ls", "clear"] as &[&str], "help command shows available commands"),
+        ("ls", &["echo", "system"], "ls lists root contents"),
+        ("clear", &["\x1b[2J"], "clear outputs ANSI escape sequence"),
+    ];
 
-    // Execute help command
-    for c in "?\n".chars() {
-        shell.process_char(c).unwrap();
+    for (cmd, expected_fragments, description) in test_cases {
+        let mut shell = helpers::create_test_shell();
+        let output = helpers::execute_command(&mut shell, cmd);
+
+        for fragment in expected_fragments {
+            assert!(
+                output.contains(fragment),
+                "Failed '{}': expected '{}' in output",
+                description,
+                fragment
+            );
+        }
     }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("ls"),
-        "Help should mention ls command: {}",
-        output
-    );
-    assert!(
-        output.contains("clear"),
-        "Help should mention clear command: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_ls_command_root() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // List root directory
-    for c in "ls\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    // Should list root-level commands and directories
-    assert!(
-        output.contains("echo") || output.contains("system"),
-        "ls should show root contents: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_clear_command() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute clear
-    for c in "clear\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    // Clear should output ANSI clear sequence
-    assert!(
-        output.contains("\x1b[2J") || output.contains("\x1b[H"),
-        "Clear should output ANSI escape: {}",
-        output
-    );
 }
 
 // ============================================================================
@@ -368,16 +180,10 @@ fn test_clear_command() {
 #[test]
 #[cfg(all(feature = "completion", not(feature = "authentication")))]
 fn test_tab_completion_single_match() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
     // Type partial command
-    for c in "ech".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input(&mut shell, "ech");
 
     shell.io_mut().clear_output();
 
@@ -387,47 +193,37 @@ fn test_tab_completion_single_match() {
     let completion_output = shell.io_mut().output();
     assert!(
         completion_output.contains('o'),
-        "Tab should have emitted 'o' to complete 'ech' to 'echo': {}",
+        "Tab should complete 'ech' to 'echo': {}",
         completion_output
     );
 
-    // Now execute with an argument
-    for c in " completion_test\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    // Execute with an argument
+    let output = helpers::execute_command(&mut shell, " completion_test");
 
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("completion_test"),
-        "Completed command should execute correctly: {}",
-        output
-    );
+    assert!(output.contains("completion_test"));
 }
 
 // ============================================================================
 // History Navigation Tests (requires history feature)
 // ============================================================================
 
+/// Helper to create a shell with populated history.
+#[cfg(all(feature = "history", not(feature = "authentication")))]
+fn setup_shell_with_history(commands: &[&str]) -> Shell<'static, fixtures::MockAccessLevel, MockIo, MockHandler, nut_shell::config::DefaultConfig> {
+    let mut shell = helpers::create_test_shell();
+
+    for cmd in commands {
+        helpers::execute_command(&mut shell, cmd);
+    }
+
+    shell.io_mut().clear_output();
+    shell
+}
+
 #[test]
 #[cfg(all(feature = "history", not(feature = "authentication")))]
 fn test_history_navigation_up() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute a command
-    for c in "echo first\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
-
-    // Execute another command
-    for c in "echo second\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
+    let mut shell = setup_shell_with_history(&["echo first", "echo second"]);
 
     // Press up arrow (should recall "echo second")
     shell.process_char('\x1b').unwrap(); // ESC
@@ -435,41 +231,20 @@ fn test_history_navigation_up() {
     shell.process_char('A').unwrap(); // Up
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("echo second"),
-        "Up arrow should recall 'echo second': {}",
-        output
-    );
+    assert!(output.contains("echo second"));
 
     // Execute and verify
     shell.io_mut().clear_output();
     shell.process_char('\n').unwrap();
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("second"),
-        "Should execute 'echo second': {}",
-        output
-    );
+    assert!(output.contains("second"));
 }
 
 #[test]
 #[cfg(all(feature = "history", not(feature = "authentication")))]
 fn test_history_navigation_up_multiple() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute two commands
-    for c in "echo first\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    for c in "echo second\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
+    let mut shell = setup_shell_with_history(&["echo first", "echo second"]);
 
     // Press up arrow once - should recall "echo second"
     shell.process_char('\x1b').unwrap();
@@ -477,11 +252,7 @@ fn test_history_navigation_up_multiple() {
     shell.process_char('A').unwrap();
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("echo second"),
-        "First up arrow should recall 'echo second': {}",
-        output
-    );
+    assert!(output.contains("echo second"));
 
     shell.io_mut().clear_output();
 
@@ -491,44 +262,20 @@ fn test_history_navigation_up_multiple() {
     shell.process_char('A').unwrap();
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("echo first"),
-        "Second up arrow should recall 'echo first': {}",
-        output
-    );
+    assert!(output.contains("echo first"));
 
     // Execute to verify the buffer contains "echo first"
     shell.io_mut().clear_output();
     shell.process_char('\n').unwrap();
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("first"),
-        "Should execute 'echo first': {}",
-        output
-    );
+    assert!(output.contains("first"));
 }
 
 #[test]
 #[cfg(all(feature = "history", not(feature = "authentication")))]
 fn test_history_navigation_down() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute three commands to have enough history
-    for c in "echo first\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    for c in "echo second\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    for c in "echo third\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
+    let mut shell = setup_shell_with_history(&["echo first", "echo second", "echo third"]);
 
     // Navigate up twice to get to "echo second"
     shell.process_char('\x1b').unwrap();
@@ -542,11 +289,7 @@ fn test_history_navigation_down() {
     shell.process_char('A').unwrap(); // Up to "echo second"
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("echo second"),
-        "Should be at 'echo second': {}",
-        output
-    );
+    assert!(output.contains("echo second"));
 
     shell.io_mut().clear_output();
 
@@ -556,22 +299,14 @@ fn test_history_navigation_down() {
     shell.process_char('B').unwrap();
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("echo third"),
-        "Down arrow should recall 'echo third': {}",
-        output
-    );
+    assert!(output.contains("echo third"));
 
     // Execute to verify
     shell.io_mut().clear_output();
     shell.process_char('\n').unwrap();
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("third"),
-        "Should execute 'echo third': {}",
-        output
-    );
+    assert!(output.contains("third"));
 }
 
 // ============================================================================
@@ -581,24 +316,14 @@ fn test_history_navigation_down() {
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_double_esc_clears_buffer() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
     // Type some input but don't execute
-    for c in "echo test".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input(&mut shell, "echo test");
 
     // Verify input was echoed before clearing
     let output_before = shell.io_mut().output();
-    assert!(
-        output_before.contains("echo test"),
-        "Input should be echoed before clearing: {}",
-        output_before
-    );
+    assert!(output_before.contains("echo test"));
 
     shell.io_mut().clear_output();
 
@@ -609,59 +334,71 @@ fn test_double_esc_clears_buffer() {
     let clear_output = shell.io_mut().output();
 
     // Should send clear sequence: \r (CR) + \x1b[K (clear to end of line) + prompt
-    assert!(
-        clear_output.contains("\r"),
-        "Should send carriage return after double-ESC: {:?}",
-        clear_output
-    );
-    assert!(
-        clear_output.contains("\x1b[K"),
-        "Should send clear-to-EOL sequence after double-ESC: {:?}",
-        clear_output
-    );
+    helpers::assert_contains_ansi(&clear_output, "\r");
+    helpers::assert_contains_ansi(&clear_output, "\x1b[K");
 
     // Now press enter - nothing should execute since buffer was cleared
     shell.io_mut().clear_output();
     shell.process_char('\n').unwrap();
 
-    // Output should not contain "test" (command was cleared)
     let output = shell.io_mut().output();
-    assert!(
-        !output.contains("test"),
-        "Double-ESC should have cleared buffer, got: {}",
-        output
-    );
+    helpers::assert_contains_none(&output, &["test"]);
 }
 
 // ============================================================================
-// Error Handling Tests
+// Input Editing Tests
 // ============================================================================
 
 #[test]
 #[cfg(not(feature = "authentication"))]
-fn test_backspace_handling() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+fn test_backspace_editing() {
+    let mut shell = helpers::create_test_shell();
 
-    // Type with backspaces
-    for c in "echox".chars() {
-        shell.process_char(c).unwrap();
-    }
+    // Type with backspaces and verify proper editing
+    helpers::type_input(&mut shell, "echox");
     shell.process_char('\x08').unwrap(); // Backspace
-    shell.process_char(' ').unwrap();
-    for c in "test\n".chars() {
-        shell.process_char(c).unwrap();
-    }
+    helpers::type_input(&mut shell, " test");
+
+    shell.io_mut().clear_output();
+    shell.process_char('\n').unwrap();
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("test"),
-        "Backspace editing should work: {}",
-        output
-    );
+    assert!(output.contains("test"), "Backspace editing should work");
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_backspace_at_start() {
+    let mut shell = helpers::create_test_shell();
+
+    // Backspace on empty buffer should not crash or produce unexpected output
+    shell.process_char('\x08').unwrap();
+
+    // Should be able to type and execute normally
+    let output = helpers::execute_command(&mut shell, "echo ok");
+    assert!(output.contains("ok"));
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_backspace_boundary() {
+    let mut shell = helpers::create_test_shell();
+
+    // Type, backspace everything, then type new command
+    helpers::type_input(&mut shell, "wrong");
+
+    // Backspace 5 times (5 characters)
+    for _ in 0..5 {
+        shell.process_char('\x08').unwrap();
+    }
+
+    // Additional backspaces should not cause issues
+    shell.process_char('\x08').unwrap();
+    shell.process_char('\x08').unwrap();
+
+    // Type correct command
+    let output = helpers::execute_command(&mut shell, "echo correct");
+    assert!(output.contains("correct"));
 }
 
 // ============================================================================
@@ -673,22 +410,9 @@ fn test_minimal_features() {
     // Test works even with no optional features
     #[cfg(not(feature = "authentication"))]
     {
-        let io = MockIo::new();
-        let handler = MockHandler;
-        let mut shell = Shell::new(&TEST_TREE, handler, io);
-        shell.activate().unwrap();
-        shell.io_mut().clear_output();
-
-        // Basic command execution should always work
-        for c in "echo minimal\n".chars() {
-            shell.process_char(c).unwrap();
-        }
-
-        let output = shell.io_mut().output();
-        assert!(
-            output.contains("minimal"),
-            "Basic functionality should work"
-        );
+        let mut shell = helpers::create_test_shell();
+        let output = helpers::execute_command(&mut shell, "echo minimal");
+        assert!(output.contains("minimal"));
     }
 }
 
@@ -699,14 +423,9 @@ fn test_minimal_features() {
 #[test]
 #[cfg(not(feature = "authentication"))]
 fn test_buffer_overflow_emits_bell() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+    let mut shell = helpers::create_test_shell();
 
-    // Input buffer size is 128 chars (hardcoded in Shell for now)
-    // Fill it up completely
+    // Input buffer size is 128 chars
     let long_input = "a".repeat(128);
     for c in long_input.chars() {
         shell.process_char(c).unwrap();
@@ -715,7 +434,7 @@ fn test_buffer_overflow_emits_bell() {
     shell.io_mut().clear_output();
 
     // Try to add one more character - should trigger bell
-    shell.process_char('x').unwrap(); // Should succeed (returns Ok)
+    shell.process_char('x').unwrap();
 
     let output = shell.io_mut().output();
     assert!(
@@ -730,70 +449,39 @@ fn test_buffer_overflow_emits_bell() {
 
 #[test]
 #[cfg(not(feature = "authentication"))]
-fn test_command_requires_exact_args() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+fn test_argument_validation() {
+    // Table-driven test for argument validation scenarios
+    let test_cases = [
+        // (command, expected_error, description)
+        (
+            "system/hardware/led",
+            "Expected 1 arguments, got 0",
+            "command requires exactly 1 arg but got 0",
+        ),
+        (
+            "system/hardware/led on",
+            "LED: on",
+            "command with correct argument count",
+        ),
+        (
+            "system/reboot now",
+            "Expected 0 arguments, got 1",
+            "command accepts 0 args but got 1",
+        ),
+    ];
 
-    // 'led' command requires exactly 1 argument (min_args=1, max_args=1)
-    // Test with no arguments - should fail
-    for c in "system/hardware/led\n".chars() {
-        shell.process_char(c).unwrap();
+    for (cmd, expected, description) in test_cases {
+        let mut shell = helpers::create_test_shell();
+        let output = helpers::execute_command(&mut shell, cmd);
+
+        assert!(
+            output.contains(expected),
+            "Failed '{}': expected '{}' in output: {}",
+            description,
+            expected,
+            output
+        );
     }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("Error: Expected 1 arguments, got 0"),
-        "Should report missing argument: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_command_accepts_valid_args() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // 'led' command with correct argument
-    for c in "system/hardware/led on\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("LED: on"),
-        "Should execute command with valid args: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_command_too_many_args() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // 'reboot' accepts 0 arguments (max_args=0)
-    // Provide arguments - should fail
-    for c in "system/reboot now\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("Error: Expected 0 arguments, got 1"),
-        "Should report too many arguments: {}",
-        output
-    );
 }
 
 // ============================================================================
@@ -805,183 +493,64 @@ fn test_command_too_many_args() {
 // the system returns "Command not found" rather than "access denied" to prevent
 // information disclosure about the system structure.
 
-// Helper function to create test credential provider
+#[test]
 #[cfg(feature = "authentication")]
-fn create_test_provider() -> (
-    nut_shell::auth::ConstCredentialProvider<
-        fixtures::MockAccessLevel,
-        nut_shell::auth::password::Sha256Hasher,
-        2,
-    >,
-    nut_shell::auth::password::Sha256Hasher,
-) {
-    use fixtures::MockAccessLevel;
-    use nut_shell::auth::{ConstCredentialProvider, PasswordHasher, User, password::Sha256Hasher};
+fn test_guest_access_control() {
+    let mut shell = helpers::create_auth_shell();
 
-    let hasher = Sha256Hasher::new();
+    // Login as guest
+    helpers::execute_command_auth(&mut shell, "guest:guest123");
 
-    let guest_salt = [1u8; 16];
-    let guest_hash = hasher.hash("guest123", &guest_salt);
-
-    let admin_salt = [2u8; 16];
-    let admin_hash = hasher.hash("admin123", &admin_salt);
-
-    let users = [
-        User::new("guest", MockAccessLevel::Guest, guest_hash, guest_salt).unwrap(),
-        User::new("admin", MockAccessLevel::Admin, admin_hash, admin_salt).unwrap(),
+    let test_cases = [
+        ("echo hello", "hello", true), // Guest can execute Guest-level commands
+        ("system/reboot", "Command not found", false), // Guest cannot execute Admin commands
+        ("debug/memory", "Command not found", false),  // Guest cannot access Admin directories
     ];
 
-    (ConstCredentialProvider::new(users, hasher), hasher)
+    for (cmd, expected, should_succeed) in test_cases {
+        let output = helpers::execute_command_auth(&mut shell, cmd);
+
+        if should_succeed {
+            assert!(
+                output.contains(expected),
+                "Guest should be able to: '{}', got: {}",
+                cmd,
+                output
+            );
+        } else {
+            assert!(
+                output.contains(expected) || output.contains("Invalid path"),
+                "Guest should not access: '{}', got: {}",
+                cmd,
+                output
+            );
+        }
+    }
 }
 
 #[test]
 #[cfg(feature = "authentication")]
-fn test_guest_can_execute_guest_level_commands() {
-    let (provider, _hasher) = create_test_provider();
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Login as guest
-    for c in "guest:guest123\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
-
-    // Guest should be able to execute Guest-level commands
-    for c in "echo hello\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("hello"),
-        "Guest should be able to execute Guest-level commands: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(feature = "authentication")]
-fn test_guest_cannot_execute_admin_commands() {
-    let (provider, _hasher) = create_test_provider();
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Login as guest
-    for c in "guest:guest123\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
-
-    // Guest should NOT be able to execute Admin commands
-    for c in "system/reboot\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("Command not found") || output.contains("Invalid path"),
-        "Guest should not be able to execute Admin commands: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(feature = "authentication")]
-fn test_guest_cannot_access_admin_directories() {
-    let (provider, _hasher) = create_test_provider();
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Login as guest
-    for c in "guest:guest123\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
-
-    // Guest should NOT be able to access Admin directories
-    for c in "debug/memory\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("Command not found") || output.contains("Invalid path"),
-        "Guest should not be able to access Admin directories: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(feature = "authentication")]
-fn test_admin_can_execute_admin_commands() {
-    let (provider, _hasher) = create_test_provider();
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
+fn test_admin_access_control() {
+    let mut shell = helpers::create_auth_shell();
 
     // Login as admin
-    for c in "admin:admin123\n".chars() {
-        shell.process_char(c).unwrap();
+    helpers::execute_command_auth(&mut shell, "admin:admin123");
+
+    let test_cases = [
+        ("system/reboot", "Reboot"),      // Admin can execute Admin commands
+        ("debug/memory", "Memory"),       // Admin can access Admin directories
+        ("echo test", "test"),            // Admin can also execute Guest-level commands
+    ];
+
+    for (cmd, expected) in test_cases {
+        let output = helpers::execute_command_auth(&mut shell, cmd);
+        assert!(
+            output.contains(expected),
+            "Admin should access '{}', got: {}",
+            cmd,
+            output
+        );
     }
-    shell.io_mut().clear_output();
-
-    // Admin should be able to execute Admin commands
-    for c in "system/reboot\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("Reboot"),
-        "Admin should be able to execute Admin commands: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(feature = "authentication")]
-fn test_admin_can_access_admin_directories() {
-    let (provider, _hasher) = create_test_provider();
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, &provider, io);
-
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Login as admin
-    for c in "admin:admin123\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-    shell.io_mut().clear_output();
-
-    // Admin should be able to access Admin directories
-    for c in "debug/memory\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("Memory"),
-        "Admin should be able to access Admin directories: {}",
-        output
-    );
 }
 
 // ============================================================================
@@ -990,8 +559,7 @@ fn test_admin_can_access_admin_directories() {
 
 #[tokio::test]
 #[cfg(all(feature = "async", not(feature = "authentication")))]
-async fn test_async_command_via_process_char_async() {
-    // Test that process_char_async can execute async commands end-to-end
+async fn test_async_command_execution() {
     let io = MockIo::new();
     let handler = MockHandler;
     let mut shell = Shell::new(&TEST_TREE, handler, io);
@@ -1011,7 +579,7 @@ async fn test_async_command_via_process_char_async() {
     let output = shell.io_mut().output();
     assert!(
         output.contains("Waited 100ms"),
-        "Async command should have executed. Output: {}",
+        "Async command should execute. Output: {}",
         output
     );
 }
@@ -1019,7 +587,6 @@ async fn test_async_command_via_process_char_async() {
 #[tokio::test]
 #[cfg(all(feature = "async", not(feature = "authentication")))]
 async fn test_async_command_with_arguments() {
-    // Test async command with custom arguments
     let io = MockIo::new();
     let handler = MockHandler;
     let mut shell = Shell::new(&TEST_TREE, handler, io);
@@ -1037,8 +604,5 @@ async fn test_async_command_with_arguments() {
     }
 
     let output = shell.io_mut().output();
-    assert!(
-        output.contains("Waited 250ms"),
-        "Async command with args should execute"
-    );
+    assert!(output.contains("Waited 250ms"));
 }

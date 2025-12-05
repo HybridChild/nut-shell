@@ -3,6 +3,7 @@
 //! Tests validate behavior across all feature combinations. See DEVELOPMENT.md for
 //! testing workflows and feature flag usage.
 
+mod helpers;
 mod test_rust_optimizations;
 mod test_shell_auth;
 mod test_shell_integration;
