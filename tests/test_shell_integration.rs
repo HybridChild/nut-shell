@@ -37,8 +37,74 @@ fn test_command_with_arguments() {
     );
 }
 
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_execute_command_with_path() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Execute command using path without navigation (from root)
+    for c in "system/status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("System OK"),
+        "Should execute command via path without navigation: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_execute_nested_command_with_path() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Execute deeply nested command with full path
+    for c in "system/network/status\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("Network OK"),
+        "Should execute nested command via full path: {}",
+        output
+    );
+}
+
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_execute_command_with_path_and_args() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    // Execute command with path and arguments
+    for c in "system/hardware/led on\n".chars() {
+        shell.process_char(c).unwrap();
+    }
+
+    let output = shell.io_mut().output();
+    assert!(
+        output.contains("LED") && output.contains("on"),
+        "Should execute command with path and arguments: {}",
+        output
+    );
+}
+
 // ============================================================================
-// Navigation Tests
+// Directory Navigation Tests
 // ============================================================================
 
 #[test]
@@ -291,72 +357,6 @@ fn test_navigate_to_root_with_slash() {
     assert!(
         output.contains("at root"),
         "Should navigate to root with /: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_execute_command_with_path() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute command using path without navigation (from root)
-    for c in "system/status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("System OK"),
-        "Should execute command via path without navigation: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_execute_nested_command_with_path() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute deeply nested command with full path
-    for c in "system/network/status\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("Network OK"),
-        "Should execute nested command via full path: {}",
-        output
-    );
-}
-
-#[test]
-#[cfg(not(feature = "authentication"))]
-fn test_execute_command_with_path_and_args() {
-    let io = MockIo::new();
-    let handler = MockHandler;
-    let mut shell = Shell::new(&TEST_TREE, handler, io);
-    shell.activate().unwrap();
-    shell.io_mut().clear_output();
-
-    // Execute command with path and arguments
-    for c in "system/hardware/led on\n".chars() {
-        shell.process_char(c).unwrap();
-    }
-
-    let output = shell.io_mut().output();
-    assert!(
-        output.contains("LED") && output.contains("on"),
-        "Should execute command with path and arguments: {}",
         output
     );
 }
