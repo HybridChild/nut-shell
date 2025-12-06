@@ -6,6 +6,7 @@ authors = ["Esben Dueholm Nørgaard"]
 license = "MIT OR Apache-2.0"
 description = "Procedural macros for nut-shell - a lightweight CLI library for embedded systems"
 repository = "https://github.com/HybridChild/nut-shell"
+documentation = "https://docs.rs/nut-shell-macros"
 keywords = ["embedded", "no-std", "cli", "macros"]
 categories = ["embedded", "no-std", "development-tools::procedural-macro-helpers"]
 
