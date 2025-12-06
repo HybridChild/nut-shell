@@ -11,6 +11,8 @@ authors = ["Esben Dueholm Nørgaard"]
 license = "MIT OR Apache-2.0"
 description = "A lightweight command-line interface library for embedded systems"
 repository = "https://github.com/HybridChild/nut-shell"
+documentation = "https://docs.rs/nut-shell"
+readme = "README.md"
 keywords = ["embedded", "no-std", "cli", "shell", "command-line"]
 categories = ["embedded", "no-std", "command-line-interface"]
 
