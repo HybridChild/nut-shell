@@ -157,15 +157,15 @@ Welcome to nut-shell! Type '?' for help.
   system/  - Directory
   echo  - Echo arguments back
 @/> echo hello world!
-hello world!
+  hello world!
 @/> system
 @/system> ls
   status  - Show system status
   version  - Show version information
 @/system> status
-System Status:
-  CPU Usage: 23%
-  Uptime: 42 hours
+  System Status:
+    CPU Usage: 23%
+    Uptime: 42 hours
 @/system> ..
 @/>
 ```
@@ -236,7 +236,7 @@ admin@/> ls
   system/  - Directory
   echo  - Echo arguments back
 admin@/> system/version
-Firmware version 3.4.5
+  Firmware version 3.4.5
 admin@/> logout
   Logged out.
 Login> admin:*****

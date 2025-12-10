@@ -22,7 +22,7 @@ impl CommandHandler<DefaultConfig> for AsyncHandler {
                         }
                         msg.push_str(arg).ok();
                     }
-                    Ok(Response::success(&msg))
+                    Ok(Response::success(&msg).indented())
                 }
             }
             "sync_info" => {
@@ -31,9 +31,9 @@ impl CommandHandler<DefaultConfig> for AsyncHandler {
                 write!(msg, "Runtime: Tokio\r\n").ok();
                 write!(msg, "Features: async commands, authentication\r\n").ok();
                 write!(msg, "Try the 'async' directory for async commands!").ok();
-                Ok(Response::success(&msg))
+                Ok(Response::success(&msg).indented())
             }
-            "sync_reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!")),
+            "sync_reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!").indented()),
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -72,7 +72,7 @@ impl CommandHandler<DefaultConfig> for AsyncHandler {
                 // Return completion message
                 let mut msg = heapless::String::<64>::new();
                 write!(msg, "Delayed for {} second(s)", seconds).ok();
-                Ok(Response::success(&msg))
+                Ok(Response::success(&msg).indented())
             }
             "async_fetch" => {
                 let url = args[0];
@@ -88,7 +88,7 @@ impl CommandHandler<DefaultConfig> for AsyncHandler {
                 write!(msg, "Content-Length: 1234\r\n").ok();
                 write!(msg, "Fetch completed successfully!").ok();
 
-                Ok(Response::success(&msg))
+                Ok(Response::success(&msg).indented())
             }
             "async_compute" => {
                 let mut msg = heapless::String::<256>::new();
@@ -101,7 +101,7 @@ impl CommandHandler<DefaultConfig> for AsyncHandler {
                 }
 
                 write!(msg, "Computation finished!").ok();
-                Ok(Response::success(&msg))
+                Ok(Response::success(&msg).indented())
             }
             _ => Err(CliError::CommandNotFound),
         }

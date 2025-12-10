@@ -10,30 +10,31 @@ pub struct ExampleHandler;
 impl CommandHandler<DefaultConfig> for ExampleHandler {
     fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
         match id {
-            "system_reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!")),
+            "system_reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!").indented()),
             "system_status" => {
                 let mut msg = heapless::String::<256>::new();
                 write!(msg, "System Status:\r\n").ok();
                 write!(msg, "  CPU Usage: 23%\r\n").ok();
                 write!(msg, "  Memory: 45% used\r\n").ok();
                 write!(msg, "  Uptime: 42 hours").ok();
-                Ok(Response::success(&msg))
+                Ok(Response::success(&msg).indented())
             }
             "system_version" => Ok(Response::success(
-                "nut-shell v0.1.0\r\nRust embedded CLI framework",
-            )),
+                "nut-shell v0.1.0 - A Rust embedded CLI framework",
+            )
+            .indented()),
             "config_get" => {
                 let key = args[0];
                 let mut msg = heapless::String::<256>::new();
                 write!(msg, "Config[{}] = <simulated value>", key).ok();
-                Ok(Response::success(&msg))
+                Ok(Response::success(&msg).indented())
             }
             "config_set" => {
                 let key = args[0];
                 let value = args[1];
                 let mut msg = heapless::String::<256>::new();
                 write!(msg, "Config[{}] set to '{}'", key, value).ok();
-                Ok(Response::success(&msg))
+                Ok(Response::success(&msg).indented())
             }
             "echo" => {
                 if args.is_empty() {
@@ -46,10 +47,10 @@ impl CommandHandler<DefaultConfig> for ExampleHandler {
                         }
                         msg.push_str(arg).ok();
                     }
-                    Ok(Response::success(&msg))
+                    Ok(Response::success(&msg).indented())
                 }
             }
-            "uptime" => Ok(Response::success("System uptime: 42 hours, 13 minutes")),
+            "uptime" => Ok(Response::success("System uptime: 42 hours, 13 minutes").indented()),
             _ => Err(CliError::CommandNotFound),
         }
     }
