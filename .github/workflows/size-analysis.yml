@@ -68,7 +68,7 @@ jobs:
           ./analyze.sh
 
       - name: Upload size report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: size-analysis-report
           path: size-analysis/report.md
