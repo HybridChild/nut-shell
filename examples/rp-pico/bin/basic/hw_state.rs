@@ -2,7 +2,6 @@
 
 use core::cell::RefCell;
 use cortex_m::interrupt::Mutex;
-use embedded_hal_0_2::adc::OneShot;
 use embedded_hal_0_2::digital::v2::OutputPin;
 use rp2040_hal::{
     adc::Adc,
@@ -72,8 +71,7 @@ pub fn read_temperature() -> f32 {
         let mut sensor_ref = TEMP_SENSOR.borrow(cs).borrow_mut();
 
         if let (Some(adc), Some(sensor)) = (adc_ref.as_mut(), sensor_ref.as_mut()) {
-            // Read temperature sensor (OneShot trait returns nb::Result)
-            let read_result: nb::Result<u16, _> = adc.read(sensor);
+            let read_result: Result<u16, _> = adc.read(sensor);
             if let Ok(adc_value) = read_result {
                 // Convert ADC value to temperature (RP2040 formula)
                 // T = 27 - (ADC_voltage - 0.706) / 0.001721
