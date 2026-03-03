@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Helper scripts for repo-wide cleanup and formatting (`scripts/cleanup.sh`, `scripts/format.sh`)
+
+### Fixed
+- `history`: Navigation position now resets correctly on duplicate command submission
+- `rp-pico` example: ADC read type annotation updated for rp2040-hal 0.12 API change
+
+### Changed
+- Updated dependency versions (`heapless`, `cortex-m`, `rp2040-hal`, and others)
+
 ## [0.1.0] - 2025-12-06
 
 ### Added
