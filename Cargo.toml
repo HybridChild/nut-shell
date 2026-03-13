@@ -5,7 +5,7 @@ resolver = "2"
 
 [package]
 name = "nut-shell"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Esben Dueholm Nørgaard"]
 license = "MIT OR Apache-2.0"
@@ -27,11 +27,11 @@ subtle = { version = "2.5", default-features = false, optional = true }
 # Dependencies for credgen binary (std-only, not used in no_std library)
 serde = { version = "1.0", features = ["derive"], optional = true }
 toml = { version = "0.9.8", optional = true }
-getrandom = { version = "0.3.4", optional = true }
+getrandom = { version = "0.4", optional = true }
 
 [target.'cfg(not(target_os = "none"))'.dev-dependencies]
 # For testing only (std available, not for embedded targets)
-tokio = { version = "1", features = ["macros", "rt"] }
+tokio = { version = "1.49.0", features = ["macros", "rt"] }
 
 [[bin]]
 name = "nut-shell-credgen"

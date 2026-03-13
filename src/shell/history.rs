@@ -41,10 +41,13 @@ impl<const N: usize, const INPUT_SIZE: usize> CommandHistory<N, INPUT_SIZE> {
     /// Add command to history.
     #[cfg(feature = "history")]
     pub fn add(&mut self, cmd: &str) {
-        // Don't add empty commands or duplicates
+        // Don't add empty commands
         if cmd.is_empty() {
             return;
         }
+
+        // Always reset navigation position when a command is submitted
+        self.position = None;
 
         // Don't add if same as most recent
         if let Some(last) = self.buffer.last()
@@ -61,9 +64,6 @@ impl<const N: usize, const INPUT_SIZE: usize> CommandHistory<N, INPUT_SIZE> {
             }
             let _ = self.buffer.push(entry);
         }
-
-        // Reset position
-        self.position = None;
     }
 
     /// Add command to history (stub version - no-op).
@@ -278,6 +278,24 @@ mod tests {
 
         // Next previous should return most recent
         assert_eq!(history.previous_command().unwrap().as_str(), "cmd3");
+    }
+
+    #[test]
+    #[cfg(feature = "history")]
+    fn test_position_resets_on_duplicate_add() {
+        let mut history = CommandHistory::<5, 128>::new();
+
+        history.add("cmd_a");
+        history.add("cmd_b");
+
+        // Navigate to cmd_b
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd_b");
+
+        // Execute cmd_b again (duplicate - not added to buffer)
+        history.add("cmd_b");
+
+        // Position should have reset - up arrow must return cmd_b again, not cmd_a
+        assert_eq!(history.previous_command().unwrap().as_str(), "cmd_b");
     }
 
     #[test]
