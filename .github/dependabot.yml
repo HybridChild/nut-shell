@@ -5,9 +5,6 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
     open-pull-requests-limit: 5
     reviewers:
       - "HybridChild"
@@ -18,17 +15,10 @@ updates:
       prefix: "deps"
       include: "scope"
     groups:
-      # Group patch updates together to reduce PR noise
-      patch-updates:
+      # Group minor and patch updates together
+      dependencies:
         patterns:
           - "*"
-        update-types:
-          - "patch"
-      # Group dev dependencies separately
-      dev-dependencies:
-        patterns:
-          - "*"
-        dependency-type: "development"
         update-types:
           - "minor"
           - "patch"
@@ -38,9 +28,6 @@ updates:
     directory: "/macros"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
     open-pull-requests-limit: 5
     reviewers:
       - "HybridChild"
@@ -52,20 +39,19 @@ updates:
       prefix: "deps(macros)"
       include: "scope"
     groups:
-      patch-updates:
+      # Group minor and patch updates together
+      dependencies:
         patterns:
           - "*"
         update-types:
+          - "minor"
           - "patch"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
+      interval: "weekly"
     open-pull-requests-limit: 3
     reviewers:
       - "HybridChild"
