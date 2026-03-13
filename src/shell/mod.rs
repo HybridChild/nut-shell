@@ -789,6 +789,13 @@ where
         // Case 1: Directory navigation
         match target_node {
             None | Some(Node::Directory(_)) => {
+                if !args.is_empty() {
+                    return Err(CliError::InvalidArgumentCount {
+                        expected_min: 0,
+                        expected_max: 0,
+                        received: args.len(),
+                    });
+                }
                 // Directory navigation - update path and return
                 self.current_path = new_path;
                 #[cfg(feature = "history")]
@@ -861,6 +868,13 @@ where
         // Case 1: Directory navigation
         match target_node {
             None | Some(Node::Directory(_)) => {
+                if !args.is_empty() {
+                    return Err(CliError::InvalidArgumentCount {
+                        expected_min: 0,
+                        expected_max: 0,
+                        received: args.len(),
+                    });
+                }
                 // Directory navigation - update path and return
                 self.current_path = new_path;
                 #[cfg(feature = "history")]

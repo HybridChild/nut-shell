@@ -289,6 +289,29 @@ fn test_navigate_to_root_explicitly() {
     helpers::assert_prompt(&output, "@/>");
 }
 
+#[test]
+#[cfg(not(feature = "authentication"))]
+fn test_directory_with_args_returns_error() {
+    // Table-driven: args passed to a directory path should return InvalidArgumentCount
+    let test_cases = [
+        ("system arg", "system"),
+        ("system arg1 arg2", "system"),
+        ("system/network arg", "system/network"),
+    ];
+
+    for (input, path) in &test_cases {
+        let mut shell = helpers::create_test_shell();
+        let output = helpers::execute_command(&mut shell, input);
+        assert!(
+            output.contains("Expected 0 arguments"),
+            "Input {:?} (path {:?}): expected 'Expected 0 arguments' in output, got: {:?}",
+            input,
+            path,
+            output
+        );
+    }
+}
+
 // ============================================================================
 // Global Commands Tests
 // ============================================================================
