@@ -205,22 +205,15 @@ async fn main(spawner: Spawner) {
     let usb = builder.build();
 
     // Spawn USB task first to start enumeration
-    spawner.spawn(embassy_usb_task(usb)).unwrap();
+    spawner.spawn(embassy_usb_task(usb).unwrap());
 
     // Small delay to allow USB enumeration to start
     Timer::after(Duration::from_millis(100)).await;
 
     // Spawn other tasks
-    spawner
-        .spawn(tasks::led_task(hw_config.led, led_channel))
-        .unwrap();
-    spawner
-        .spawn(tasks::temperature_monitor(
-            hw_config.adc,
-            hw_config.temp_channel,
-        ))
-        .unwrap();
-    spawner.spawn(shell_task(usb_class, led_channel)).unwrap();
+    spawner.spawn(tasks::led_task(hw_config.led, led_channel).unwrap());
+    spawner.spawn(tasks::temperature_monitor(hw_config.adc, hw_config.temp_channel).unwrap());
+    spawner.spawn(shell_task(usb_class, led_channel).unwrap());
 }
 
 /// USB device task (handles USB protocol)
