@@ -6,6 +6,7 @@ target
 Cargo.lock
 
 !/examples/**/.cargo/
+!/examples/**/Cargo.lock
 !/size-analysis/**/.cargo/
 
 /logs
