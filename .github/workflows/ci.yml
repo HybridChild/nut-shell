@@ -158,6 +158,8 @@ jobs:
           - native
           - rp-pico
           - stm32f072
+          - stm32h753
+          - stm32h753-embassy
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -165,7 +167,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: thumbv6m-none-eabi
+          targets: thumbv6m-none-eabi,thumbv7em-none-eabihf
 
       - name: Cache cargo registry
         uses: actions/cache@v5
