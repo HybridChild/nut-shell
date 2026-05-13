@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Strip trailing `\r\n` in indented response to avoid blank final line
+
 ## [0.1.2] - 2026-03-13
 
 ### Fixed
