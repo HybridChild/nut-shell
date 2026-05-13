@@ -471,8 +471,11 @@ where
 
         // Write message (with optional indentation)
         if response.indent_message {
-            // Split by lines and indent each
-            for (i, line) in response.message.split("\r\n").enumerate() {
+            // Strip trailing \r\n before splitting — a message ending with \r\n
+            // produces a trailing empty segment that would render as a blank indented line.
+            let raw = response.message.as_str();
+            let msg = raw.strip_suffix("\r\n").unwrap_or(raw);
+            for (i, line) in msg.split("\r\n").enumerate() {
                 if i > 0 {
                     self.io.write_str("\r\n")?;
                 }
@@ -1815,6 +1818,23 @@ mod tests {
 
         // All 4 lines indented, no trailing newline
         assert_eq!(shell.io.get_output(), "  A\r\n  B\r\n  C\r\n  D");
+    }
+
+    #[test]
+    #[cfg(not(feature = "authentication"))]
+    fn test_write_formatted_response_indented_trailing_crlf() {
+        let io = MockIo::new();
+        let handler = MockHandler;
+        let mut shell: Shell<MockLevel, MockIo, MockHandler, DefaultConfig> =
+            Shell::new(&TEST_TREE, handler, io);
+
+        // Message ends with \r\n — must not produce a blank indented line at the end.
+        let response = crate::response::Response::<DefaultConfig>::success("A\r\nB\r\n")
+            .indented()
+            .without_postfix_newline();
+        shell.write_formatted_response(&response).unwrap();
+
+        assert_eq!(shell.io.get_output(), "  A\r\n  B");
     }
 
     #[test]
