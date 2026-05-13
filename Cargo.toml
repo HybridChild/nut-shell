@@ -1,6 +1,6 @@
 [workspace]
 members = ["macros"]
-exclude = ["examples/native", "examples/rp-pico", "examples/rp-pico-buildtime", "examples/stm32f072", "examples/stm32h753", "size-analysis/minimal"]
+exclude = ["examples/native", "examples/rp-pico", "examples/rp-pico-buildtime", "examples/stm32f072", "examples/stm32h753", "examples/stm32h753-embassy", "size-analysis/minimal"]
 resolver = "2"
 
 [package]
