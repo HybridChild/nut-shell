@@ -1,0 +1,49 @@
+[package]
+name = "stm32h753zi_examples"
+version = "0.1.0"
+edition = "2024"
+authors = ["Esben Dueholm Nørgaard"]
+
+[dependencies]
+# Nut-shell library (parent crate)
+nut-shell = { path = "../..", default-features = false }
+
+# Cortex-M support
+cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7"
+
+# STM32H7 HAL with USB OTG_HS support
+# stm32h753v includes revision_v (required for vos0 / 480 MHz) + rm0433
+stm32h7xx-hal = { version = "0.16", features = ["stm32h753v", "rt", "usb_hs"] }
+
+# USB stack — synopsys-usb-otg is a transitive dep of stm32h7xx-hal usb_hs;
+# usb-device and usbd-serial provide the device framework and CDC-ACM class.
+usb-device = "0.3"
+usbd-serial = "0.2"
+
+# Static allocation for USB bus (requires 'static lifetime)
+static_cell = "2.1"
+
+# Utilities
+heapless = "0.9"
+nb = "1.1"
+panic-halt = "1.0"
+
+[[bin]]
+name = "basic"
+path = "bin/basic/main.rs"
+
+[features]
+# Import features from nut-shell for pass-through
+authentication = ["nut-shell/authentication"]
+completion = ["nut-shell/completion"]
+history = ["nut-shell/history"]
+async = ["nut-shell/async"]
+
+# H753ZI has 1 MB RAM — enable completion and history by default
+default = ["completion", "history"]
+
+[profile.release]
+debug = true
+lto = true
+opt-level = "z"

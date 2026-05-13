@@ -136,7 +136,7 @@ fi
 
 # 9. Check example projects
 print_step "Checking example projects..."
-EXAMPLES=("native" "rp-pico" "stm32f072")
+EXAMPLES=("native" "rp-pico" "stm32f072" "stm32h753")
 for example in "${EXAMPLES[@]}"; do
     print_step "  Checking example: $example..."
     if (cd "examples/$example" && cargo check --all-features); then
