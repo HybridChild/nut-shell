@@ -1,7 +1,7 @@
-//! Shared library code for STM32 examples
+//! Shared library code for STM32F072 examples
 //!
 //! This module contains common implementations used across multiple
-//! STM32 examples to reduce code duplication.
+//! STM32F072 examples to reduce code duplication.
 
 #![no_std]
 
