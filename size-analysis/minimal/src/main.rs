@@ -3,8 +3,10 @@
 
 use core::fmt::Write;
 use nut_shell::config::MinimalConfig;
+use nut_shell::shell::cmdctx::CommandContext;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 use nut_shell::{CharIo, CliError, CommandHandler, Response, Shell};
+
 use panic_halt as _;
 
 // Minimal access level for testing
@@ -85,9 +87,9 @@ const ROOT: Directory<Level> = Directory {
 struct MinHandler;
 
 impl CommandHandler<MinimalConfig> for MinHandler {
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<MinimalConfig>, CliError> {
-        match id {
-            "status" => status_cmd::<MinimalConfig>(args),
+    fn execute_sync(&self, ctx: CommandContext) -> Result<Response<MinimalConfig>, CliError> {
+        match ctx.id {
+            "status" => status_cmd::<MinimalConfig>(ctx.args),
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -95,11 +97,10 @@ impl CommandHandler<MinimalConfig> for MinHandler {
     #[cfg(feature = "async")]
     async fn execute_async(
         &self,
-        id: &str,
-        args: &[&str],
+        ctx: CommandContext<'_>,
     ) -> Result<Response<MinimalConfig>, CliError> {
-        match id {
-            "info" => info_cmd::<MinimalConfig>(args).await,
+        match ctx.id {
+            "info" => info_cmd::<MinimalConfig>(ctx.args).await,
             _ => Err(CliError::CommandNotFound),
         }
     }

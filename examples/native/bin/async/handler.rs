@@ -2,21 +2,22 @@
 
 use core::fmt::Write;
 use nut_shell::{
-    CliError, config::DefaultConfig, response::Response, shell::handler::CommandHandler,
+    CliError, config::DefaultConfig, response::Response, shell::cmdctx::CommandContext,
+    shell::handler::CommandHandler,
 };
 use tokio::time::{Duration, sleep};
 
 pub struct AsyncHandler;
 
 impl CommandHandler<DefaultConfig> for AsyncHandler {
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
+    fn execute_sync(&self, ctx: CommandContext) -> Result<Response<DefaultConfig>, CliError> {
+        match ctx.id {
             "sync_echo" => {
-                if args.is_empty() {
+                if ctx.args.is_empty() {
                     Ok(Response::success(""))
                 } else {
                     let mut msg = heapless::String::<256>::new();
-                    for (i, arg) in args.iter().enumerate() {
+                    for (i, arg) in ctx.args.iter().enumerate() {
                         if i > 0 {
                             msg.push(' ').ok();
                         }
@@ -41,13 +42,12 @@ impl CommandHandler<DefaultConfig> for AsyncHandler {
     #[cfg(feature = "async")]
     async fn execute_async(
         &self,
-        id: &str,
-        args: &[&str],
+        ctx: CommandContext<'_>,
     ) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
+        match ctx.id {
             "async_delay" => {
                 // Parse delay duration
-                let seconds = args[0].parse::<u64>().map_err(|_| {
+                let seconds = ctx.args[0].parse::<u64>().map_err(|_| {
                     let mut expected = heapless::String::<32>::new();
                     expected.push_str("positive integer").ok();
                     CliError::InvalidArgumentFormat {
@@ -75,7 +75,7 @@ impl CommandHandler<DefaultConfig> for AsyncHandler {
                 Ok(Response::success(&msg).indented())
             }
             "async_fetch" => {
-                let url = args[0];
+                let url = ctx.args[0];
 
                 // Simulate async HTTP fetch
                 let mut msg = heapless::String::<256>::new();

@@ -2,7 +2,8 @@
 
 use core::fmt::Write;
 use nut_shell::{
-    CliError, config::ShellConfig, response::Response, shell::handler::CommandHandler,
+    CliError, config::ShellConfig, response::Response, shell::cmdctx::CommandContext,
+    shell::handler::CommandHandler,
 };
 use stm32_examples::{hw_commands, system_commands};
 
@@ -80,29 +81,29 @@ impl Stm32Handler {
 }
 
 impl<C: ShellConfig> CommandHandler<C> for Stm32Handler {
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
-        match id {
+    fn execute_sync(&self, ctx: CommandContext) -> Result<Response<C>, CliError> {
+        match ctx.id {
             "system_info" => self.system_info(),
             // System diagnostic commands
             "system_uptime" => self.uptime::<C>(), // Use local implementation with systick access
-            "system_meminfo" => system_commands::cmd_meminfo::<C>(args),
-            "system_benchmark" => system_commands::cmd_benchmark::<C>(args),
-            "system_flash" => system_commands::cmd_flash::<C>(args),
-            "system_crash" => system_commands::cmd_crash::<C>(args),
+            "system_meminfo" => system_commands::cmd_meminfo::<C>(ctx.args),
+            "system_benchmark" => system_commands::cmd_benchmark::<C>(ctx.args),
+            "system_flash" => system_commands::cmd_flash::<C>(ctx.args),
+            "system_crash" => system_commands::cmd_crash::<C>(ctx.args),
             // Hardware status commands
             "hw_temp" => self.temperature(),
-            "hw_chipid" => hw_commands::cmd_chipid::<C>(args),
-            "hw_clocks" => hw_commands::cmd_clocks::<C>(args),
-            "hw_core" => hw_commands::cmd_core::<C>(args),
-            "hw_bootreason" => hw_commands::cmd_bootreason::<C>(args),
+            "hw_chipid" => hw_commands::cmd_chipid::<C>(ctx.args),
+            "hw_clocks" => hw_commands::cmd_clocks::<C>(ctx.args),
+            "hw_core" => hw_commands::cmd_core::<C>(ctx.args),
+            "hw_bootreason" => hw_commands::cmd_bootreason::<C>(ctx.args),
             // Hardware control commands
-            "hw_led" => self.led_control(args),
+            "hw_led" => self.led_control(ctx.args),
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, _id: &str, _args: &[&str]) -> Result<Response<C>, CliError> {
+    async fn execute_async(&self, _ctx: CommandContext<'_>) -> Result<Response<C>, CliError> {
         // Basic example is synchronous-only, no async commands
         Err(CliError::CommandNotFound)
     }

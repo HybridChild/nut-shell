@@ -3,7 +3,8 @@
 use core::fmt::Write;
 use heapless;
 use nut_shell::{
-    CliError, config::DefaultConfig, response::Response, shell::handler::CommandHandler,
+    CliError, config::DefaultConfig, response::Response, shell::cmdctx::CommandContext,
+    shell::handler::CommandHandler,
 };
 use rp_pico_examples::{hw_commands, system_commands};
 
@@ -53,24 +54,24 @@ impl PicoHandler {
 }
 
 impl CommandHandler<DefaultConfig> for PicoHandler {
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
+    fn execute_sync(&self, ctx: CommandContext) -> Result<Response<DefaultConfig>, CliError> {
+        match ctx.id {
             "system_info" => self.system_info(),
             // System diagnostic commands
-            "system_uptime" => system_commands::cmd_uptime::<DefaultConfig>(args),
-            "system_meminfo" => system_commands::cmd_meminfo::<DefaultConfig>(args),
-            "system_benchmark" => system_commands::cmd_benchmark::<DefaultConfig>(args),
-            "system_flash" => system_commands::cmd_flash::<DefaultConfig>(args),
-            "system_crash" => system_commands::cmd_crash::<DefaultConfig>(args),
+            "system_uptime" => system_commands::cmd_uptime::<DefaultConfig>(ctx.args),
+            "system_meminfo" => system_commands::cmd_meminfo::<DefaultConfig>(ctx.args),
+            "system_benchmark" => system_commands::cmd_benchmark::<DefaultConfig>(ctx.args),
+            "system_flash" => system_commands::cmd_flash::<DefaultConfig>(ctx.args),
+            "system_crash" => system_commands::cmd_crash::<DefaultConfig>(ctx.args),
             // Hardware status commands
             "hw_temp" => self.temperature(),
-            "hw_chipid" => hw_commands::cmd_chipid::<DefaultConfig>(args),
-            "hw_clocks" => hw_commands::cmd_clocks::<DefaultConfig>(args),
-            "hw_core" => hw_commands::cmd_core::<DefaultConfig>(args),
-            "hw_bootreason" => hw_commands::cmd_bootreason::<DefaultConfig>(args),
-            "hw_gpio" => hw_commands::cmd_gpio::<DefaultConfig>(args),
+            "hw_chipid" => hw_commands::cmd_chipid::<DefaultConfig>(ctx.args),
+            "hw_clocks" => hw_commands::cmd_clocks::<DefaultConfig>(ctx.args),
+            "hw_core" => hw_commands::cmd_core::<DefaultConfig>(ctx.args),
+            "hw_bootreason" => hw_commands::cmd_bootreason::<DefaultConfig>(ctx.args),
+            "hw_gpio" => hw_commands::cmd_gpio::<DefaultConfig>(ctx.args),
             // Hardware control commands
-            "hw_led" => self.led_control(args),
+            "hw_led" => self.led_control(ctx.args),
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -78,8 +79,7 @@ impl CommandHandler<DefaultConfig> for PicoHandler {
     #[cfg(feature = "async")]
     async fn execute_async(
         &self,
-        _id: &str,
-        _args: &[&str],
+        _ctx: CommandContext<'_>,
     ) -> Result<Response<DefaultConfig>, CliError> {
         // basic example is synchronous-only, no async commands
         Err(CliError::CommandNotFound)

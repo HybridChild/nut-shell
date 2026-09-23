@@ -6,18 +6,19 @@
 use crate::config::ShellConfig;
 use crate::error::CliError;
 use crate::response::Response;
+use crate::shell::cmdctx::CommandContext;
 
 /// Command execution handler trait.
 /// Maps command IDs to execution functions (dispatches on unique ID, not display name).
 pub trait CommandHandler<C: ShellConfig> {
     /// Execute synchronous command by unique ID.
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
+    fn execute_sync(&self, ctx: CommandContext) -> Result<Response<C>, CliError>;
 
     /// Execute asynchronous command by unique ID (requires `async` feature).
     /// Uses `async fn` without Send bounds for both single and multi-threaded executors.
     #[cfg(feature = "async")]
     #[allow(async_fn_in_trait)]
-    async fn execute_async(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError>;
+    async fn execute_async(&self, ctx: CommandContext) -> Result<Response<C>, CliError>;
 }
 
 #[cfg(test)]
@@ -29,12 +30,8 @@ mod tests {
     struct TestHandler;
 
     impl CommandHandler<DefaultConfig> for TestHandler {
-        fn execute_sync(
-            &self,
-            id: &str,
-            _args: &[&str],
-        ) -> Result<Response<DefaultConfig>, CliError> {
-            match id {
+        fn execute_sync(&self, ctx: CommandContext) -> Result<Response<DefaultConfig>, CliError> {
+            match ctx.id {
                 "test" => Ok(Response::success("OK")),
                 _ => Err(CliError::CommandNotFound),
             }
@@ -43,10 +40,9 @@ mod tests {
         #[cfg(feature = "async")]
         async fn execute_async(
             &self,
-            id: &str,
-            _args: &[&str],
+            ctx: CommandContext<'_>,
         ) -> Result<Response<DefaultConfig>, CliError> {
-            match id {
+            match ctx.id {
                 "async-test" => Ok(Response::success("Async OK")),
                 _ => Err(CliError::CommandNotFound),
             }
@@ -56,11 +52,23 @@ mod tests {
     #[test]
     fn test_sync_handler() {
         let handler = TestHandler;
-        let result = handler.execute_sync("test", &[]);
+        let ctx = CommandContext::new(
+            "test",
+            &[],
+            #[cfg(feature = "context-path")]
+            &[],
+        );
+        let result = handler.execute_sync(ctx);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().message.as_str(), "OK");
 
-        let result = handler.execute_sync("unknown", &[]);
+        let ctx = CommandContext::new(
+            "unknown",
+            &[],
+            #[cfg(feature = "context-path")]
+            &[],
+        );
+        let result = handler.execute_sync(ctx);
         assert_eq!(result, Err(CliError::CommandNotFound));
     }
 
@@ -68,11 +76,23 @@ mod tests {
     #[tokio::test]
     async fn test_async_handler() {
         let handler = TestHandler;
-        let result = handler.execute_async("async-test", &[]).await;
+        let ctx = CommandContext::new(
+            "async-test",
+            &[],
+            #[cfg(feature = "context-path")]
+            &[],
+        );
+        let result = handler.execute_async(ctx).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().message.as_str(), "Async OK");
 
-        let result = handler.execute_async("unknown", &[]).await;
+        let ctx = CommandContext::new(
+            "unknown",
+            &[],
+            #[cfg(feature = "context-path")]
+            &[],
+        );
+        let result = handler.execute_async(ctx).await;
         assert_eq!(result, Err(CliError::CommandNotFound));
     }
 }

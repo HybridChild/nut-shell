@@ -8,6 +8,8 @@
 mod helpers;
 
 // Imports used in feature-gated tests
+#[cfg(all(feature = "context-path"))]
+use helpers::fixtures::TEST_TREE_CTXPATH;
 #[allow(unused_imports)]
 use helpers::fixtures::{MockAccessLevel, MockHandler, MockIo, TEST_TREE};
 #[allow(unused_imports)]
@@ -391,4 +393,26 @@ async fn test_async_command_with_arguments() {
 
     let output = shell.io_mut().output();
     assert!(output.contains("Waited 250ms"));
+}
+
+// ============================================================================
+// context-path Execution Tests (requires context-path feature)
+// ============================================================================
+
+#[test]
+#[cfg(all(feature = "context-path"))]
+fn test_context_path() {
+    let io = MockIo::new();
+    let handler = MockHandler;
+    let mut shell = Shell::new(&TEST_TREE_CTXPATH, handler, io);
+    shell.activate().unwrap();
+    shell.io_mut().clear_output();
+
+    helpers::execute_command(&mut shell, "dir1");
+    helpers::execute_command(&mut shell, "dir2");
+    helpers::execute_command(&mut shell, "showpath");
+
+    let output = shell.io_mut().output();
+    assert!(output.contains("Current Path Array: [\"dir1\", \"dir2\"]"));
+    assert!(output.contains("Current Path With Seperator: \"/dir1/dir2\""));
 }

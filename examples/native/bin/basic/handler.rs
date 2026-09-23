@@ -2,14 +2,15 @@
 
 use core::fmt::Write;
 use nut_shell::{
-    CliError, config::DefaultConfig, response::Response, shell::handler::CommandHandler,
+    CliError, config::DefaultConfig, response::Response, shell::cmdctx::CommandContext,
+    shell::handler::CommandHandler,
 };
 
 pub struct ExampleHandler;
 
 impl CommandHandler<DefaultConfig> for ExampleHandler {
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
+    fn execute_sync(&self, ctx: CommandContext) -> Result<Response<DefaultConfig>, CliError> {
+        match ctx.id {
             "system_reboot" => Ok(Response::success("System rebooting...\r\nGoodbye!").indented()),
             "system_status" => {
                 let mut msg = heapless::String::<256>::new();
@@ -24,24 +25,24 @@ impl CommandHandler<DefaultConfig> for ExampleHandler {
             )
             .indented()),
             "config_get" => {
-                let key = args[0];
+                let key = ctx.args[0];
                 let mut msg = heapless::String::<256>::new();
                 write!(msg, "Config[{}] = <simulated value>", key).ok();
                 Ok(Response::success(&msg).indented())
             }
             "config_set" => {
-                let key = args[0];
-                let value = args[1];
+                let key = ctx.args[0];
+                let value = ctx.args[1];
                 let mut msg = heapless::String::<256>::new();
                 write!(msg, "Config[{}] set to '{}'", key, value).ok();
                 Ok(Response::success(&msg).indented())
             }
             "echo" => {
-                if args.is_empty() {
+                if ctx.args.is_empty() {
                     Ok(Response::success(""))
                 } else {
                     let mut msg = heapless::String::<256>::new();
-                    for (i, arg) in args.iter().enumerate() {
+                    for (i, arg) in ctx.args.iter().enumerate() {
                         if i > 0 {
                             msg.push(' ').ok();
                         }
@@ -58,12 +59,16 @@ impl CommandHandler<DefaultConfig> for ExampleHandler {
     #[cfg(feature = "async")]
     async fn execute_async(
         &self,
-        id: &str,
-        _args: &[&str],
+        ctx: CommandContext<'_>,
     ) -> Result<Response<DefaultConfig>, CliError> {
         // This example doesn't use async commands
         let mut msg = heapless::String::<128>::new();
-        write!(msg, "Async command '{}' not supported in this example", id).ok();
+        write!(
+            msg,
+            "Async command '{}' not supported in this example",
+            ctx.id
+        )
+        .ok();
         Err(CliError::Other(msg))
     }
 }

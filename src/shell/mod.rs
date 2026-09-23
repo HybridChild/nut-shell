@@ -9,6 +9,7 @@ use crate::config::ShellConfig;
 use crate::error::CliError;
 use crate::io::CharIo;
 use crate::response::Response;
+use crate::shell::cmdctx::CommandContext;
 use crate::tree::{CommandKind, Directory, Node};
 use core::marker::PhantomData;
 
@@ -16,6 +17,7 @@ use core::marker::PhantomData;
 use crate::tree::completion::suggest_completions;
 
 // Sub-modules
+pub mod cmdctx;
 pub mod decoder;
 pub mod handler;
 pub mod history;
@@ -767,6 +769,59 @@ where
         }
     }
 
+    /// Extract the path into a vector we can pass back to the handler
+    ///
+    /// After converting the result with .as_slice(), at the root directory this will return []
+    /// At a subdirectory it will return something similar to ["dir1", "dir2"]
+    /// This allows for the use of the same directory in multiple locations within the command tree
+    pub fn get_path_vec(
+        &'tree self,
+        path: &heapless::Vec<usize, 8>,
+    ) -> Result<heapless::Vec<&'tree str, 8>, CliError> {
+        let mut result: heapless::Vec<&str, 8> = heapless::Vec::new();
+        let mut current = self.tree;
+
+        for &index in path.iter() {
+            match current.children.get(index) {
+                Some(Node::Directory(dir)) => {
+                    result.push(dir.name).map_err(|_| CliError::InvalidPath)?;
+                    current = dir;
+                }
+                Some(Node::Command(_)) | None => {
+                    return Err(CliError::InvalidPath);
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    /// Extract the path into a vector we can pass back to the handler
+    ///
+    /// At the root directory this will return []
+    /// At a subdirectory it will return something similar to ["dir1", "dir2"]
+    /// This allows for the use of the same directory in multiple locations within the command tree
+    #[cfg(feature = "context-path")]
+    fn get_path_arr<'a>(
+        &'a self,
+        path: &heapless::Vec<usize, 8>,
+    ) -> Result<heapless::Vec<&'a str, 8>, CliError> {
+        let mut result = heapless::Vec::new();
+        let mut current = self.tree;
+
+        for &index in path.iter() {
+            match current.children.get(index) {
+                Some(Node::Directory(dir)) => {
+                    result.push(dir.name).map_err(|_| CliError::InvalidPath)?;
+                    current = dir;
+                }
+                Some(Node::Command(_)) | None => {
+                    return Err(CliError::InvalidPath);
+                }
+            }
+        }
+        Ok(result)
+    }
+
     /// Execute a tree path (navigation or command execution).
     ///
     /// Resolves the path and either:
@@ -829,8 +884,17 @@ where
                 // Dispatch to command handler
                 match cmd_meta.kind {
                     CommandKind::Sync => {
+                        #[cfg(feature = "context-path")]
+                        let path_arr = self.get_path_arr(&new_path).unwrap();
+
                         // Execute synchronous tree command (dispatch by unique ID)
-                        self.handler.execute_sync(cmd_meta.id, args)
+                        let ctx = CommandContext::new(
+                            cmd_meta.id,
+                            args,
+                            #[cfg(feature = "context-path")]
+                            path_arr.as_slice(),
+                        );
+                        self.handler.execute_sync(ctx)
                     }
                     #[cfg(feature = "async")]
                     CommandKind::Async => {
@@ -908,12 +972,30 @@ where
                 // Dispatch to command handler (handle both sync and async)
                 match cmd_meta.kind {
                     CommandKind::Sync => {
+                        #[cfg(feature = "context-path")]
+                        let path_arr = self.get_path_arr(&new_path).unwrap();
+
                         // Sync command in async context - call directly
-                        self.handler.execute_sync(cmd_meta.id, args)
+                        let ctx = CommandContext::new(
+                            cmd_meta.id,
+                            args,
+                            #[cfg(feature = "context-path")]
+                            path_arr.as_slice(),
+                        );
+                        self.handler.execute_sync(ctx)
                     }
                     CommandKind::Async => {
+                        #[cfg(feature = "context-path")]
+                        let path_arr = self.get_path_arr(&new_path).unwrap();
+
                         // Async command - await execution
-                        self.handler.execute_async(cmd_meta.id, args).await
+                        let ctx = CommandContext::new(
+                            cmd_meta.id,
+                            args,
+                            #[cfg(feature = "context-path")]
+                            path_arr.as_slice(),
+                        );
+                        self.handler.execute_async(ctx).await
                     }
                 }
             }
@@ -1283,8 +1365,7 @@ mod tests {
     impl CommandHandler<DefaultConfig> for MockHandler {
         fn execute_sync(
             &self,
-            _id: &str,
-            _args: &[&str],
+            _ctx: CommandContext,
         ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
             Err(crate::error::CliError::CommandNotFound)
         }
@@ -1292,8 +1373,7 @@ mod tests {
         #[cfg(feature = "async")]
         async fn execute_async(
             &self,
-            _id: &str,
-            _args: &[&str],
+            _ctx: CommandContext<'_>,
         ) -> Result<crate::response::Response<DefaultConfig>, crate::error::CliError> {
             Err(crate::error::CliError::CommandNotFound)
         }

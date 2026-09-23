@@ -3,7 +3,7 @@
 use core::fmt::Write;
 use embassy_time::Instant;
 use nut_shell::{
-    CliError, config::ShellConfig, response::Response, shell::handler::CommandHandler,
+    CliError, config::ShellConfig, response::Response, shell::handler::CommandHandler, shell::cmdctx::CommandContext,
 };
 use stm32h753zi_embassy_examples::{hw_commands, system_commands};
 
@@ -94,25 +94,25 @@ impl H753Handler {
 }
 
 impl<C: ShellConfig> CommandHandler<C> for H753Handler {
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<C>, CliError> {
-        match id {
+    fn execute_sync(&self, ctx: CommandContext) -> Result<Response<C>, CliError> {
+        match ctx.id {
             "system_info" => self.system_info(),
             "system_uptime" => self.uptime::<C>(),
-            "system_meminfo" => system_commands::cmd_meminfo::<C>(args),
-            "system_benchmark" => system_commands::cmd_benchmark::<C>(args),
-            "system_flash" => system_commands::cmd_flash::<C>(args),
-            "system_crash" => system_commands::cmd_crash::<C>(args),
-            "hw_chipid" => hw_commands::cmd_chipid::<C>(args),
-            "hw_clocks" => hw_commands::cmd_clocks::<C>(args),
-            "hw_core" => hw_commands::cmd_core::<C>(args),
-            "hw_bootreason" => hw_commands::cmd_bootreason::<C>(args),
-            "hw_led" => self.led_control(args),
+            "system_meminfo" => system_commands::cmd_meminfo::<C>(ctx.args),
+            "system_benchmark" => system_commands::cmd_benchmark::<C>(ctx.args),
+            "system_flash" => system_commands::cmd_flash::<C>(ctx.args),
+            "system_crash" => system_commands::cmd_crash::<C>(ctx.args),
+            "hw_chipid" => hw_commands::cmd_chipid::<C>(ctx.args),
+            "hw_clocks" => hw_commands::cmd_clocks::<C>(ctx.args),
+            "hw_core" => hw_commands::cmd_core::<C>(ctx.args),
+            "hw_bootreason" => hw_commands::cmd_bootreason::<C>(ctx.args),
+            "hw_led" => self.led_control(ctx.args),
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     #[cfg(feature = "async")]
-    async fn execute_async(&self, _id: &str, _args: &[&str]) -> Result<Response<C>, CliError> {
+    async fn execute_async(&self, _ctx: CommandContext<'_>) -> Result<Response<C>, CliError> {
         Err(CliError::CommandNotFound)
     }
 }

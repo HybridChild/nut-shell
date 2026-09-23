@@ -8,11 +8,14 @@
 
 #![allow(dead_code)]
 
+#[cfg(all(feature = "context-path"))]
+use core::fmt::Write;
 use heapless::{Deque, String as HString, Vec as HVec};
 use nut_shell::CharIo;
 use nut_shell::config::DefaultConfig;
 use nut_shell::error::CliError;
 use nut_shell::response::Response;
+use nut_shell::shell::cmdctx::CommandContext;
 use nut_shell::shell::handler::CommandHandler;
 use nut_shell::tree::{CommandKind, CommandMeta, Directory, Node};
 use nut_shell_macros::AccessLevel;
@@ -491,15 +494,15 @@ fn format_msg(parts: &[&str]) -> HString<256> {
 }
 
 impl CommandHandler<DefaultConfig> for MockHandler {
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
+    fn execute_sync(&self, ctx: CommandContext) -> Result<Response<DefaultConfig>, CliError> {
+        match ctx.id {
             // Root commands
             "help" => Ok(Response::success("Help text here")),
             "echo" => {
-                if args.is_empty() {
+                if ctx.args.is_empty() {
                     Ok(Response::success(""))
                 } else {
-                    let msg = join_args(args);
+                    let msg = join_args(ctx.args);
                     Ok(Response::success(&msg))
                 }
             }
@@ -511,20 +514,20 @@ impl CommandHandler<DefaultConfig> for MockHandler {
             // Network commands (system/network/)
             "net_status" => Ok(Response::success("Network OK")),
             "net_config" => {
-                let params = join_args(args);
+                let params = join_args(ctx.args);
                 let msg = format_msg(&["Network configured: ", &params]);
                 Ok(Response::success(&msg))
             }
             "net_ping" => {
-                let host = args.first().unwrap_or(&"localhost");
-                let count = args.get(1).unwrap_or(&"4");
+                let host = ctx.args.first().unwrap_or(&"localhost");
+                let count = ctx.args.get(1).unwrap_or(&"4");
                 let msg = format_msg(&["Pinging ", host, " (", count, " times)"]);
                 Ok(Response::success(&msg))
             }
 
             // Hardware commands (system/hardware/)
             "hw_led" => {
-                let state = args.first().unwrap_or(&"off");
+                let state = ctx.args.first().unwrap_or(&"off");
                 let msg = format_msg(&["LED: ", state]);
                 Ok(Response::success(&msg))
             }
@@ -532,16 +535,16 @@ impl CommandHandler<DefaultConfig> for MockHandler {
 
             // Debug commands
             "debug_mem" => {
-                if args.is_empty() {
+                if ctx.args.is_empty() {
                     Ok(Response::success("Memory dump (full)"))
                 } else {
-                    let addr = join_args(args);
+                    let addr = join_args(ctx.args);
                     let msg = format_msg(&["Memory at ", &addr]);
                     Ok(Response::success(&msg))
                 }
             }
             "debug_reg" => {
-                let reg = args.first().unwrap_or(&"0x00");
+                let reg = ctx.args.first().unwrap_or(&"0x00");
                 let msg = format_msg(&["Register ", reg, ": 0x1234"]);
                 Ok(Response::success(&msg))
             }
@@ -561,6 +564,19 @@ impl CommandHandler<DefaultConfig> for MockHandler {
                 .indented()
                 .without_prompt()),
 
+            // context-path commands
+            #[cfg(all(feature = "context-path"))]
+            "shared_showpath" => {
+                let mut msg = heapless::String::<256>::new();
+                write!(msg, "Current Path Array: {:?}\r\n", ctx.path).ok();
+                write!(
+                    msg,
+                    "Current Path With Seperator: {:?}\r\n",
+                    ctx.get_path_withsep().unwrap()
+                )
+                .ok();
+                Ok(Response::success(&msg).indented())
+            }
             _ => Err(CliError::CommandNotFound),
         }
     }
@@ -568,13 +584,13 @@ impl CommandHandler<DefaultConfig> for MockHandler {
     #[cfg(feature = "async")]
     async fn execute_async(
         &self,
-        id: &str,
-        args: &[&str],
+        ctx: CommandContext<'_>,
     ) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
+        match ctx.id {
             "async-wait" => {
                 // Simulate async operation
-                let duration = args
+                let duration = ctx
+                    .args
                     .first()
                     .and_then(|s| s.parse::<u32>().ok())
                     .unwrap_or(100);
@@ -763,3 +779,35 @@ mod tests {
         }
     }
 }
+
+// =============================================================================
+// Test Tree for context-path
+// =============================================================================
+
+pub const CMD_SHOWPATH: CommandMeta<MockAccessLevel> = CommandMeta {
+    id: "shared_showpath",
+    name: "showpath",
+    description: "Show the path of the current command",
+    access_level: MockAccessLevel::User,
+    kind: CommandKind::Sync,
+    min_args: 0,
+    max_args: 0,
+};
+
+const DIR2_DIR: Directory<MockAccessLevel> = Directory {
+    name: "dir2",
+    children: &[Node::Command(&CMD_SHOWPATH)],
+    access_level: MockAccessLevel::User,
+};
+
+const DIR1_DIR: Directory<MockAccessLevel> = Directory {
+    name: "dir1",
+    children: &[Node::Directory(&DIR2_DIR)],
+    access_level: MockAccessLevel::User,
+};
+
+pub const TEST_TREE_CTXPATH: Directory<MockAccessLevel> = Directory {
+    name: "/",
+    children: &[Node::Directory(&DIR1_DIR)],
+    access_level: MockAccessLevel::User,
+};

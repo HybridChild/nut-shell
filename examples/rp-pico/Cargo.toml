@@ -68,6 +68,7 @@ authentication = ["nut-shell/authentication"]
 completion = ["nut-shell/completion"]
 history = ["nut-shell/history"]
 async = ["nut-shell/async"]
+context-path = ["nut-shell/context-path"]
 
 default = ["completion", "history"]
 

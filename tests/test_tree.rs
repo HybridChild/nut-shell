@@ -7,6 +7,7 @@
 #[path = "fixtures/mod.rs"]
 mod fixtures;
 use fixtures::{MockAccessLevel, MockHandler, TEST_TREE};
+use nut_shell::shell::cmdctx::CommandContext;
 use nut_shell::shell::handler::CommandHandler;
 use nut_shell::tree::{CommandKind, Node};
 
@@ -27,7 +28,13 @@ fn test_metadata_matches_handler() {
         assert_eq!(cmd.name, "help");
         assert_eq!(cmd.kind, CommandKind::Sync);
         // Verify handler exists
-        assert!(handler.execute_sync("help", &[]).is_ok());
+        let ctx = CommandContext::new(
+            "help",
+            &[],
+            #[cfg(feature = "context-path")]
+            &[],
+        );
+        assert!(handler.execute_sync(ctx).is_ok());
     } else {
         panic!("help command not found in TEST_TREE");
     }
@@ -36,7 +43,13 @@ fn test_metadata_matches_handler() {
         assert_eq!(cmd.name, "echo");
         assert_eq!(cmd.kind, CommandKind::Sync);
         // Verify handler exists
-        assert!(handler.execute_sync("echo", &[]).is_ok());
+        let ctx = CommandContext::new(
+            "echo",
+            &[],
+            #[cfg(feature = "context-path")]
+            &[],
+        );
+        assert!(handler.execute_sync(ctx).is_ok());
     } else {
         panic!("echo command not found in TEST_TREE");
     }
@@ -82,19 +95,37 @@ async fn test_async_command_execution() {
     let handler = MockHandler;
 
     // Test async-wait with no args
-    let result = handler.execute_async("async-wait", &[]).await;
+    let ctx = CommandContext::new(
+        "async-wait",
+        &[],
+        #[cfg(feature = "context-path")]
+        &[],
+    );
+    let result = handler.execute_async(ctx).await;
     assert!(result.is_ok());
     let response = result.unwrap();
     assert!(response.message.as_str().contains("Waited 100ms"));
 
     // Test async-wait with custom duration
-    let result = handler.execute_async("async-wait", &["250"]).await;
+    let ctx = CommandContext::new(
+        "async-wait",
+        &["250"],
+        #[cfg(feature = "context-path")]
+        &[],
+    );
+    let result = handler.execute_async(ctx).await;
     assert!(result.is_ok());
     let response = result.unwrap();
     assert!(response.message.as_str().contains("Waited 250ms"));
 
     // Test unknown async command
-    let result = handler.execute_async("unknown-async", &[]).await;
+    let ctx = CommandContext::new(
+        "unknown-async",
+        &[],
+        #[cfg(feature = "context-path")]
+        &[],
+    );
+    let result = handler.execute_async(ctx).await;
     assert_eq!(result, Err(CliError::CommandNotFound));
 }
 

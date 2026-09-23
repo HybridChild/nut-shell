@@ -24,6 +24,7 @@ authentication = ["nut-shell/authentication"]
 completion = ["nut-shell/completion"]
 history = ["nut-shell/history"]
 async = ["nut-shell/async"]
+context-path = ["nut-shell/context-path"]
 
 default = ["completion", "history"]
 
@@ -35,6 +36,11 @@ path = "bin/basic/main.rs"
 name = "async"
 path = "bin/async/main.rs"
 required-features = ["async"]
+
+[[bin]]
+name = "context-path"
+path = "bin/context-path/main.rs"
+required-features = ["context-path"]
 
 [profile.release]
 debug = true

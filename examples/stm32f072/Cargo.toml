@@ -35,6 +35,7 @@ authentication = ["nut-shell/authentication"]
 completion = ["nut-shell/completion"]
 history = ["nut-shell/history"]
 async = ["nut-shell/async"]
+context-path = ["nut-shell/context-path"]
 
 # Minimal default features for STM32F072's limited RAM (16KB)
 # Completion and history can cause stack overflow on constrained devices

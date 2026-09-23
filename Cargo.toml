@@ -53,6 +53,9 @@ history = []
 # Async command support - enables async command execution
 async = []
 
+# Include the command path in the handler context
+context-path = []
+
 # Credential generator binary (std-only, requires authentication)
 credgen = ["authentication", "dep:serde", "dep:toml", "dep:getrandom"]
 

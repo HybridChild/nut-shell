@@ -39,6 +39,7 @@ authentication = ["nut-shell/authentication"]
 completion = ["nut-shell/completion"]
 history = ["nut-shell/history"]
 async = ["nut-shell/async"]
+context-path = ["nut-shell/context-path"]
 
 # H753ZI has 1 MB RAM — enable completion and history by default
 default = ["completion", "history"]

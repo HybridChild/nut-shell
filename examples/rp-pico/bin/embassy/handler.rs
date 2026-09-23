@@ -6,7 +6,8 @@ use embassy_sync::channel::Channel;
 use embassy_time::{Duration, Timer};
 use heapless;
 use nut_shell::{
-    CliError, config::DefaultConfig, response::Response, shell::handler::CommandHandler,
+    CliError, config::DefaultConfig, response::Response, shell::cmdctx::CommandContext,
+    shell::handler::CommandHandler,
 };
 use rp_pico_examples::{hw_commands, system_commands};
 
@@ -63,37 +64,36 @@ impl PicoHandler {
 }
 
 impl CommandHandler<DefaultConfig> for PicoHandler {
-    fn execute_sync(&self, id: &str, args: &[&str]) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
+    fn execute_sync(&self, ctx: CommandContext) -> Result<Response<DefaultConfig>, CliError> {
+        match ctx.id {
             "system_info" => self.system_info(),
             // System diagnostic commands
-            "system_uptime" => system_commands::cmd_uptime::<DefaultConfig>(args),
-            "system_meminfo" => system_commands::cmd_meminfo::<DefaultConfig>(args),
-            "system_benchmark" => system_commands::cmd_benchmark::<DefaultConfig>(args),
-            "system_flash" => system_commands::cmd_flash::<DefaultConfig>(args),
-            "system_crash" => system_commands::cmd_crash::<DefaultConfig>(args),
+            "system_uptime" => system_commands::cmd_uptime::<DefaultConfig>(ctx.args),
+            "system_meminfo" => system_commands::cmd_meminfo::<DefaultConfig>(ctx.args),
+            "system_benchmark" => system_commands::cmd_benchmark::<DefaultConfig>(ctx.args),
+            "system_flash" => system_commands::cmd_flash::<DefaultConfig>(ctx.args),
+            "system_crash" => system_commands::cmd_crash::<DefaultConfig>(ctx.args),
             // Hardware status commands
             "hw_temp" => self.temperature(),
-            "hw_chipid" => hw_commands::cmd_chipid::<DefaultConfig>(args),
-            "hw_clocks" => hw_commands::cmd_clocks::<DefaultConfig>(args),
-            "hw_core" => hw_commands::cmd_core::<DefaultConfig>(args),
-            "hw_bootreason" => hw_commands::cmd_bootreason::<DefaultConfig>(args),
-            "hw_gpio" => hw_commands::cmd_gpio::<DefaultConfig>(args),
+            "hw_chipid" => hw_commands::cmd_chipid::<DefaultConfig>(ctx.args),
+            "hw_clocks" => hw_commands::cmd_clocks::<DefaultConfig>(ctx.args),
+            "hw_core" => hw_commands::cmd_core::<DefaultConfig>(ctx.args),
+            "hw_bootreason" => hw_commands::cmd_bootreason::<DefaultConfig>(ctx.args),
+            "hw_gpio" => hw_commands::cmd_gpio::<DefaultConfig>(ctx.args),
             // Hardware control commands
-            "led" => self.signal_led(args),
+            "led" => self.signal_led(ctx.args),
             _ => Err(CliError::CommandNotFound),
         }
     }
 
     async fn execute_async(
         &self,
-        id: &str,
-        args: &[&str],
+        ctx: CommandContext<'_>,
     ) -> Result<Response<DefaultConfig>, CliError> {
-        match id {
+        match ctx.id {
             "system_delay" => {
                 // Parse delay duration
-                let seconds = args[0].parse::<u64>().map_err(|_| {
+                let seconds = ctx.args[0].parse::<u64>().map_err(|_| {
                     let mut expected = heapless::String::<32>::new();
                     expected.push_str("positive integer").ok();
                     CliError::InvalidArgumentFormat {
